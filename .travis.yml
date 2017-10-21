@@ -12,6 +12,8 @@ before_install:
   - sudo apt-get -qq update
   - sudo apt-get install -y libeigen3-dev
 install:
+  # make links to headers (ugly hack)
+  - sudo ln -s /usr/include/eigen3/unsupported /usr/local/include/unsupported
   - sudo ln -s /usr/include/eigen3/Eigen /usr/local/include/Eigen
 script:
   - mkdir Debug
