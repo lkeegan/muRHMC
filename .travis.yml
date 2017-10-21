@@ -1,0 +1,24 @@
+dist: trusty
+sudo: required
+notifications:
+  email: false
+language:
+  - cpp
+compiler:
+  - gcc
+  - clang
+before_install:
+  # install eigen library
+  - sudo apt-get -qq update
+  - sudo apt-get install -y libeigen3-dev
+install:
+  - sudo ln -s /usr/include/eigen3/Eigen /usr/local/include/Eigen
+script:
+  - mkdir Debug
+  - cd Debug
+  - cmake -DCMAKE_BUILD_TYPE=Debug .. && make -j 2
+  - cd ../
+  - mkdir Release
+  - cd Release
+  - cmake -DCMAKE_BUILD_TYPE=Release .. && make -j 2
+  - cd ../
