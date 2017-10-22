@@ -1,4 +1,5 @@
 #include "dirac_op.hpp"
+#include "omp.h"
 #include <iostream> //FOR DEBUGGING
 
 dirac_op::dirac_op (const lattice& grid) : grid(grid), eta(grid) {
@@ -29,6 +30,8 @@ void dirac_op::gamma5 (field<fermion>& phi) const {
 }
 
 void dirac_op::D (field<fermion> &lhs, const field<fermion> &rhs, const field<gauge>& U, double m) const {
+	// default static scheduling, with N threads, split loop into N chunks, one per thread 
+	#pragma omp parallel for
 	for(int ix=0; ix<rhs.V; ++ix) {
 		lhs[ix] = m * rhs[ix];
 		for(int mu=0; mu<4; ++mu) {

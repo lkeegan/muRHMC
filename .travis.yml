@@ -16,6 +16,7 @@ install:
   - sudo ln -s /usr/include/eigen3/unsupported /usr/local/include/unsupported
   - sudo ln -s /usr/include/eigen3/Eigen /usr/local/include/Eigen
 script:
+  - export OMP_NUM_THREADS=4
   - mkdir Debug
   - cd Debug
   - cmake -DCMAKE_BUILD_TYPE=Debug .. && make -j 2
