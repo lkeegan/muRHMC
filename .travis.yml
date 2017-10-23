@@ -6,17 +6,17 @@ language:
   - cpp
 compiler:
   - gcc
-  - clang
+  # - clang
 before_install:
   # install eigen library
   - sudo apt-get -qq update
   - sudo apt-get install -y libeigen3-dev
 install:
   # make links to headers (ugly hack)
-  - sudo ln -s /usr/include/eigen3/unsupported /usr/local/include/unsupported
-  - sudo ln -s /usr/include/eigen3/Eigen /usr/local/include/Eigen
+  #- sudo ln -s /usr/include/eigen3/unsupported /usr/local/include/unsupported
+  #- sudo ln -s /usr/include/eigen3/Eigen /usr/local/include/Eigen
 script:
-  - export OMP_NUM_THREADS=4
+  - export OMP_NUM_THREADS=2
   - mkdir Debug
   - cd Debug
   - cmake -DCMAKE_BUILD_TYPE=Debug .. && make -j 2
