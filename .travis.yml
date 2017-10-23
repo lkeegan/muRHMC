@@ -9,12 +9,22 @@ compiler:
   # - clang
 before_install:
   # install eigen library
-  - sudo apt-get -qq update
-  - sudo apt-get install -y libeigen3-dev
+  #- sudo apt-get -qq update
+  #- sudo apt-get install -y libeigen3-dev
 install:
-  # make links to eigen headers (ugly hack)
-  - sudo ln -s /usr/include/eigen3/unsupported /usr/local/include/unsupported
-  - sudo ln -s /usr/include/eigen3/Eigen /usr/local/include/Eigen
+  # install eigen3 library
+  - wget https://bitbucket.org/eigen/eigen/get/default.tar.gz
+  - tar zxf default.tar.gz
+  - cd eigen-eigen-*
+  - mkdir Build
+  - cd Build
+  - cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
+  - make
+  - sudo make install
+  - cd ../..
+
+#  - sudo ln -s /usr/include/eigen3/unsupported /usr/local/include/unsupported
+#  - sudo ln -s /usr/include/eigen3/Eigen /usr/local/include/Eigen
 script:
   - export OMP_NUM_THREADS=2
   - mkdir Debug
