@@ -8,9 +8,9 @@ compiler:
   - gcc
   # - clang
 before_install:
-  # install eigen library
+  # install something:
   #- sudo apt-get -qq update
-  #- sudo apt-get install -y libeigen3-dev
+  #- sudo apt-get install -y [PACKAGE_NAME]
 install:
   # install eigen3 library
   - wget https://bitbucket.org/eigen/eigen/get/default.tar.gz
@@ -23,8 +23,6 @@ install:
   - sudo make install
   - cd ../..
 
-#  - sudo ln -s /usr/include/eigen3/unsupported /usr/local/include/unsupported
-#  - sudo ln -s /usr/include/eigen3/Eigen /usr/local/include/Eigen
 script:
   - export OMP_NUM_THREADS=2
   - mkdir Debug

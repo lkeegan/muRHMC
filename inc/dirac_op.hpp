@@ -24,21 +24,32 @@ private:
 public:
 	const lattice& grid;
 	field<gamma_matrices> eta;
+	bool ANTI_PERIODIC_BCS = true;
+	double mu_I = 0.0; //isospin chemical potential
 
 	explicit dirac_op (const lattice& grid);
 
 	// Applies staggered gamma_5 operator to fermion field (in place).
-	void gamma5 (field<fermion> &phi) const;
+	void gamma5 (field<fermion>& phi) const;
+
+	// Give timelike gauge links or force links at x_0=L0-1 boundary a minus sign
+	// If called before and after applying Dirac op, or calculating fermionic force term,
+	// this gives antiperiodic bcs in time direction to the fermions
+	void apbs_in_time (field<gauge>& U) const;
 
 	// Staggered massive Dirac operator D: lhs = D(rhs)
-	void D (field<fermion> &lhs, const field<fermion> &rhs, const field<gauge>& U, double m) const;
+	void D (field<fermion>& lhs, const field<fermion>& rhs, field<gauge>& U, double m) const;
 
 	// Hermitian Dirac operator squared: (D+m)(D+m)^\dagger == (g5 D) (g5 D) + m^2
-	void DDdagger (field<fermion> &lhs, const field<fermion> &rhs, const field<gauge>& U, double m) const;
+	void DDdagger (field<fermion>& lhs, const field<fermion>& rhs, field<gauge>& U, double m) const;
 
 	// CG inversion of (g5 D g5 D + m^2) x = b: given b solves for x
 	// returns number of times Dirac operator was called
-	int cg(field<fermion>& x, const field<fermion>& b, const field<gauge>& U, double m, double eps) const;
+	int cg(field<fermion>& x, const field<fermion>& b, field<gauge>& U, double m, double eps) const;
+
+	// CG multishift inversion of (g5 D g5 D + m_a^2) x_a = b: given b solves for x_a for each shift m_a
+	// returns number of times Dirac operator was called: should be the same as for CG inversion of smallest m_a
+	int cg_multishift(std::vector<field<fermion>>& x, const field<fermion>& b, field<gauge>& U, std::vector<double>& m, double eps) const;
 };
  
 #endif //LATTICE_DIRAC_OP_H

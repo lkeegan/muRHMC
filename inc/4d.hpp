@@ -3,6 +3,7 @@
 
 #include<vector>
 #include<complex>
+#include "omp.h"
 
 // 4d lattice with pbcs
 // pair of integer vectors store indices of nearest up/dn neighbours
@@ -18,6 +19,7 @@ public:
 	int L2;
 	int L3;
 	int V;
+	int VOL3;
 
 	// constructor for L0xL1xL2xL3 lattice
 	lattice (int L0, int L1, int L2, int L3);
@@ -35,6 +37,11 @@ public:
 	int iup (int i, int mu) const { return neighbours_up_[4*i+mu]; }
 	int idn (int i, int mu) const { return neighbours_dn_[4*i+mu]; }
 
+	// returns 4-index i in [0, V) corresponding to the point (x0, ix) 
+	// where ix is a point in the spatial volume [0, VOL3)
+	// and x0 is the timeslice in [0, L0)
+	int it_ix (int x0, int ix) const { return x0 + L0 * ix; }
+
 };
 
 template<typename T> class field {
@@ -44,15 +51,15 @@ protected:
 
 public:
 	const lattice& grid;
-	int V;
-	explicit field (const lattice& latt) : grid(latt), V(latt.V) { data_.resize(V); }
+	int V, VOL3, L0;
+	explicit field (const lattice& latt) : grid(latt), V(latt.V), VOL3(latt.VOL3), L0(latt.L0) { data_.resize(V); }
 
 	// assignment op just copies data, no check that lattices are consistent - TODO 
 	field& operator=(const field& rhs) {
 		for(int ix=0; ix<V; ++ix) {
 			data_[ix] = rhs[ix];
 		}
-		return *this;	 
+		return *this;
 	}
 
 	field& operator+=(const field& rhs)
@@ -105,6 +112,15 @@ public:
 	// *this = scale * (*this) + rhs_multiplier * rhs
 	field& scale_add(double scale, double rhs_multiplier, field& rhs)
 	{
+		#pragma omp parallel for
+		for(int ix=0; ix<V; ++ix) {
+			data_[ix] = scale * data_[ix] + rhs_multiplier * rhs[ix];
+		}
+	    return *this;
+	}
+	field& scale_add(std::complex<double> scale, std::complex<double> rhs_multiplier, field& rhs)
+	{
+		#pragma omp parallel for
 		for(int ix=0; ix<V; ++ix) {
 			data_[ix] = scale * data_[ix] + rhs_multiplier * rhs[ix];
 		}
@@ -119,10 +135,10 @@ public:
 			data_[ix].setZero();
 		}		
 	}
-
 	// equivalent to real part of dot with itself
 	double squaredNorm() const {
 		double norm = 0.0;
+		#pragma omp parallel for reduction(+:norm)
 		for(int ix=0; ix<V; ++ix) {
 			norm += data_[ix].squaredNorm();
 		}
@@ -131,6 +147,8 @@ public:
 	//complex conjugate of this dotted with rhs
 	std::complex<double> dot (const field& rhs) const {
 		std::complex<double> sum (0.0, 0.0);
+		//#pragma omp parallel for reduction(+:sum)
+		//note: openMP can't reduce std::complex<double> type
 		for(int ix=0; ix<V; ++ix) {
 			sum += data_[ix].dot(rhs[ix]);
 		}
@@ -154,6 +172,12 @@ public:
 	// returns index of nearest neighbour in mu direction
 	int iup (int i, int mu) const { return grid.iup (i, mu); }
 	int idn (int i, int mu) const { return grid.idn (i, mu); }
+
+	// returns 4-index i in [0, V) corresponding to the point (x0, ix) 
+	// where ix is a point in the spatial volume [0, VOL3)
+	// and x0 is the timeslice in [0, L0)
+	int it_ix (int x0, int ix) const { return grid.it_ix (x0, ix); }
+
 };
 
 #endif //LATTICE_4D_H

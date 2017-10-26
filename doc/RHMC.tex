@@ -1,0 +1,87 @@
+\documentclass[a4paper,12pt]{article}
+
+%PACKAGES
+\usepackage[margin=2cm]{geometry}
+\usepackage{latexsym,amsmath,amsfonts,amssymb}
+%\usepackage{multirow}
+%\usepackage{float,placeins}
+%\usepackage[dvips]{graphicx}
+%\usepackage[pdftex]{graphicx,color}
+\usepackage{graphicx,color}
+%\usepackage{feynmf}
+%\usepackage[FIGBOTCAP]{subfigure}
+%\usepackage{mathrsfs,mathtools}
+\usepackage{pstricks,pst-node,pst-text,pst-3d}
+\usepackage{verbatim}
+%\usepackage{epstopdf}
+%\usepackage{epsfig}
+\usepackage{hyperref}
+\usepackage{float,placeins}
+
+%\usepackage{showkeys}
+%\input proof
+
+%USEFUL COMMANDS
+\newcommand{\tr}[1]{\text{Tr}\big[#1\big]}
+\newcommand{\ga}[1]{\Gamma\left(#1\right)}
+\renewcommand{\d}[1]{\delta^d\Big(#1\Big)}
+\newcommand{\ie}{\emph{i.e.}}
+\newcommand{\ex}[1]{{\rm e}^{#1}} \def\ii{{\rm i}}
+\newcommand{\Tr}{{\rm Tr}}
+\newcommand{\sect}[1]{\setcounter{equation}{0}\section{#1}}
+\renewcommand{\theequation}{\thesection.\arabic{equation}}
+
+% Pagination
+% \renewcommand{\baselinestretch}{1.1}
+% \textwidth 160mm
+% \textheight 215mm
+ \topmargin -3cm
+% \oddsidemargin 5mm
+
+\begin{document}
+
+\author{Liam Keegan}
+\title{RHMC Code Documentation}
+
+\maketitle
+
+\section{Introduction}
+A simple RHMC code to simulate $n_f$ flavors of unimproved staggered fermions with the Wilson SU(3) gauge action.
+
+\section{QCD formulation}
+\subsection{Gauge Action}
+Wilson SU(3) plaquette lattice gauge action,
+\begin{equation}
+ S_g[U] = -\frac{\beta}{3} \sum_x \sum_{\mu<\nu} Re \Tr \left[ U_{\mu}(x)  U_{\nu}(x+\hat\mu)  U_{\mu}^{\dagger}(x+\hat\nu)  U_{\nu}^{\dagger}(x)\right]
+\end{equation}
+where $U_\mu(x)$ is a 3x3 complex matrix at the site $x$ in the direction $\mu$.
+
+\subsection{Fermion Action}
+\begin{equation}
+ S_f[U] = \phi^{\dagger} (D D^{\dagger})^{-2} \phi
+\end{equation}
+where $D$ is the staggered lattice Dirac operator
+\begin{equation}
+ D_{nm} = \sum_{\mu} \eta_{\mu}(x) \left( U_{\mu}(x) \delta_{n m} \right)
+\end{equation}
+and $\eta_{\mu}(x)$ are the space-dependent staggered equivalent of Dirac $\gamma$-matrices,
+\begin{equation}
+ \eta_{0}(x) = 1, etc
+\end{equation}
+
+\section{HMC}
+The action simulated by the HMC is
+
+\subsection{Momenta}
+
+
+\subsection{Gauge Force}
+
+\subsection{Fermion Force}
+
+\section{Inverters}
+\subsection{CG}
+\subsection{CG-Multishift}
+\subsection{CG-Block}
+
+\end{document}

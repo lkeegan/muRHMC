@@ -7,7 +7,7 @@
 #include <complex>
 #include <iostream>
 
-Approx approx = Approx::custom().epsilon( 1e-14 );
+Approx approx = Approx::custom().epsilon( 2e-14 );
 
 TEST_CASE( "Nearest Neigbours: 4^4 lattice of U[mu]", "[lattice]" ) {
 	// create 4^4 lattice with random U[mu] at each site
@@ -59,6 +59,42 @@ TEST_CASE( "Nearest Neighbours: 12x6x3x2 lattice of U[mu]", "[lattice]" ) {
 	REQUIRE( U.at(7, 5, 0, 1) == U.dn(i, 2) );
 	REQUIRE( U.at(7, 5, 1, 0) == U.up(i, 3) );
 	REQUIRE( U.at(7, 5, 1, 0) == U.dn(i, 3) );
+}
+
+TEST_CASE( "Time-slices: 12x6x4x2 lattice of U[mu]", "[lattice]" ) {
+	// create 12x6x4x2 lattice with random U[mu] at each site
+	// compare av plaquette at each timeslice using it_ix index vs
+	// with explicit slow indexing of time slice using "at"
+	int L0 =12;
+	int L1 =6;
+	int L2 =4;
+	int L3 =2;
+	lattice grid (L0, L1, L2, L3);
+	field<gauge> U (grid);
+	hmc hmc (123);
+	hmc.random_U (U, 0.5);
+
+	double plaq_slice_sum = 0;
+	for(int x0=0; x0<U.L0; ++x0) {
+		double plaq_slice = 0;
+		double plaq_at = 0;
+		// construct plaq using timeslice
+		for(int ix3=0; ix3<U.VOL3; ++ix3) {
+			plaq_slice += hmc.plaq(U.it_ix(x0, ix3), U);
+		}
+		// construct plaq using grid debugging indexing
+		for(int x1=0; x1<L1; ++x1) {
+			for(int x2=0; x2<L2; ++x2) {
+				for(int x3=0; x3<L3; ++x3) {
+					plaq_at += hmc.plaq(grid.index(x0, x1, x2, x3), U);
+				}
+			}
+		}
+		REQUIRE( plaq_slice == approx(plaq_at) );
+		plaq_slice_sum += plaq_slice;
+	}
+	// check that sum over time slices agrees with normal plaquette
+	REQUIRE( plaq_slice_sum == approx(static_cast<double>(6*3*U.V) * hmc.plaq(U)) );
 }
 
 // returns average deviation from hermitian per matrix, should be ~1e-15
@@ -135,14 +171,18 @@ TEST_CASE( "Gauge action self consistency", "[hmc]" ) {
 	hmc.random_U(U, 12.0);
 	double beta = 4.678;
 	double ac_plaq = hmc.action_U(U, beta);
+	double ac_plaq_local = 0;
 	double ac_staple = 0;
 	for(int ix=0; ix<U.V; ++ix) {
+		ac_plaq_local += hmc.plaq(ix, U);
 		for(int mu=0; mu<4; ++mu) {
 			SU3mat P = U[ix][mu]*hmc.staple(ix, mu, U);
 			ac_staple -= P.trace().real() * beta / 12.0;
 		}
 	}
+	ac_plaq_local *= (-beta / 3.0);
 	REQUIRE( ac_plaq == approx(ac_staple) );
+	REQUIRE( ac_plaq_local == approx(ac_staple) );
 }
 
 TEST_CASE( "Momenta P have expected mean < Tr[P^2] > = 4 * VOL", "[hmc]" ) {
@@ -283,4 +323,45 @@ TEST_CASE( "CG inversion of (D+m)(D+m)^dagger", "[inverters]") {
 	}
 
 	double ac = hmc.action_F (U, chi, mass, D);
+}
+
+TEST_CASE( "CG vs CG-multishift inversion", "[inverters]") {
+	double eps = 1.e-10;
+	lattice grid (4);
+	field<gauge> U (grid);
+	hmc hmc (1234);
+	hmc.random_U(U, 10.0);
+	std::vector<double> mass = {0.1285, 0.158, 0.201};
+	dirac_op D (grid);
+
+	// make random fermion field chi
+	field<fermion> chi (grid);
+	hmc.gaussian_fermion (chi);
+
+	// make vector of x's to store shifted inversions
+	std::vector<field<fermion>> x;
+	for(int i_m=0; i_m<static_cast<int>(mass.size()); ++i_m) {
+		x.push_back(field<fermion>(grid));
+	}	
+	field<fermion> y (grid), z(grid);
+
+	// x_i = (DD' + m_i^2)^-1 chi
+	int iter = D.cg_multishift(x, chi, U, mass, eps);
+	INFO("CG_multishift: eps = " << eps << "\t iterations = " << iter << "\t lowest mass = " << mass[0]);
+
+	for(int i_m=0; i_m<static_cast<int>(mass.size()); ++i_m) {
+		// y = (DD' + m^2)^-1 chi
+		int iter = D.cg(y, chi, U, mass[i_m], eps);
+		INFO("CG: eps = " << eps << "\t\t iterations = " << iter << "\t mass" << mass[i_m]);
+
+		D.DDdagger(z, y, U, mass[i_m]);
+		double devCG = is_field_equal(z, chi);
+
+		D.DDdagger(z, x[i_m], U, mass[i_m]);
+		double devCG_multishift = is_field_equal(z, chi);
+
+		INFO("mass: " << mass[i_m] << "\tCG deviation: " << devCG << "\t CG_multishift deviation: " << devCG_multishift);
+		REQUIRE( devCG == Approx(0).epsilon(5e-13 + 10.0*eps) );
+		REQUIRE( devCG_multishift == Approx(0).epsilon(5e-13 + 10.0*eps) );
+	}
 }

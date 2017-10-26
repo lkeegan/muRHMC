@@ -3,7 +3,8 @@
 // constructor
 lattice::lattice (int L0, int L1, int L2, int L3) :
  L0(L0), L1(L1), L2(L2), L3(L3) {
-	V = L0 * L1 * L2 * L3;
+	VOL3 = L1 * L2 * L3;
+	V = L0 * VOL3;
 	// Initialise nearest neighbours vector with indices of neighbours
 	neighbours_up_.reserve(4*V);
 	neighbours_dn_.reserve(4*V);

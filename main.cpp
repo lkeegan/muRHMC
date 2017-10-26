@@ -47,17 +47,17 @@ int main(int argc, char *argv[]) {
 
 	// start from random gauge field: 2nd param = roughness
 	// so 0.0 gives unit gauge links
-	hmc.random_U(U, 10.0);
+	hmc.random_U (U, 0.5);
 
 	hmc_params hmc_pars;
-	hmc_pars.beta = 5.6;
-	hmc_pars.mass = 0.15689;
+	hmc_pars.beta = 5.0;
+	hmc_pars.mass = 0.025;
 	hmc_pars.tau = 1.0;
-	hmc_pars.n_steps = 13;
+	hmc_pars.n_steps = 23;
 
-	int n_traj = 20;
-	int n_therm = 20;
-	int n_block = 10;
+	int n_traj = 5000;
+	int n_therm = 500;
+	int n_block = 50;
 	int acc = 0;
 	std::vector<double> plq;
 	std::vector<double> tmpplq;
@@ -65,6 +65,8 @@ int main(int argc, char *argv[]) {
 	std::vector<double> tmpdE;
 	std::vector<double> expdE;
 	std::vector<double> tmpexpdE;
+	std::vector<double> poly;
+	std::vector<double> tmppoly;
 
 	for(int i=0; i<n_traj+n_therm; ++i) {
 
@@ -72,12 +74,15 @@ int main(int argc, char *argv[]) {
 		if(i>n_therm) {
 			//std::cout << "#new action U, P, total:\t" << action_U(U, beta) << "\t" << action_P(P) << "\t" << old_ac << std::endl << std::endl;
 			tmpplq.push_back(hmc.plaq(U));
+			tmppoly.push_back(hmc.polyakov_loop(U));
 			tmpdE.push_back(hmc.deltaE);
 			tmpexpdE.push_back(exp(-hmc.deltaE));
 //			std::cout << "#dE:\t" << new_ac - old_ac << std::endl;
 			if(i%n_block==0) {
 				plq.push_back(av(tmpplq));
 				tmpplq.clear();
+				poly.push_back(av(tmppoly));
+				tmppoly.clear();
 				dE.push_back(av(tmpdE));
 				tmpdE.clear();
 				expdE.push_back(av(tmpexpdE));
@@ -86,14 +91,17 @@ int main(int argc, char *argv[]) {
 			}
 		}
 		//std::cout << "#action U, P, total:\t" << action_U(U, beta) << "\t" << action_P(P) << "\t" << action(U, P, beta) << std::endl;
-		//std::cout << "#accepted?: " << accepted << std::endl << std::endl;
+		std::cout << hmc.plaq(U) << "\t" << hmc.polyakov_loop(U) << std::endl;
 	}
 	//std::cout << "UU^dagger: " << U[34][2]*U[34][2].adjoint() << std::endl;
 	//std::cout << "Det[U]: " << U[34][2].determinant() << std::endl;
 
-	std::cout << hmc_pars.tau/hmc_pars.n_steps << "\t" << 1.0-av(expdE) << "\t" << std_err(expdE) << "\t" <<
-		 av(dE) << "\t" << std_err(dE) << "\t" << av(plq) << "\t" << std_err(plq) << "\t" << 
-		 acc/static_cast<double>(n_traj+n_therm) << std::endl;
+	std::cout 	<< hmc_pars.tau/hmc_pars.n_steps << "\t" 
+				<< 1.0-av(expdE) << "\t" << std_err(expdE) << "\t" 
+				<< av(dE) << "\t" << std_err(dE) << "\t" 
+				<< av(plq) << "\t" << std_err(plq) << "\t" 
+				<< av(poly) << "\t" << std_err(poly) << "\t"
+		 		<< acc/static_cast<double>(n_traj+n_therm) << std::endl;
 
 	return(0);
 }

@@ -35,7 +35,7 @@ public:
 	int leapfrog (field<gauge>& U, field<fermion>& phi, field<gauge>& P, double tau, int n_steps, double beta, double m, const dirac_op& D);
 
 	// total action
-	double action (const field<gauge>& U, const field<fermion>& phi, const field<gauge>& P, double beta, double m, const dirac_op& D);
+	double action (field<gauge>& U, const field<fermion>& phi, const field<gauge>& P, double beta, double m, const dirac_op& D);
 
 	// action of gauge field
 	double action_U (const field<gauge>& U, double beta);
@@ -44,10 +44,10 @@ public:
 	double action_P (const field<gauge>& P);
 
 	// action of pseudofermion field 
-	double action_F (const field<gauge>& U, const field<fermion>& phi, double m, const dirac_op& D);
+	double action_F (field<gauge>& U, const field<fermion>& phi, double m, const dirac_op& D);
 
 	// do a single HMC integration step of length eps for the momenta (returns # calls of dirac op)
-	int step_P (field<gauge>& P, const field<gauge> &U, const field<fermion>& phi, double beta, double m, const dirac_op& D, double eps);
+	int step_P (field<gauge>& P, field<gauge> &U, const field<fermion>& phi, double beta, double m, const dirac_op& D, double eps);
 
 	// do a single HMC integration step of length eps for the gauge links
 	void step_U (const field<gauge>& P, field<gauge> &U, double eps);
@@ -66,17 +66,22 @@ public:
 	void force_gauge (field<gauge>& force, const field<gauge>& U, double beta);
 
 	// HMC fermionic force: adds to existing force (returns # calls of dirac op)
-	int force_fermion (field<gauge> &force, const field<gauge> &U, const field<fermion>& phi, double m, const dirac_op& D);
+	int force_fermion (field<gauge> &force, field<gauge> &U, const field<fermion>& phi, double m, const dirac_op& D);
 
-	// staple for link U_{\mu}(ix) 
+	// staple for link U_{\mu}(ix)
 	SU3mat staple (int ix, int mu, const field<gauge>& U);
 
-	// local plaquette Re Tr { P_{\mu\nu}(i) }
+	// local plaquette Re Tr { P_{\mu\nu}(i) }: range [0, 3] 
 	double plaq (int i, int mu, int nu, const field<gauge>& U);
 
-	// average of plaquette normalised to 1
+	// local plaquette summed over \sum_{\mu<\nu} Re Tr { P_{\mu\nu}(i) } : range [0, 18]
+	double plaq (int ix, const field<gauge> &U);
+
+	// average of plaquette over N_c, mu,nu and volume: range [0, 1]
 	double plaq (const field<gauge>& U);
 
+	// average of real part of polyakov loops in time (x_0) direction
+	double polyakov_loop (const field<gauge>& U);
 };
 
 #endif //LATTICE_HMC_H
