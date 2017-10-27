@@ -1,7 +1,9 @@
 #include "hmc.hpp"
 #include "dirac_op.hpp"
+#include "io.hpp"
 #include <iostream>
 #include <random>
+
 // return average of values in vector
 double av(std::vector<double> &vec) {
 	double sum = std::accumulate(vec.begin(), vec.end(), 0.0);
@@ -36,6 +38,7 @@ int main(int argc, char *argv[]) {
     }
 
 	unsigned int seed = atoi(argv[1]);
+	std::cout.precision(17);
 
 	// make 4^4 lattice
 	lattice grid (4);
@@ -44,10 +47,22 @@ int main(int argc, char *argv[]) {
 	// initialise HMC and Dirac Op
 	hmc hmc (seed);
 	dirac_op D (grid);
+	D.mu_I = 0.02;
+
+	read_fortran_gauge_field(U, "fort.1");
+	std::cout << "PLAQ " << hmc.plaq(U) << std::endl;
 
 	// start from random gauge field: 2nd param = roughness
 	// so 0.0 gives unit gauge links
 	hmc.random_U (U, 0.5);
+
+	std::cout << "PLAQ rand1 " << hmc.plaq(U) << std::endl;
+	write_gauge_field(U, "tmp.dat");
+	hmc.random_U (U, 0.5);
+	std::cout << "PLAQ rand2 " << hmc.plaq(U) << std::endl;
+
+	read_gauge_field(U, "tmp.dat");
+	std::cout << "PLAQ rand1 " << hmc.plaq(U) << std::endl;
 
 	hmc_params hmc_pars;
 	hmc_pars.beta = 5.0;

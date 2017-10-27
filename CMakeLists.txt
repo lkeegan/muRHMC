@@ -24,14 +24,18 @@ set(CATCH_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/catch)
 add_library(Catch INTERFACE)
 target_include_directories(Catch INTERFACE ${CATCH_INCLUDE_DIR})
 
+#set header files
 include_directories(inc)
 
+#set common source files
+set (SRCS ${SRCS} src/hmc.cpp src/dirac_op.cpp src/4d.cpp src/io.cpp)	
+
 # Make unit test executable
-add_executable(tests test/main.cpp src/hmc.cpp src/dirac_op.cpp src/4d.cpp)
+add_executable(tests test/main.cpp ${SRCS})
 target_link_libraries(tests Catch)
 
 # Make hmc executable
-add_executable(hmc main.cpp src/hmc.cpp src/dirac_op.cpp src/4d.cpp)
+add_executable(hmc main.cpp ${SRCS})
 
 #enable_testing()
 add_test(NAME Addition COMMAND tests)

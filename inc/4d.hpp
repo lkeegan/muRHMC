@@ -52,7 +52,10 @@ protected:
 public:
 	const lattice& grid;
 	int V, VOL3, L0;
-	explicit field (const lattice& latt) : grid(latt), V(latt.V), VOL3(latt.VOL3), L0(latt.L0) { data_.resize(V); }
+	int L1, L2, L3;
+	explicit field (const lattice& latt) : grid(latt), V(latt.V), VOL3(latt.VOL3), 
+										   L0(latt.L0), L1(latt.L1), L2(latt.L2), L3(latt.L3)
+										   { data_.resize(V); }
 
 	// assignment op just copies data, no check that lattices are consistent - TODO 
 	field& operator=(const field& rhs) {

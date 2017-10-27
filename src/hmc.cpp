@@ -107,7 +107,6 @@ void hmc::step_U (const field<gauge>& P, field<gauge> &U, double eps) {
 
 void hmc::random_U (field<gauge> &U, double eps) {
 	gaussian_P(U);
-	#pragma omp parallel for
 	for(int ix=0; ix<U.V; ++ix) {
 		for(int mu=0; mu<4; ++mu) {
 			U[ix][mu] = ((std::complex<double> (0.0, eps) * U[ix][mu]).exp()).eval();
@@ -118,7 +117,6 @@ void hmc::random_U (field<gauge> &U, double eps) {
 void hmc::gaussian_fermion (field<fermion>& chi) {
 	// normal distribution p(x) ~ exp(-x^2), i.e. mu=0, sigma=1/sqrt(2):
 	std::normal_distribution<double> randdist_gaussian (0, 1.0/sqrt(2.0));
-	#pragma omp parallel for
 	for(int ix=0; ix<chi.V; ++ix) {
 		for(int i=0; i<3; ++i) {
 			std::complex<double> r (randdist_gaussian (rng), randdist_gaussian (rng));
@@ -131,7 +129,6 @@ void hmc::gaussian_P (field<gauge>& P) {
 	// normal distribution p(x) ~ exp(-x^2/2), i.e. mu=0, sigma=1:
 	std::normal_distribution<double> randdist_gaussian (0, 1.0);
 	SU3_Generators T;
-	#pragma omp parallel for
 	for(int ix=0; ix<P.V; ++ix) {
 		for(int mu=0; mu<4; ++mu) {
 			P[ix][mu].setZero();
@@ -174,10 +171,12 @@ int hmc::force_fermion (field<gauge> &force, field<gauge> &U, const field<fermio
 	SU3_Generators T;
 	#pragma omp parallel for
 	for(int ix=0; ix<U.V; ++ix) {
-		// mu=0 terms have extra chemical potential isospin factors exp(+-\mu_I/2): 
+		// mu=0 terms have extra chemical potential isospin factors exp(+-\mu_I/2):
+		double mu_I_plus_factor = exp(0.5 * D.mu_I);
+		double mu_I_minus_factor = exp(-0.5 * D.mu_I);
 		for(int a=0; a<8; ++a) {
-			double Fa = D.eta[ix][4]*D.eta[ix][0] * (chi[ix].dot(T[a] * exp(0.5*D.mu_I) * U[ix][0] * psi.up(ix,0))).imag();
-			Fa += D.eta.up(ix,0)[4]*D.eta.up(ix,0)[0] * (chi.up(ix,0).dot(U[ix][0].adjoint() * exp(-0.5*D.mu_I) * T[a] * psi[ix])).imag();
+			double Fa = D.eta[ix][4]*D.eta[ix][0] * (chi[ix].dot(T[a] * mu_I_plus_factor * U[ix][0] * psi.up(ix,0))).imag();
+			Fa += D.eta.up(ix,0)[4]*D.eta.up(ix,0)[0] * (chi.up(ix,0).dot(U[ix][0].adjoint() * mu_I_minus_factor * T[a] * psi[ix])).imag();
 			force[ix][0] += Fa * T[a];
 		}
 		for(int mu=1; mu<4; ++mu) {

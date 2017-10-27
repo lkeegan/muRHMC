@@ -271,6 +271,7 @@ TEST_CASE( "eta_5 hermicity of Staggered Dirac operator", "[staggered]") {
 	hmc hmc (123);
 	hmc.random_U(U, 10.0);
 	dirac_op D (grid);
+	D.mu_I = 0.9;
 
 	// make random fermion field chi
 	field<fermion> chi (grid);
