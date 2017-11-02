@@ -9,7 +9,7 @@
 #include <iostream>
 
 // default tolerance for floating-point equality tests
-Approx approx = Approx::custom().epsilon( 2e-14 );
+Approx approx = Approx::custom().epsilon( 5e-14 );
 
 // some default parameters for the HMC
 hmc_params hmc_params = {
