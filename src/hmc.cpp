@@ -6,7 +6,6 @@ hmc::hmc (const hmc_params& params) : rng(params.seed), params(params) {
 }
 
 int hmc::trajectory (field<gauge>& U, dirac_op& D) {
-
 	// make random gaussian momentum field P
 	field<gauge> P (U.grid);
 	gaussian_P (P);

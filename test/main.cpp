@@ -15,7 +15,7 @@ Approx approx = Approx::custom().epsilon( 2e-14 );
 hmc_params hmc_params = {
 	5.4, 	// beta
 	0.292, 	// mass
-	0.057, 	// mu_I
+	0.157, 	// mu_I
 	1.0, 	// tau
 	7, 		// n_steps
 	1.e-6,	// MD_eps
@@ -255,6 +255,48 @@ TEST_CASE( "D(m, mu) = -eta_5 D(-m, mu) eta_5", "[staggered]") {
 	REQUIRE( is_field_equal(psi1, psi2) == approx(0) );
 }
 
+TEST_CASE( "Gauge covariance of D(m, mu)", "[staggered]") {
+	lattice grid (4);
+	field<gauge> U (grid);
+	field<gauge> V (grid);
+	hmc hmc (hmc_params);
+	hmc_params.mass = 0.1322;
+	hmc_params.mu_I = 0.219;
+	hmc.random_U(U, 10.0);
+	// V[ix][0] is a random SU(3) matrix at each site
+	hmc.random_U(V, 2.7);
+	dirac_op D (grid);
+
+	// make random fermion field chi
+	field<fermion> chi (grid);
+	hmc.gaussian_fermion(chi);
+
+	// psi1 = D(mass, mu) chi
+	field<fermion> psi1 (grid);
+	D.D(psi1, chi, U, hmc_params.mass, hmc_params.mu_I);
+
+	// chi[x] -> V[x] chi[x]
+	for(int ix=0; ix<U.V; ++ix) {
+		chi[ix] = V[ix][0] * chi[ix];
+	}
+	// psi1[x] -> V[x] psi1[x]
+	for(int ix=0; ix<U.V; ++ix) {
+		psi1[ix] = V[ix][0] * psi1[ix];
+	}
+	// U_mu[x] -> V[x] U_mu[x] V[x+mu]^dagger
+	for(int ix=0; ix<U.V; ++ix) {
+		for(int mu=0; mu<4; ++mu) {
+			U[ix][mu] = V[ix][0] * U[ix][mu] * (V.up(ix,mu)[0].adjoint());
+		}
+	}
+
+	// psi2 = D(mass, m) chi
+	field<fermion> psi2 (grid);
+	D.D(psi2, chi, U, hmc_params.mass, hmc_params.mu_I);
+
+	REQUIRE( is_field_equal(psi1, psi2) == approx(0) );
+}
+
 TEST_CASE( "CG inversion of (D+m)(D+m)^dagger", "[inverters]") {
 	lattice grid (4);
 	field<gauge> U (grid);
@@ -324,8 +366,27 @@ TEST_CASE( "Reversibility of HMC", "[hmc]" ) {
 		REQUIRE( is_field_SU3(U) == approx(0) );
 		
 	}
-
 }
+
+TEST_CASE( "HMC conserves action for small tau", "[hmc]" ) {
+	// create 4^4 lattice with random U[mu] at each site, random gaussian P
+	// integrate by a small amount, check action is conserved within some eps
+
+	lattice grid (4);
+	field<gauge> U (grid);
+	field<gauge> P (grid);
+	hmc_params.tau = 0.05;
+	hmc_params.n_steps = 5;
+	hmc_params.MD_eps = 1.e-8;
+	hmc hmc (hmc_params);
+	dirac_op D (grid);
+	hmc.random_U(U, 10.0);
+	hmc.trajectory(U, D);
+	INFO("HMC deltaE: " << hmc.deltaE << "\t MD_eps: " << hmc_params.MD_eps 
+		 << "\t tau: " << hmc_params.tau << "\t n_steps: " << hmc_params.n_steps);
+	REQUIRE( hmc.deltaE == approx(0).epsilon(1.e-6 * U.V) );		
+}
+
 /*
 TEST_CASE( "CG vs CG-multishift inversion", "[inverters]") {
 	double eps = 1.e-10;
