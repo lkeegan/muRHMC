@@ -70,6 +70,15 @@ public:
 			   (U_[2]==other[2]) &&
 			   (U_[3]==other[3]);
 	}
+
+	gauge& operator*=(double scalar)
+	{
+		for(int i=0; i<4; ++i) {
+			U_[i] *= scalar;
+		}
+	    return *this;
+	}
+
 };
 
 #endif //LATTICE_SU3_H

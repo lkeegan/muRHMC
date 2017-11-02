@@ -46,7 +46,7 @@
 \maketitle
 
 \section{Introduction}
-A simple RHMC code to simulate $n_f$ flavors of unimproved staggered fermions with the Wilson SU(3) gauge action.
+A simple RHMC code to simulate $n_f+n_f$ QCD with isospin chemical potential, using unimproved staggered fermions and the Wilson SU(3) gauge action.
 
 \section{QCD formulation}
 \subsection{Gauge Action}
@@ -56,32 +56,153 @@ Wilson SU(3) plaquette lattice gauge action,
 \end{equation}
 where $U_\mu(x)$ is a 3x3 complex matrix at the site $x$ in the direction $\mu$.
 
-\subsection{Fermion Action}
+Defining the staple
 \begin{equation}
- S_f[U] = \phi^{\dagger} (D D^{\dagger})^{-2} \phi
+ A_\mu(x) \equiv \sum_{\mu\neq\nu} \left\{
+ U_{\nu}(x+\hat\mu) U_{\mu}^{\dagger}(x+\hat\nu)  U_{\nu}^{\dagger}(x) +
+ U_{\nu}^{\dagger}(x+\hat\mu-\hat\nu) U_{\mu}^{\dagger}(x-\hat\nu)  U_{\nu}(x-\hat\nu) \right\}
 \end{equation}
-where $D$ is the staggered lattice Dirac operator
+the terms in the action that depend on a given link $U_{\mu}(x)$ are then
 \begin{equation}
- D_{nm} = \sum_{\mu} \eta_{\mu}(x) \left( U_{\mu}(x) \delta_{n m} \right)
+ S_g^{local}[U_{\mu}(x)] = -\frac{\beta}{6} \Tr \left[ U_{\mu}(x) A_{\mu}(x) + A_{\mu}^{\dagger}(x)U_{\mu}^{\dagger}(x)  \right]
 \end{equation}
-and $\eta_{\mu}(x)$ are the space-dependent staggered equivalent of Dirac $\gamma$-matrices,
+which is related to the full action by
 \begin{equation}
- \eta_{0}(x) = 1, etc
+ S_g[U] = \frac{1}{12} \sum_{x} \sum_{\mu} S_g^{local}[U_{\mu}(x)]
 \end{equation}
 
+\subsection{Fermion Action}
+The fermion action for $4+4$ staggered flavors with isospin chemical potential $\mu_I$ and mass $m$ is given by
+\begin{equation}
+\label{eq:action_fermion}
+ S_f[U] = \phi^{\dagger} (D(\mu_I,m) [D(\mu_I,m)]^{\dagger})^{-1} \phi
+\end{equation}
+where $D(\mu_I,m)$ is the staggered lattice Dirac operator
+\begin{align}
+ [D(\mu_I,m)]_{xy} &= e^{\mu_I/2} U_{0}(x) \delta_{n,m-\hat0} - e^{-\mu_I/2} U_{0}^{\dagger}(x-\hat0) \delta_{n,m+\hat0} \\
+ &+ \sum_{\mu=1}^{3} \eta_{\mu}(x) \left[ U_{\mu}(x) \delta_{n,m-\hat\mu} - U_{\mu}^{\dagger}(x-\hat\mu) \delta_{n,m+\hat\mu} \right]
+\end{align}
+and $\eta_{\mu}(x) = -1^{\sum_{\nu<\mu}x_{\nu}}$ are the space-dependent staggered equivalent of Dirac $\gamma$-matrices, i.e.
+\begin{align}
+ \eta_{0}(x) &= 1 \\
+ \eta_{1}(x) &= -1^{x_0} \\
+ \eta_{2}(x) &= -1^{x_0+x_1} \\
+ \eta_{3}(x) &= -1^{x_0+x_1+x_2} \\
+ \eta_{5}(x) &= -1^{x_0+x_1+x_2+x_3}
+\end{align}
+For $\mu_I=0$ this reduces to the standard $n_f=8$ staggered action, with the usual staggered $\gamma_5$--hermicity property $D^{\dagger} = \eta_5 D \eta_5 = -D$ for the massless case, 
+which allows us to write the operator in the action in the form $DD^{\dagger} + m^2$.
+
+However for non--zero $\mu_I$ we have instead the relation
+\begin{equation}
+ [D(\mu_I,m)]^{\dagger} = - D(-\mu_I,-m)
+\end{equation}
+so that
+\begin{equation}
+ D(\mu_I,m) [D(\mu_I,m)]^{\dagger} = -D(\mu_I,m) D(-\mu_I,-m)
+\end{equation}
+
+To generate a field $\phi$ according to the distribution $e^{-S_f[U]}$ we 
+can first generate a complex vector $\chi$ with distribution $e^{-\chi^{\dagger}\chi}$, then set $\phi = D(\mu_I,m)\chi$
 \section{HMC}
-The action simulated by the HMC is
+The hamiltonian for the HMC is
+\begin{equation}
+ S[P, U, \phi] = S_p[P] + S_g[U] + S_f[\phi, U]
+\end{equation}
+where we need to solve the classical equations of motion
+\begin{align}
+ \frac{dP_{\mu}(x)}{dt} &= -\frac{\partial}{\partial U_{\mu}(x)}(S_g[U] + S_f[\phi, U]) = -F_g(x,\mu) - F_f(x,\mu) \\
+ \frac{dU_{\mu}(x)}{dt} &= P_{\mu}(x)
+\end{align}
+The steps required to update a gauge configuration $U$:
+\begin{itemize}
+ \item Generate gaussian momenta $P$
+ \item Generate $\chi$ with distribution $e^{-\chi^{\dagger}\chi}$, then set $\phi = D\chi$
+ \item Integrate the force terms to generate $U', P'$
+ \item Accept or reject $U'$ with probability $e^{S[P, U, \phi] - S[P', U', \phi]}$
+\end{itemize}
 
 \subsection{Momenta}
+The momenta $P_{\mu}(x)$ are defined as
+\begin{equation}
+ P_{\mu}(x) = \sum_{a=1}^8 p^a_{\mu}(x) T_a 
+\end{equation}
+where $T_a$ are the generators of SU(3) and $p^a_{\mu}(x)$ are real numbers.
+The action is given by
+\begin{equation}
+ S_p[P] = \sum_{x,\mu}\Tr\left\{\left[P_{\mu}(x)\right]^2\right\} = \frac{1}{2}\sum_{x,\mu}\sum_{a=1}^8 [p^a_{\mu}(x)]^2
+\end{equation}
+so we can generate momenta simply by sampling the numbers $p^a$ from the gaussian distribution $e^{-(p^a)^2/2}$.
 
+The resulting matrices $P$ have $\Tr[P]=0$ and $\left\langle \Tr [P^2]\right\rangle = 4$.
 
 \subsection{Gauge Force}
+The gauge force is given by
+\begin{equation}
+F_g(x,\mu) = \sum F_g^a(x,\mu) T_a
+\end{equation}
+where
+\begin{align}
+F_g^a(x,\mu) &= \frac{\partial S_g[U]}{\partial U_{\mu}^{(a)}(x)} = \frac{\partial S_g^{local}[U_{\mu}(x)]}{\partial U_{\mu}^{(a)}(x)} \\ 
+&= -\frac{\beta}{6} \frac{\partial }{\partial U_{\mu}^{(a)}(x)} \Tr \left[ U_{\mu}(x) A_{\mu}(x) + A_{\mu}^{\dagger}(x)U_{\mu}^{\dagger}(x)  \right] \\
+&= \frac{i\beta}{6} \Tr \left[ T_a \left( U_{\mu}(x) A_{\mu}(x) - A_{\mu}^{\dagger}(x)U_{\mu}^{\dagger}(x)\right) \right]
+\end{align}
+But the quantity $(...)$ is traceless and anti-hermitian, i.e. can be written as $\sum_b c_b T_b$, so that using the trace identity $Tr[T_aT_b] = \tfrac{1}{2}\delta_{ab}$ we find
+\begin{align}
+F_g(x,\mu) &= \sum_{ab} \frac{i\beta}{6} \Tr \left[ T_a c_b T_b \right] T_a = \frac{i\beta}{12} \sum_a c_a T_a \\
+&= \frac{i\beta}{12} \left[ U_{\mu}(x) A_{\mu}(x) - A_{\mu}^{\dagger}(x)U_{\mu}^{\dagger}(x) \right]
+\end{align}
 
 \subsection{Fermion Force}
+
+\subsection{Force Integration}
+The integration of the force terms is done by alternating two discrete steps,
+\begin{align}
+ I_P(P, F, \epsilon)&: P \Leftarrow P - \epsilon F \\
+ I_U(U, P, \epsilon)&: U \Leftarrow e^{i \epsilon P) U
+\end{align}
+which can be combined in various ways to give integrators that are exactly reversible.
+\subsection{Leapfrog}
+The simplest integrator is the leapfrog, where an integration step of size $\epsilon$ is given by
+\begin{itemize}
+ \item $I_P(\epsilon/2)$
+ \item $I_U(\epsilon)$
+ \item $I_P(\epsilon/2)$
+\end{itemize}
+
+\subsection{OMF2}
 
 \section{Inverters}
 \subsection{CG}
 \subsection{CG-Multishift}
 \subsection{CG-Block}
+
+\appendix
+\section{SU(3) Matrix Algebra}
+
+\subsection{Generators}
+The generators of SU(3) are the set of traceless $3\times 3$ hermitian matrices $T_a$, where $a=1,2,\ldots,8$, with the properties
+\begin{equation}
+\tr{T_a}=0, \quad T_a^{\dagger}=T_a, \quad \tr{T_a T_b} = \tfrac{1}{2}\delta_{ab}
+\end{equation}
+\begin{equation}
+[T_a,T_b] = T_a T_b - T_b T_a = f_{abc} T_c
+\end{equation}
+where $f_{abc}$ is real and antisymmetric in all indices. An SU(3) matrix $U$ can be written as
+\begin{equation}
+U = e^{i \omega_a T_a}
+\end{equation}
+where $\omega_a$ are real numbers.
+
+\subsection{Differentiation}
+Differentiation w.r.t an element of the algebra can be defined as
+\begin{equation}
+\frac{\partial F(U)}{\partial U^{(a)}} \equiv \frac{\partial}{\partial \omega} \left. F(e^{i \omega T_a} U) \right|_{\omega=0}
+\end{equation}
+which gives for SU(3) matrices $U, V, W,$
+\begin{align}
+\frac{\partial}{\partial U^{(a)}} \left( V U W \right) &= i V T_a U W \\
+\frac{\partial}{\partial U^{(a)}} \left( V U^{\dagger} W \right) &= -i V U T_a W
+\end{align}
 
 \end{document}

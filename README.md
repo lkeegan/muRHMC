@@ -1,17 +1,20 @@
 # RHMC [![Build Status](https://travis-ci.org/lkeegan/RHMC.svg?branch=master)](https://travis-ci.org/lkeegan/RHMC)
-A simple lattice code: RHMC simulation of QCD with n_f unimproved staggered fermions
+A simple lattice code: RHMC simulation of (n_f+n_f) flavor QCD with isospin chemical potential, using unimproved staggered fermions and the Wilson gauge action. See the [documentation](../blob/master/doc/RHMC.pdf) for more details.
 
-Requires the [Eigen](http://eigen.tuxfamily.org) C++ templatelibrary for matrix operations, and can use openMP.
+Requires the [Eigen](http://eigen.tuxfamily.org) C++ template library for matrix operations, and supports openMP.
 
 ## Current working features
-- HMC for pure gauge + n_f=8 staggered fermions
-- Leapfrog integrator
+- HMC for pure gauge + n_f=4+4 isospin chemical potential
+- Leapfrog and OMF2 integrator
 - CG and CG-multishift inverter
-- Plaquette and Polykov loop observables
-
-## In progress
-- Isospin chemical potential
+- Gauge observables
+	- Plaquette
+	- Polyakov loop
+- Fermionic observables
+	- psibar-psi
 - Gauge field I/O
+ 
+## In progress
 - Isospin observables
 - Brute force inversion of explicitly constructed Dirac operator via Lapack
 
@@ -19,7 +22,7 @@ Requires the [Eigen](http://eigen.tuxfamily.org) C++ templatelibrary for matrix 
 - RHMC: remez algorithm, maybe also zolotarev for square roots
 - CG block solver for multiple RHS
 - Mutiple timescale integration
-- Higher order integrators: OM2, OM4
+- OMF4 integrator
 - Even/odd preconditioning
 - Input file
 - Measurement program

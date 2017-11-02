@@ -5,7 +5,7 @@ set(CMAKE_VERBOSE_MAKEFILE ON)
 set(CMAKE_CXX_STANDARD 11)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -pedantic -Wextra -Wno-int-in-bool-context")
-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -march=native -g")
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -march=native -g") #remove g if not profiling release code
 
 FIND_PACKAGE(OpenMP REQUIRED)
 if(OPENMP_FOUND)
@@ -28,14 +28,17 @@ target_include_directories(Catch INTERFACE ${CATCH_INCLUDE_DIR})
 include_directories(inc)
 
 #set common source files
-set (SRCS ${SRCS} src/hmc.cpp src/dirac_op.cpp src/4d.cpp src/io.cpp)	
+set (SRCS ${SRCS} src/hmc.cpp src/dirac_op.cpp src/4d.cpp src/io.cpp)
 
 # Make unit test executable
 add_executable(tests test/main.cpp ${SRCS})
 target_link_libraries(tests Catch)
 
-# Make hmc executable
-add_executable(hmc main.cpp ${SRCS})
+# Make rhmc executable
+add_executable(rhmc rhmc.cpp ${SRCS})
+
+# Make measurements executable
+add_executable(measure measure.cpp ${SRCS})
 
 #enable_testing()
 add_test(NAME Addition COMMAND tests)

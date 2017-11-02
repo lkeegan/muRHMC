@@ -97,6 +97,22 @@ public:
 	    return *this;
 	}
 
+	field& operator/=(double scalar)
+	{
+		for(int ix=0; ix<V; ++ix) {
+			data_[ix] /= scalar;
+		}
+	    return *this;
+	}
+
+	field& operator/=(std::complex<double> scalar)
+	{
+		for(int ix=0; ix<V; ++ix) {
+			data_[ix] /= scalar;
+		}
+	    return *this;
+	}
+
 	// *this += rhs_multiplier * rhs
 	field& add(std::complex<double> rhs_multiplier, field& rhs)
 	{

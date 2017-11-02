@@ -38,36 +38,42 @@ void dirac_op::apbs_in_time (field<gauge>& U) const {
 	}
 }
 
-void dirac_op::D (field<fermion>& lhs, const field<fermion>& rhs, field<gauge>& U, double m) const {
+void dirac_op::D (field<fermion>& lhs, const field<fermion>& rhs, field<gauge>& U, double mass, double mu_I) const {
 	// flip sign of timelike U's at boundary to impose anti-periodic bcs on fermions 
 	apbs_in_time(U);
+
+	double mu_I_plus_factor = exp(0.5 * mu_I);
+	double mu_I_minus_factor = exp(-0.5 * mu_I);
 	// default static scheduling, with N threads, split loop into N chunks, one per thread 
 	#pragma omp parallel for
 	for(int ix=0; ix<rhs.V; ++ix) {
-		lhs[ix] = m * rhs[ix];
-		// mu=0 terms have extra chemical potential isospin factors exp(+-\mu_I/2): 
-		lhs[ix] += 0.5 * eta[ix][0] * (U[ix][0] * exp(0.5*mu_I) * rhs.up(ix,0) - U.dn(ix,0)[0].adjoint() * exp(-0.5*mu_I) * rhs.dn(ix,0));
+		lhs[ix] = mass * rhs[ix];
+		// mu=0 terms have extra chemical potential isospin factors exp(+-\mu_I/2):
+		// NB eta[ix][0] is just 1 so dropped from this expression
+		lhs[ix] += 0.5 * mu_I_plus_factor * U[ix][0] * rhs.up(ix,0)
+				  -0.5 * mu_I_minus_factor * U.dn(ix,0)[0].adjoint() * rhs.dn(ix,0);
 		for(int mu=1; mu<4; ++mu) {
-			lhs[ix] += 0.5 * eta[ix][mu] * (U[ix][mu] * rhs.up(ix,mu) - U.dn(ix,mu)[mu].adjoint() * rhs.dn(ix,mu));
+			lhs[ix] += 0.5 * eta[ix][mu] * U[ix][mu] * rhs.up(ix,mu) 
+				      -0.5 * eta[ix][mu] * U.dn(ix,mu)[mu].adjoint() * rhs.dn(ix,mu);
 		}
 	}
 	// undo flip to restore original U's
 	apbs_in_time(U);
 }
 
-void dirac_op::DDdagger (field<fermion>& lhs, const field<fermion>& rhs, field<gauge>& U, double m) const {
-	// (D+m)(D+m)^dagger == g5 D g5 D + m^2
-	field<fermion> tmp(rhs.grid);
-	D(tmp, rhs, U, 0.0);
-	gamma5(tmp);
-	D(lhs, tmp, U, 0.0);
-	gamma5(lhs);
-	for(int ix=0; ix<rhs.V; ++ix) {
-		lhs[ix] += (m * m) * rhs[ix];
-	}
+void dirac_op::DDdagger (field<fermion>& lhs, const field<fermion>& rhs, field<gauge>& U, double mass, double mu_I) {
+	// without isospin:
+	// (D+m)(D+m)^dagger = g5 D g5 D + m^2 = -D^2 + m^2
+	// however with isospin: D(mu)^dag(mu) = -D(-mu) so above no longer holds,
+	// instead here we do: 
+	// (D(mu)+m)*(D(mu)+m)^dagger = (D(mu)+m)*(-D(-mu)+m) = -D(m,mu)*D(-m,-mu)
+    field<fermion> tmp(rhs.grid);
+	D(tmp, rhs, U, -mass, -mu_I);
+	D(lhs, tmp, U, mass, mu_I);
+	lhs *= -1.0;
 }
 
-int dirac_op::cg(field<fermion>& x, const field<fermion>& b, field<gauge>& U, double m, double eps) const {
+int dirac_op::cg(field<fermion>& x, const field<fermion>& b, field<gauge>& U, double mass, double mu_I, double eps) {
 	field<fermion> a(b.grid), p(b.grid), r(b.grid);
 	double r2_old = 0;
 	double r2_new = 0;
@@ -89,7 +95,7 @@ int dirac_op::cg(field<fermion>& x, const field<fermion>& b, field<gauge>& U, do
 	while (sqrt(r2_new) > eps)
 	{
 		// a = A p
-		DDdagger(a, p, U, m);
+		DDdagger(a, p, U, mass, mu_I);
 		++iter;
 		r2_old = r2_new;
 		// beta = -<r|r>/<p|a>
@@ -104,11 +110,16 @@ int dirac_op::cg(field<fermion>& x, const field<fermion>& b, field<gauge>& U, do
 		// p = alpha p + r
 		p.scale_add(alpha, 1.0, r);
 		//std::cout << r2_new/b2 << std::endl;
+		if(iter>1e4)
+		{
+			std::cout << "CG not converging: iter=" << iter << " error=" << sqrt(r2_new) << std::endl; 
+			exit(0); 
+		}
 	}
-	return iter;	
+	return iter;
 } 
 
-int dirac_op::cg_multishift(std::vector<field<fermion>>& x, const field<fermion>& b, field<gauge>& U, std::vector<double>& m, double eps) const {
+int dirac_op::cg_multishift(std::vector<field<fermion>>& x, const field<fermion>& b, field<gauge>& U, double mass, double mu_I, std::vector<double>& sigma, double eps) {
 	int n_shifts = x.size();
 	std::vector<field<fermion>> p;
 	field<fermion> a(b.grid), r(b.grid);
@@ -139,7 +150,9 @@ int dirac_op::cg_multishift(std::vector<field<fermion>>& x, const field<fermion>
 	while (sqrt(r2_new) > eps)
 	{
 		// a = A p_0
-		DDdagger(a, p[0], U, m[0]);
+		DDdagger(a, p[0], U, mass, mu_I);
+		// add first shift to DDdagger explicitly here:
+		a.add( (sigma[0]*sigma[0]), p[0]);
 		++iter;
 		r2_old = r2_new;
 		// beta = -<r|r>/<p|a>
@@ -148,7 +161,7 @@ int dirac_op::cg_multishift(std::vector<field<fermion>>& x, const field<fermion>
 		// see arXiv:hep-lat/9612014 for derivation
 		for(int i_shift=1; i_shift<n_shifts; ++i_shift) {
 			zeta_p1[i_shift] = zeta[i_shift] * zeta_m1[i_shift] * beta_m1[0];
-			zeta_p1[i_shift] /= (beta[0]*alpha[0]*(zeta_m1[i_shift]-zeta[i_shift]) + zeta_m1[i_shift]*beta_m1[0]*(1.0 - (m[i_shift]*m[i_shift]-m[0]*m[0])*beta[0]));
+			zeta_p1[i_shift] /= (beta[0]*alpha[0]*(zeta_m1[i_shift]-zeta[i_shift]) + zeta_m1[i_shift]*beta_m1[0]*(1.0 - (sigma[i_shift]*sigma[i_shift]-sigma[0]*sigma[0])*beta[0]));
 			beta[i_shift] = beta[0] * zeta_p1[i_shift] / zeta[i_shift];
 		}
 		// x_i -= beta_i * p_i
@@ -176,6 +189,11 @@ int dirac_op::cg_multishift(std::vector<field<fermion>>& x, const field<fermion>
 		// p_i = alpha_i p_i + zeta_i r
 		for(int i_shift=0; i_shift<n_shifts; ++i_shift) {
 			p[i_shift].scale_add(alpha[i_shift], zeta[i_shift], r);
+		}
+		if(iter>1e4)
+		{
+			std::cout << "CG-multishift not converging: iter=" << iter << " error=" << sqrt(r2_new) << std::endl;
+			exit(0); 
 		}
 	}
 	return iter;	

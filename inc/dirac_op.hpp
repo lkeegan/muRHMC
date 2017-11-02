@@ -25,7 +25,6 @@ public:
 	const lattice& grid;
 	field<gamma_matrices> eta;
 	bool ANTI_PERIODIC_BCS = true;
-	double mu_I = 0.0; //isospin chemical potential
 
 	explicit dirac_op (const lattice& grid);
 
@@ -37,19 +36,21 @@ public:
 	// this gives antiperiodic bcs in time direction to the fermions
 	void apbs_in_time (field<gauge>& U) const;
 
-	// Staggered massive Dirac operator D: lhs = D(rhs)
-	void D (field<fermion>& lhs, const field<fermion>& rhs, field<gauge>& U, double m) const;
+	// Staggered massive Dirac operator D with isospin chemical potential mu_I: lhs = D(rhs)
+	void D (field<fermion>& lhs, const field<fermion>& rhs, field<gauge>& U, double m, double mu_I) const;
 
-	// Hermitian Dirac operator squared: (D+m)(D+m)^\dagger == (g5 D) (g5 D) + m^2
-	void DDdagger (field<fermion>& lhs, const field<fermion>& rhs, field<gauge>& U, double m) const;
+	// Hermitian D D^{\dagger} operator: lhs = DDdagger(rhs)
+	void DDdagger (field<fermion>& lhs, const field<fermion>& rhs, field<gauge>& U, double m, double mu_I);
 
-	// CG inversion of (g5 D g5 D + m^2) x = b: given b solves for x
+	// CG inversion of D D^{\dagger} x = b: given b solves for x
 	// returns number of times Dirac operator was called
-	int cg(field<fermion>& x, const field<fermion>& b, field<gauge>& U, double m, double eps) const;
+	int cg(field<fermion>& x, const field<fermion>& b, field<gauge>& U, double m, double mu_I, double eps);
 
-	// CG multishift inversion of (g5 D g5 D + m_a^2) x_a = b: given b solves for x_a for each shift m_a
-	// returns number of times Dirac operator was called: should be the same as for CG inversion of smallest m_a
-	int cg_multishift(std::vector<field<fermion>>& x, const field<fermion>& b, field<gauge>& U, std::vector<double>& m, double eps) const;
+	// CG multishift inversion of (D D^{\dagger} + sigma_a^2) x_a = b: given b solves for x_a for each shift sigma_a
+	// returns number of times Dirac operator was called
+	// without isospin sigma is a shift in the mass parameter, so should take same number of inversions as
+	// CG inverting DD^dagger with mass^2 = m^2 + sigma[0]^2
+	int cg_multishift(std::vector<field<fermion>>& x, const field<fermion>& b, field<gauge>& U, double m, double mu_I, std::vector<double>& sigma, double eps);
 };
  
 #endif //LATTICE_DIRAC_OP_H
