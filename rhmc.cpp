@@ -74,9 +74,9 @@ int main(int argc, char *argv[]) {
 	// so 0.0 gives unit gauge links, large value = random
 	hmc.random_U (U, 0.5);
 
-	int n_traj = 1000; //10000;
-	int n_therm = 100; //500
-	int n_block = 100;
+	int n_traj = 20; //10000;
+	int n_therm = 20; //500
+	int n_block = 10;
 	int acc = 0;
 	std::vector<double> plq;
 	std::vector<double> tmpplq;

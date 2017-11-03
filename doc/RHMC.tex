@@ -3,24 +3,18 @@
 %PACKAGES
 \usepackage[margin=2cm]{geometry}
 \usepackage{latexsym,amsmath,amsfonts,amssymb}
-%\usepackage{multirow}
-%\usepackage{float,placeins}
-%\usepackage[dvips]{graphicx}
-%\usepackage[pdftex]{graphicx,color}
 \usepackage{graphicx,color}
-%\usepackage{feynmf}
-%\usepackage[FIGBOTCAP]{subfigure}
-%\usepackage{mathrsfs,mathtools}
 \usepackage{pstricks,pst-node,pst-text,pst-3d}
 \usepackage{verbatim}
-%\usepackage{epstopdf}
-%\usepackage{epsfig}
 \usepackage{hyperref}
 \usepackage{float,placeins}
-
-%\usepackage{showkeys}
-%\input proof
-
+\usepackage{xcolor}
+\hypersetup{
+    colorlinks,
+    linkcolor={reds!50!black},
+    citecolor={blue!50!black},
+    urlcolor={blue!50!black}
+}
 %USEFUL COMMANDS
 \newcommand{\tr}[1]{\text{Tr}\big[#1\big]}
 \newcommand{\ga}[1]{\Gamma\left(#1\right)}
@@ -31,17 +25,10 @@
 \newcommand{\sect}[1]{\setcounter{equation}{0}\section{#1}}
 \renewcommand{\theequation}{\thesection.\arabic{equation}}
 
-% Pagination
-% \renewcommand{\baselinestretch}{1.1}
-% \textwidth 160mm
-% \textheight 215mm
- \topmargin -3cm
-% \oddsidemargin 5mm
-
 \begin{document}
 
-\author{Liam Keegan}
-\title{RHMC Code Documentation}
+\author{Liam Keegan\\ \href{mailto:liam@keegan.ch}{liam@keegan.ch}}
+\title{RHMC Code Documentation \\ \href{https://github.com/lkeegan/RHMC}{github.com/lkeegan/RHMC}}
 
 \maketitle
 
@@ -91,19 +78,43 @@ and $\eta_{\mu}(x) = -1^{\sum_{\nu<\mu}x_{\nu}}$ are the space-dependent stagger
  \eta_{5}(x) &= -1^{x_0+x_1+x_2+x_3}
 \end{align}
 For $\mu_I=0$ this reduces to the standard $n_f=8$ staggered action, with the usual staggered $\gamma_5$--hermicity property $D^{\dagger} = \eta_5 D \eta_5 = -D$ for the massless case, 
-which allows us to write the operator in the action in the form $DD^{\dagger} + m^2$.
-
-However for non--zero $\mu_I$ we have instead the relation
+which allows us to write 
 \begin{equation}
- [D(\mu_I,m)]^{\dagger} = - D(-\mu_I,-m)
+D(0,m) [D(0,m)]^{\dagger} = (D(0,0) + m)(D(0,0) + m)^{\dagger} = D(0,0)D^{\dagger}(0,0) + m^2
 \end{equation}
-so that
+Moreover, if we split the pseudofermion field into even and odd sites we find a block diagonal operator
 \begin{equation}
- D(\mu_I,m) [D(\mu_I,m)]^{\dagger} = -D(\mu_I,m) D(-\mu_I,-m)
+D(0,m) [D(0,m)]^{\dagger} \phi = 
+\begin{pmatrix}
+D(0,0)D^{\dagger}(0,0) + m^2 & 0 \\
+0 & D(0,0)D^{\dagger}(0,0) + m^2
+\end{pmatrix}
+\begin{pmatrix}
+\phi^{even} \\
+\phi^{odd}
+\end{pmatrix}
+\end{equation}
+so we can find the determinant of just one of these blocks and square it, halving the size of the effective Dirac operator. Equivalently an LU preconditioning of the Dirac operator 
+applied to even and odd sites allows us to compute the inverse of the operator by inverting a hermitian operator applied to only even sites.
+
+However, for non--zero $\mu_I$ the $\gamma_5$--hermicity property becomes instead $D(\mu_I)^{\dagger} = \eta_5 D(-\mu_I) \eta_5 = -D(-\mu_I)$. This means that the above matrix is 
+no longer block diagonal, and the LU preconditioning results in a non-hermitian operator (which is ok but means BiCGstab instead of CG will need to be used for the inversion).
+\begin{equation}
+D(\mu_I,m) [D(\mu_I,m)]^{\dagger} \phi = 
+\begin{pmatrix}
+D(\mu_I,0)D^{\dagger}(\mu_I,0) + m^2 & m\hat D(\mu_I) \\
+ m\hat D(\mu_I) & D(\mu_I,0)D^{\dagger}(\mu_I,0) + m^2
+\end{pmatrix}
+\begin{pmatrix}
+\phi^{even} \\
+\phi^{odd}
+\end{pmatrix}
+\end{equation}
+where
+\begin{equation}
+ [\hat D(\mu_I)]_{xy} = \sinh(\mu_I/2)\left[U_0(x)\delta_{x,y-\hat0} + U_0(x-\hat0)\delta_{x,y+\hat0}\right]
 \end{equation}
 
-To generate a field $\phi$ according to the distribution $e^{-S_f[U]}$ we 
-can first generate a complex vector $\chi$ with distribution $e^{-\chi^{\dagger}\chi}$, then set $\phi = D(\mu_I,m)\chi$
 \section{HMC}
 The hamiltonian for the HMC is
 \begin{equation}
@@ -111,16 +122,16 @@ The hamiltonian for the HMC is
 \end{equation}
 where we need to solve the classical equations of motion
 \begin{align}
- \frac{dP_{\mu}(x)}{dt} &= -\frac{\partial}{\partial U_{\mu}(x)}(S_g[U] + S_f[\phi, U]) = -F_g(x,\mu) - F_f(x,\mu) \\
+ \frac{dP_{\mu}(x)}{dt} &= -\frac{\partial}{\partial U_{\mu}(x)}\left(S_g[U] + S_f[\phi, U]\right) = -F_g(x,\mu) - F_f(x,\mu) \\
  \frac{dU_{\mu}(x)}{dt} &= P_{\mu}(x)
 \end{align}
-The steps required to update a gauge configuration $U$:
-\begin{itemize}
+The following steps are required to update a gauge configuration $U$:
+\begin{enumerate}
  \item Generate gaussian momenta $P$
  \item Generate $\chi$ with distribution $e^{-\chi^{\dagger}\chi}$, then set $\phi = D\chi$
  \item Integrate the force terms to generate $U', P'$
  \item Accept or reject $U'$ with probability $e^{S[P, U, \phi] - S[P', U', \phi]}$
-\end{itemize}
+\end{enumerate}
 
 \subsection{Momenta}
 The momenta $P_{\mu}(x)$ are defined as
@@ -132,9 +143,16 @@ The action is given by
 \begin{equation}
  S_p[P] = \sum_{x,\mu}\Tr\left\{\left[P_{\mu}(x)\right]^2\right\} = \frac{1}{2}\sum_{x,\mu}\sum_{a=1}^8 [p^a_{\mu}(x)]^2
 \end{equation}
-so we can generate momenta simply by sampling the numbers $p^a$ from the gaussian distribution $e^{-(p^a)^2/2}$.
+so we can generate momenta simply by sampling the numbers $p^a$ from the normal gaussian distribution $e^{-(p^a)^2/2}$.
 
 The resulting matrices $P$ have $\Tr[P]=0$ and $\left\langle \Tr [P^2]\right\rangle = 4$.
+
+\subsection{Pseudofermions}
+The pseudofermion fields are 3-component complex vectors defined on each site of the lattice. To generate a field $\phi$ according to the distribution $e^{-S_f[U]}$ we 
+can first generate a complex vector $\chi$ with distribution $e^{-\chi^{\dagger}\chi}$, i.e. set each of 
+the six real numbers that make up the 3 complex components of $\chi$ to a random value $r$ sampled from the normal gaussian distribution $e^{-r^2/2}$.
+
+Then set $\phi = D(\mu_I,m)\chi$.
 
 \subsection{Gauge Force}
 The gauge force is given by
@@ -158,10 +176,10 @@ F_g(x,\mu) &= \sum_{ab} \frac{i\beta}{6} \Tr \left[ T_a c_b T_b \right] T_a = \f
 \subsection{Force Integration}
 The integration of the force terms is done by alternating two discrete steps,
 \begin{align}
- I_P(P, F, \epsilon)&: P \Leftarrow P - \epsilon F \\
- I_U(U, P, \epsilon)&: U \Leftarrow e^{i \epsilon P) U
+  I_P(P, F, \epsilon): P & \leftarrow P - \epsilon F \\
+  I_U(U, P, \epsilon): U & \leftarrow e^{i \epsilon P} U
 \end{align}
-which can be combined in various ways to give integrators that are exactly reversible.
+which can be combined to form reversible integrators of different orders.
 \subsection{Leapfrog}
 The simplest integrator is the leapfrog, where an integration step of size $\epsilon$ is given by
 \begin{itemize}
@@ -169,14 +187,75 @@ The simplest integrator is the leapfrog, where an integration step of size $\eps
  \item $I_U(\epsilon)$
  \item $I_P(\epsilon/2)$
 \end{itemize}
+giving a second order integrator with one Dirac operator inversion required per step.
 
 \subsection{OMF2}
+One integration step of size $\epsilon$ is given by
+\begin{itemize}
+ \item $I_P(\lambda \epsilon)$
+ \item $I_U(\epsilon/2)$
+ \item $I_P((1-2\lambda) \epsilon)$
+ \item $I_U(\epsilon/2)$
+ \item $I_P(\lambda \epsilon)$
+\end{itemize}
+where $\lambda$ is a tunable parameter, e.g. $\lambda = 0.193$. This is also a second order integrator, 
+with $\sim10\times$ smaller errors than leapfrog, but requires two Dirac operator inversions per step.
+
+\subsection{OMF4}
+todo?
 
 \section{Inverters}
 \subsection{CG}
 \subsection{CG-Multishift}
 \subsection{CG-Block}
+\subsection{CG-Block-Multishift}
 
+\section{Observables}
+\subsection{Gauge}
+\subsubsection{Plaquette}
+The plaquette is averaged over the whole lattice and normalised to 1,
+\begin{equation}
+ plaquette[U] = \frac{1}{L^4} \sum_x \frac{1}{6}\sum_{\mu<\nu} \frac{1}{3} Re \Tr \left[ U_{\mu}(x)  U_{\nu}(x+\hat\mu)  U_{\mu}^{\dagger}(x+\hat\nu)  U_{\nu}^{\dagger}(x)\right]
+\end{equation}
+
+\subsubsection{Polyakov Loop}
+The polyakov loop is the product of links in the time direction, averaged over the spatial voume, normalised to 1,
+\begin{equation}
+ polyakov[U] = \frac{1}{L^3} \sum_x^{L^3} \frac{1}{3} Re \Tr \left[\prod_{t=0}^{T-1} U_{0}(x, t)\right]
+\end{equation}
+
+
+\subsection{Fermionic}
+Fermionic observables generally involve traces of the inverse of the Dirac operator, which can be estimated stochastically by 
+inverting gaussian noise vectors. For this purpose we define here $\phi$ as a gaussian noise vector with unit norm, $\phi^{\dagger}.\phi=1$,
+which we use as a source vector to find
+\begin{equation}
+ \chi = \left[D(\mu_I,m) D^{\dagger}(\mu_I,m)\right]^{-1} \phi = -\left[D(\mu_I,m) D(-\mu_I,-m)\right]^{-1} \phi
+\end{equation}
+and also
+\begin{equation}
+ \psi = \left[D(\mu_I,m)\right]^{-1} \phi = -D(-\mu_I,-m) \chi
+\end{equation}
+from which we can construct estimators of various fermionic observables.
+
+\subsubsection{Quark condensate}
+\begin{equation}
+ condensate = \left\langle \phi^{\dagger}.\psi \right\rangle
+\end{equation}
+
+\subsubsection{Pion susceptibility}
+\begin{equation}
+ susceptibility = \left\langle \phi^{\dagger}.\chi \right\rangle
+\end{equation}
+
+\subsubsection{Isospin density}
+\begin{equation}
+ density = -2 \Re \left\langle \chi^{\dagger}.\left(\frac{\partial D(\mu_I,m)}{\partial\mu_I}\psi\right) \right\rangle
+\end{equation}
+where
+\begin{equation}
+ \left[\frac{\partial D(\mu_I,m)}{\partial\mu_I}\psi\right]_x =\frac{\mu_I}{4}\left[ e^{\mu_I/2} U_0(x) \psi(x+\hat0) + e^{-\mu_I/2} U^{\dagger}_0(x-\hat0) \psi(x-\hat0)\right]
+\end{equation}
 \appendix
 \section{SU(3) Matrix Algebra}
 

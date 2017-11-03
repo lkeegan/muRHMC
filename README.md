@@ -1,5 +1,5 @@
 # RHMC [![Build Status](https://travis-ci.org/lkeegan/RHMC.svg?branch=master)](https://travis-ci.org/lkeegan/RHMC)
-A simple lattice code: RHMC simulation of (n_f+n_f) flavor QCD with isospin chemical potential, using unimproved staggered fermions and the Wilson gauge action. See the [documentation](../blob/master/doc/RHMC.pdf) for more details.
+A simple lattice code: RHMC simulation of (n_f+n_f) flavor QCD with isospin chemical potential, using unimproved staggered fermions and the Wilson gauge action. See the [documentation](doc/RHMC.pdf) for more details.
 
 Requires the [Eigen](http://eigen.tuxfamily.org) C++ template library for matrix operations, and supports openMP.
 

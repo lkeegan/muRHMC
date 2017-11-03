@@ -45,7 +45,7 @@ void read_fortran_gauge_field(field<gauge>& U, const std::string& fileName) {
 			}
 		}
 	}
-} 
+}
 
 void read_gauge_field (field<gauge>& U, const std::string& fileName) {
 	std::ifstream input(fileName.c_str(), std::ios::binary);

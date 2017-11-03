@@ -50,11 +50,11 @@ void dirac_op::D (field<fermion>& lhs, const field<fermion>& rhs, field<gauge>& 
 		lhs[ix] = mass * rhs[ix];
 		// mu=0 terms have extra chemical potential isospin factors exp(+-\mu_I/2):
 		// NB eta[ix][0] is just 1 so dropped from this expression
-		lhs[ix] += 0.5 * mu_I_plus_factor * U[ix][0] * rhs.up(ix,0)
-				  -0.5 * mu_I_minus_factor * U.dn(ix,0)[0].adjoint() * rhs.dn(ix,0);
+		lhs[ix].noalias() += 0.5 * mu_I_plus_factor * U[ix][0] * rhs.up(ix,0);
+		lhs[ix].noalias() += -0.5 * mu_I_minus_factor * U.dn(ix,0)[0].adjoint() * rhs.dn(ix,0);
 		for(int mu=1; mu<4; ++mu) {
-			lhs[ix] += 0.5 * eta[ix][mu] * U[ix][mu] * rhs.up(ix,mu) 
-				      -0.5 * eta[ix][mu] * U.dn(ix,mu)[mu].adjoint() * rhs.dn(ix,mu);
+			lhs[ix].noalias() += 0.5 * eta[ix][mu] * U[ix][mu] * rhs.up(ix,mu); 
+			lhs[ix].noalias() += -0.5 * eta[ix][mu] * U.dn(ix,mu)[mu].adjoint() * rhs.dn(ix,mu);
 		}
 	}
 	// undo flip to restore original U's
