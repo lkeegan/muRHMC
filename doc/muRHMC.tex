@@ -28,12 +28,12 @@
 \begin{document}
 
 \author{Liam Keegan\\ \href{mailto:liam@keegan.ch}{liam@keegan.ch}}
-\title{RHMC Code Documentation \\ \href{https://github.com/lkeegan/RHMC}{github.com/lkeegan/RHMC}}
+\title{$\mu$RHMC Code Documentation \\ \href{https://github.com/lkeegan/muRHMC}{github.com/lkeegan/muRHMC}}
 
 \maketitle
 
 \section{Introduction}
-A simple RHMC code to simulate $n_f+n_f$ QCD with isospin chemical potential, using unimproved staggered fermions and the Wilson SU(3) gauge action.
+A simple RHMC code to simulate $n_f+n_f$ QCD with isospin chemical potential $\mu_u = -\mu_d = 2 \mu_I$, using unimproved staggered fermions and the Wilson SU(3) gauge action.
 
 \section{QCD formulation}
 \subsection{Gauge Action}
@@ -59,14 +59,14 @@ which is related to the full action by
 \end{equation}
 
 \subsection{Fermion Action}
-The fermion action for $4+4$ staggered flavors with isospin chemical potential $\mu_I$ and mass $m$ is given by
+The fermion action for $4+4$ staggered flavors with isospin chemical potential $\mu_u = -\mu_d = 2 \mu_I$ and mass $m$ is given by
 \begin{equation}
 \label{eq:action_fermion}
- S_f[U] = \phi^{\dagger} (D(\mu_I,m) [D(\mu_I,m)]^{\dagger})^{-1} \phi
+ S_f[U] = \phi^{\dagger} [D(\mu_I,m) D^{\dagger}(\mu_I,m)]^{-1} \phi
 \end{equation}
 where $D(\mu_I,m)$ is the staggered lattice Dirac operator
 \begin{align}
- [D(\mu_I,m)]_{xy} &= e^{\mu_I/2} U_{0}(x) \delta_{n,m-\hat0} - e^{-\mu_I/2} U_{0}^{\dagger}(x-\hat0) \delta_{n,m+\hat0} \\
+ [D(\mu_I,m)]_{xy} &= e^{\mu_I} U_{0}(x) \delta_{n,m-\hat0} - e^{-\mu_I} U_{0}^{\dagger}(x-\hat0) \delta_{n,m+\hat0} \\
  &+ \sum_{\mu=1}^{3} \eta_{\mu}(x) \left[ U_{\mu}(x) \delta_{n,m-\hat\mu} - U_{\mu}^{\dagger}(x-\hat\mu) \delta_{n,m+\hat\mu} \right]
 \end{align}
 and $\eta_{\mu}(x) = -1^{\sum_{\nu<\mu}x_{\nu}}$ are the space-dependent staggered equivalent of Dirac $\gamma$-matrices, i.e.
@@ -80,11 +80,11 @@ and $\eta_{\mu}(x) = -1^{\sum_{\nu<\mu}x_{\nu}}$ are the space-dependent stagger
 For $\mu_I=0$ this reduces to the standard $n_f=8$ staggered action, with the usual staggered $\gamma_5$--hermicity property $D^{\dagger} = \eta_5 D \eta_5 = -D$ for the massless case, 
 which allows us to write 
 \begin{equation}
-D(0,m) [D(0,m)]^{\dagger} = (D(0,0) + m)(D(0,0) + m)^{\dagger} = D(0,0)D^{\dagger}(0,0) + m^2
+D(0,m) D^{\dagger}(0,m) = (D(0,0) + m)(D(0,0) + m)^{\dagger} = D(0,0)D^{\dagger}(0,0) + m^2
 \end{equation}
 Moreover, if we split the pseudofermion field into even and odd sites we find a block diagonal operator
 \begin{equation}
-D(0,m) [D(0,m)]^{\dagger} \phi = 
+D(0,m) D(0,m)^{\dagger} \phi = 
 \begin{pmatrix}
 D(0,0)D^{\dagger}(0,0) + m^2 & 0 \\
 0 & D(0,0)D^{\dagger}(0,0) + m^2
@@ -98,7 +98,7 @@ so we can find the determinant of just one of these blocks and square it, halvin
 applied to even and odd sites allows us to compute the inverse of the operator by inverting a hermitian operator applied to only even sites.
 
 However, for non--zero $\mu_I$ the $\gamma_5$--hermicity property becomes instead $D(\mu_I)^{\dagger} = \eta_5 D(-\mu_I) \eta_5 = -D(-\mu_I)$. This means that the above matrix is 
-no longer block diagonal, and the LU preconditioning results in a non-hermitian operator (which is ok but means BiCGstab instead of CG will need to be used for the inversion).
+no longer block diagonal, but instead 
 \begin{equation}
 D(\mu_I,m) [D(\mu_I,m)]^{\dagger} \phi = 
 \begin{pmatrix}
@@ -112,8 +112,9 @@ D(\mu_I,0)D^{\dagger}(\mu_I,0) + m^2 & m\hat D(\mu_I) \\
 \end{equation}
 where
 \begin{equation}
- [\hat D(\mu_I)]_{xy} = \sinh(\mu_I/2)\left[U_0(x)\delta_{x,y-\hat0} + U_0(x-\hat0)\delta_{x,y+\hat0}\right]
+ [\hat D(\mu_I)]_{xy} = \sinh(\mu_I)\left[U_0(x)\delta_{x,y-\hat0} + U_0(x-\hat0)\delta_{x,y+\hat0}\right]
 \end{equation}
+and the LU preconditioning results in a non-hermitian operator (which is ok but means BiCGstab instead of CG will need to be used for the inversion).
 
 \section{HMC}
 The hamiltonian for the HMC is
@@ -206,12 +207,14 @@ todo?
 
 \section{Inverters}
 \subsection{CG}
+\subsection{BiCGstab}
 \subsection{CG-Multishift}
-\subsection{CG-Block}
-\subsection{CG-Block-Multishift}
+\subsection{BiCGstab-Multishift}
+\subsection{BiCGstab-Block}
+\subsection{BiCGstab-Block-Multishift}
 
 \section{Observables}
-\subsection{Gauge}
+\subsection{Gauge Observables}
 \subsubsection{Plaquette}
 The plaquette is averaged over the whole lattice and normalised to 1,
 \begin{equation}
@@ -224,8 +227,7 @@ The polyakov loop is the product of links in the time direction, averaged over t
  polyakov[U] = \frac{1}{L^3} \sum_x^{L^3} \frac{1}{3} Re \Tr \left[\prod_{t=0}^{T-1} U_{0}(x, t)\right]
 \end{equation}
 
-
-\subsection{Fermionic}
+\subsection{Fermionic Observables}
 Fermionic observables generally involve traces of the inverse of the Dirac operator, which can be estimated stochastically by 
 inverting gaussian noise vectors. For this purpose we define here $\phi$ as a gaussian noise vector with unit norm, $\phi^{\dagger}.\phi=1$,
 which we use as a source vector to find
@@ -234,13 +236,13 @@ which we use as a source vector to find
 \end{equation}
 and also
 \begin{equation}
- \psi = \left[D(\mu_I,m)\right]^{-1} \phi = -D(-\mu_I,-m) \chi
+ \psi = -\left[D(\mu_I,m)\right]^{-1} \phi = D(-\mu_I,-m) \chi
 \end{equation}
 from which we can construct estimators of various fermionic observables.
 
 \subsubsection{Quark condensate}
 \begin{equation}
- condensate = \left\langle \phi^{\dagger}.\psi \right\rangle
+ condensate = -\left\langle \phi^{\dagger}.\psi \right\rangle
 \end{equation}
 
 \subsubsection{Pion susceptibility}
@@ -250,12 +252,13 @@ from which we can construct estimators of various fermionic observables.
 
 \subsubsection{Isospin density}
 \begin{equation}
- density = -2 \Re \left\langle \chi^{\dagger}.\left(\frac{\partial D(\mu_I,m)}{\partial\mu_I}\psi\right) \right\rangle
+ density = 2 \Re \left\langle \chi^{\dagger}.\left(\frac{\partial D(\mu_I,m)}{\partial\mu_I}\psi\right) \right\rangle
 \end{equation}
 where
 \begin{equation}
- \left[\frac{\partial D(\mu_I,m)}{\partial\mu_I}\psi\right]_x =\frac{\mu_I}{4}\left[ e^{\mu_I/2} U_0(x) \psi(x+\hat0) + e^{-\mu_I/2} U^{\dagger}_0(x-\hat0) \psi(x-\hat0)\right]
+ \left[\frac{\partial D(\mu_I,m)}{\partial\mu_I}\psi\right]_x =\frac{\mu_I}{2}\left[ e^{\mu_I} U_0(x) \psi(x+\hat0) + e^{-\mu_I} U^{\dagger}_0(x-\hat0) \psi(x-\hat0)\right]
 \end{equation}
+
 \appendix
 \section{SU(3) Matrix Algebra}
 

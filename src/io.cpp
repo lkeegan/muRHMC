@@ -1,14 +1,26 @@
 #include "io.hpp"
-#include <iostream> //FOR DEBUGGING
+#include <iostream>
+#include <iomanip>
 
-void read_fortran_gauge_field(field<gauge>& U, const std::string& fileName) {
+constexpr int STRING_WIDTH = 17;
+
+void log(const std::string& message) {
+	std::cout << "# " << std::left << std::setw(STRING_WIDTH) << message << std::endl;
+}
+
+void log(const std::string& message, double value) {
+	std::cout << "# " << std::left << std::setw(STRING_WIDTH) << message << std::left << std::setw(STRING_WIDTH) << value << std::endl;
+}
+
+void read_fortran_gauge_field(field<gauge>& U, const std::string& filename) {
 	// open file in binary mode
-	std::ifstream input(fileName.c_str(), std::ios::binary);
+	log(("Reading fortran gauge field from file: " + filename));
+	std::ifstream input(filename.c_str(), std::ios::binary);
+	// fortran 'unformatted' format: 4-byte delimeter before each variable
+	// header consists of 2x doubles and 2x ints
+	// so we want to skip 2x doubles + 2x ints + 5x 4-byte delimeters
+	constexpr int SKIP_BYTES = 2*8 + 2*4 + 5*4;
 	if (input.good()) {
-		// fortran 'unformatted' format: 4-byte delimeter before each variable
-		// header consists of 2x doubles and 2x ints
-		// so we want to skip 2x doubles + 2x ints + 5x 4-byte delimeters
-		const int SKIP_BYTES = 2*8 + 2*4 + 5*4;  
 		input.seekg(SKIP_BYTES, std::ios::cur);
 
 		// the rest of the file is now an array of doubles, with ordering
@@ -44,11 +56,20 @@ void read_fortran_gauge_field(field<gauge>& U, const std::string& fileName) {
 				}
 			}
 		}
+		log("Gauge field read with plaquette: ", checksum_plaquette(U));
+	}
+	else {
+		log("Failed to open file: " + filename);		
 	}
 }
 
-void read_gauge_field (field<gauge>& U, const std::string& fileName) {
-	std::ifstream input(fileName.c_str(), std::ios::binary);
+std::string make_filename (const std::string& base_name, int config_number) {
+	return base_name + "_" + std::to_string(config_number) + ".cnfg";
+}
+
+void read_gauge_field (field<gauge>& U, const std::string& base_name, int config_number) {
+	std::string filename = make_filename (base_name, config_number);
+	std::ifstream input(filename.c_str(), std::ios::binary);
 	if (input.good()) {
 		double plaq_check;
 		// read average plaquette as checksum
@@ -58,24 +79,33 @@ void read_gauge_field (field<gauge>& U, const std::string& fileName) {
 		// check that plaquette matches checksum
 		double plaq = checksum_plaquette(U);
 		if(fabs(plaq - plaq_check) > 1.e-15) {
-			std::cout.precision(17);
-			std::cout << "ERROR: read_gauge_field CHECKSUM fail!" << std::endl;
-			std::cout << "checksum plaquette: " << plaq_check << std::endl;
-			std::cout << "measured plaquette: " << plaq << std::endl;
-			std::cout << "deviation: " << plaq - plaq_check << std::endl;
+			log("ERROR: read_gauge_field CHECKSUM fail!");
+			log("filename: " + filename);
+			log("checksum plaquette in file", plaq_check);
+			log("measured plaquette", plaq);
+			log("deviation", plaq - plaq_check);
 			exit(0);
 		}
+		log("Gauge field [" + filename + "] read with plaquette: ", plaq);
+	}
+	else {
+		log("Failed to read from file: " + filename);		
 	}
 }
 
-void write_gauge_field (field<gauge>& U, const std::string& fileName) {
-	std::ofstream output(fileName.c_str(), std::ios::binary);
+void write_gauge_field (field<gauge>& U, const std::string& base_name, int config_number) {
+	std::string filename = make_filename (base_name, config_number);
+	std::ofstream output(filename.c_str(), std::ios::binary);
 	if (output.good()) {
 		double plaq = checksum_plaquette(U);
 		// write average plaquette as checksum
 		output.write(reinterpret_cast<char*>(&plaq), sizeof(plaq));
 		// write U		
 		output.write(reinterpret_cast<char*>(&(U[0][0](0,0))), U.V*4*9*sizeof(std::complex<double>));
+		log("Gauge field [" + filename + "] written with plaquette: ", plaq);
+	}
+	else {
+		log("Failed to write to file: " + filename);		
 	}
 }
 

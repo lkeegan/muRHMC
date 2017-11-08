@@ -1,25 +1,10 @@
 #include "hmc.hpp"
 #include "dirac_op.hpp"
 #include "io.hpp"
+#include "stats.hpp"
 #include <iostream>
 #include <random>
-
-// return average of values in vector
-double av(std::vector<double> &vec) {
-	double sum = std::accumulate(vec.begin(), vec.end(), 0.0);
-	return sum/static_cast<double>(vec.size());
-}
-
-// return std error of average
-double std_err(std::vector<double> &vec) {
-	double mean = av(vec);
-
-	double s = 0.;
-	for (unsigned int i=0; i<vec.size(); i++) {
-		s += (vec[i] - mean)*(vec[i] - mean);
-	}
-	return sqrt(s)/static_cast<double>(vec.size());
-}
+#include <Eigen/Eigenvalues>
 
 int main(int argc, char *argv[]) {
 
@@ -71,8 +56,8 @@ int main(int argc, char *argv[]) {
 
 	// read philippe gauge config
 	read_fortran_gauge_field(U, "fort.1");
-	std::cout << "FORTRAN GAUGE CONFIG PLAQ: " << hmc.plaq(U) << std::endl;
-	std::cout << "FORTRAN GAUGE CONFIG POLY: " << hmc.polyakov_loop(U) << std::endl;
+	std::cout << "# FORTRAN GAUGE CONFIG PLAQ: " << hmc.plaq(U) << std::endl;
+	std::cout << "# FORTRAN GAUGE CONFIG POLY: " << hmc.polyakov_loop(U) << std::endl;
 
 	std::vector<double> psibar_psi, pion_susceptibility, isospin_density;
 	
@@ -94,14 +79,14 @@ int main(int argc, char *argv[]) {
 
 		// isospin_density = (d/dmu)Tr[{D(mu,m)D(mu,m)^dag}^-1]
 		// 2 Re{ <chi|(dD/dmu)|psi> }
-		double mu_I_plus_factor = exp(0.5 * hmc_pars.mu_I);
-		double mu_I_minus_factor = exp(-0.5 * hmc_pars.mu_I);
+		double mu_I_plus_factor = exp(hmc_pars.mu_I);
+		double mu_I_minus_factor = exp(-hmc_pars.mu_I);
 		double sum_iso = 0;
 		for(int ix=0; ix<U.V; ++ix) {
 			sum_iso += mu_I_plus_factor * chi[ix].dot( U[ix][0] * psi.up(ix,0) ).real();
 			sum_iso += mu_I_minus_factor * chi[ix].dot( U.dn(ix,0)[0].adjoint() * psi.dn(ix,0) ).real();
 		}
-		isospin_density.push_back(0.5 * hmc_pars.mu_I * sum_iso);
+		isospin_density.push_back(hmc_pars.mu_I * sum_iso);
 	}
 
 	std::cout << "# mu_I\t<psibar_psi>\t\terror\t\t\t<pion_susceptibility>\terror\t\t\t<isospin_density>\terror" << std::endl;
@@ -110,5 +95,21 @@ int main(int argc, char *argv[]) {
 				<< av(pion_susceptibility) << "\t" << std_err(pion_susceptibility) << "\t"
 				<< av(isospin_density) << "\t" << std_err(isospin_density) << std::endl;
 
+	// Calculate all eigenvalues of Dirac op:
+	Eigen::MatrixXcd eigenvalues = D.D_eigenvalues (U, hmc_pars.mass, hmc_pars.mu_I);				
+	// phase of determinant:
+	// Det[D] = \prod_i \lambda_i
+	double phase_det = std::arg(eigenvalues.prod());
+	std::cout << "phase of determinant: " << phase_det << std::endl;
+
+	// Trace[D^-1] = \sum_i \lambda_i^-1:
+	std::cout << "pbp exact: " << eigenvalues.cwiseInverse().sum()/static_cast<double>(3*U.V) << std::endl;
+
+	// Calculate all eigenvalues of DDdagger op:
+	Eigen::MatrixXcd eigenvaluesDDdag = D.DDdagger_eigenvalues (U, hmc_pars.mass, hmc_pars.mu_I);				
+
+	// Trace[D^-1] = \sum_i \lambda_i^-1:
+	std::cout << "psuscept_hermitian exact: " << ((eigenvalues.cwiseInverse()).adjoint() * (eigenvalues.cwiseInverse()))/static_cast<double>(3*U.V) << std::endl;
+	std::cout << "psuscept exact: " << eigenvaluesDDdag.cwiseInverse().sum()/static_cast<double>(3*U.V) << std::endl;
 	return(0);
 }

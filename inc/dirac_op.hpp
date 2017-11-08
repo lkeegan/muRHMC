@@ -42,6 +42,16 @@ public:
 	// Hermitian D D^{\dagger} operator: lhs = DDdagger(rhs)
 	void DDdagger (field<fermion>& lhs, const field<fermion>& rhs, field<gauge>& U, double m, double mu_I);
 
+	// Returns eigenvalues of Dirac op
+	// Explicitly constructs dense (3*VOL)x(3*VOL) matrix Dirac op and finds all eigenvalues 
+	Eigen::MatrixXcd D_eigenvalues (field<gauge>& U, double mass, double mu_I) const;
+
+	// Same for DDdagger, but much faster since we can use a hermitian solver.
+	Eigen::MatrixXcd DDdagger_eigenvalues (field<gauge>& U, double mass, double mu_I) const;
+
+	// explicitly construct dirac op as dense (3*VOL)x(3*VOL) matrix
+	Eigen::MatrixXcd D_dense_matrix (field<gauge>& U, double mass, double mu_I) const;
+
 	// CG inversion of D D^{\dagger} x = b: given b solves for x
 	// returns number of times Dirac operator was called
 	int cg(field<fermion>& x, const field<fermion>& b, field<gauge>& U, double m, double mu_I, double eps);

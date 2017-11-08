@@ -1,41 +1,20 @@
 #include "hmc.hpp"
 #include "dirac_op.hpp"
 #include "io.hpp"
+#include "stats.hpp"
 #include <iostream>
+#include <iomanip>
 #include <random>
 
-// return average of values in vector
-double av(std::vector<double> &vec) {
-	double sum = std::accumulate(vec.begin(), vec.end(), 0.0);
-	return sum/static_cast<double>(vec.size());
-}
-
-// return std error of average
-double std_err(std::vector<double> &vec) {
-	double mean = av(vec);
-
-	double s = std::accumulate(vec.begin(), vec.end(), 0.0,
-		[mean](double partial_result, double value){ 
-			return partial_result + (value - mean) * (value - mean);
-		} );
-	/*
-	// above is equivalent to:
-	double s = 0.;
-	for (unsigned int i=0; i<vec.size(); i++) {
-		s += (vec[i] - mean)*(vec[i] - mean);
-	}
-	*/
-	return sqrt(s)/static_cast<double>(vec.size());
-}
-
 int main(int argc, char *argv[]) {
-
-    if (argc != 6) {
-        std::cout << "This program requires 5 arguments:" << std::endl;
-        std::cout << "beta mass mu_I n_integrator_steps seed" << std::endl;
-        std::cout << "e.g. ./hmc 4.4 0.25 0.10 17 12345" << std::endl;
+    if (argc-1 != 8) {
+        std::cout << "This program requires 8 arguments:" << std::endl;
+        std::cout << "beta mass mu_I n_integrator_steps n_therm n_traj n_save seed, e.g." << std::endl;
+        std::cout << "./rhmc 4.4 0.14 0.25 17 500 1000 100 12345" << std::endl;
         return 1;
     }
+
+	std::cout.precision(14);
 
 	// HMC parameters
 	hmc_params hmc_pars;
@@ -43,24 +22,32 @@ int main(int argc, char *argv[]) {
 	hmc_pars.mass = atof(argv[2]);
 	hmc_pars.mu_I = atof(argv[3]);
 	hmc_pars.tau = 1.0;
-	hmc_pars.n_steps = atof(argv[4]);
+	hmc_pars.n_steps = static_cast<int>(atof(argv[4]));
 	hmc_pars.MD_eps = 1.e-6;
-	hmc_pars.seed = atoi(argv[5]);
+	hmc_pars.seed = static_cast<int>(atof(argv[8]));
+
+	// run parameters
+	int n_therm = static_cast<int>(atof(argv[5]));
+	int n_traj = static_cast<int>(atof(argv[6]));
+	int n_save = static_cast<int>(atof(argv[7]));
+	std::string str_mu(argv[3]);
+	std::string base_name = "mu" + str_mu;	
 
 	// make 4^4 lattice
 	lattice grid (4);
 
-	std::cout.precision(17);
-
-	std::cout << "# RHMC run with parameters:" << std::endl;
-	std::cout << "# L\t" << grid.L0 << std::endl;
-	std::cout << "# beta\t" << hmc_pars.beta << std::endl;
-	std::cout << "# mass\t" << hmc_pars.mass << std::endl;
-	std::cout << "# mu_I\t" << hmc_pars.mu_I << std::endl;
-	std::cout << "# tau\t" << hmc_pars.tau << std::endl;
-	std::cout << "# n_steps\t" << hmc_pars.n_steps << std::endl;
-	std::cout << "# MD epsilon\t" << hmc_pars.MD_eps << std::endl;
-	std::cout << "# seed\t" << hmc_pars.seed << std::endl;
+	log("RHMC run with parameters:");
+	log("L", grid.L0);
+	log("beta", hmc_pars.beta);
+	log("mass", hmc_pars.mass);
+	log("mu_I", hmc_pars.mu_I);
+	log("tau", hmc_pars.tau);
+	log("n_steps", hmc_pars.n_steps);
+	log("MD epsilon", hmc_pars.MD_eps);
+	log("RNG seed", hmc_pars.seed);
+	log("n_traj", n_traj);
+	log("n_therm", n_therm);
+	log("n_save", n_save);
 
 	// make U[mu] field on lattice
 	field<gauge> U (grid);
@@ -74,59 +61,52 @@ int main(int argc, char *argv[]) {
 	// so 0.0 gives unit gauge links, large value = random
 	hmc.random_U (U, 0.5);
 
-	int n_traj = 20; //10000;
-	int n_therm = 20; //500
-	int n_block = 10;
-	int acc = 0;
-	std::vector<double> plq;
-	std::vector<double> tmpplq;
 	std::vector<double> dE;
-	std::vector<double> tmpdE;
 	std::vector<double> expdE;
-	std::vector<double> tmpexpdE;
+	std::vector<double> plq;
 	std::vector<double> poly;
-	std::vector<double> tmppoly;
-	std::vector<double> pbp;
-	std::vector<double> tmppbp;
 
-	for(int i=0; i<n_traj+n_therm; ++i) {
-
+	// thermalisation
+	log("");
+	log("Thermalisation:");
+	log("");
+	int acc = 0;
+	for(int i=1; i<=n_therm; ++i) {
 		acc += hmc.trajectory (U, D);
-		if(i>n_therm) {
-			tmpplq.push_back(hmc.plaq(U));
-			tmppoly.push_back(hmc.polyakov_loop(U));
-			tmpdE.push_back(hmc.deltaE);
-			tmpexpdE.push_back(exp(-hmc.deltaE));
-			tmppbp.push_back(hmc.chiral_condensate(U, D));
-//			std::cout << "#dE:\t" << new_ac - old_ac << std::endl;
-			if(i%n_block==0) {
-				plq.push_back(av(tmpplq));
-				tmpplq.clear();
-				poly.push_back(av(tmppoly));
-				tmppoly.clear();
-				dE.push_back(av(tmpdE));
-				tmpdE.clear();
-				expdE.push_back(av(tmpexpdE));
-				tmpexpdE.clear();
-				pbp.push_back(av(tmppbp));
-				tmppbp.clear();
-				//std::cout << deltaE << std::endl;	
-			}
-		}
-		//std::cout << "#action U, P, total:\t" << action_U(U, beta) << "\t" << action_P(P) << "\t" << action(U, P, beta) << std::endl;
-		std::cout << "iter " << i-n_therm << "/" << n_traj<< "\tplaq: " << hmc.plaq(U) << "\t acc: " << acc/static_cast<double>(i+1) << std::endl;
-		//std::cout << hmc.plaq(U) << "\t" << hmc.chiral_condensate(U, D) << std::endl;
+		std::cout << "# iter " << i << " / " << n_therm 
+				  << "\tplaq: " << hmc.plaq(U) 
+				  << "\t acc: " << acc/static_cast<double>(i) << std::endl;
 	}
-	//std::cout << "UU^dagger: " << U[34][2]*U[34][2].adjoint() << std::endl;
-	//std::cout << "Det[U]: " << U[34][2].determinant() << std::endl;
+	log("Thermalisation acceptance", static_cast<double>(acc)/static_cast<double>(n_therm));
 
-	std::cout 	<< hmc_pars.tau/hmc_pars.n_steps << "\t" 
-				<< 1.0-av(expdE) << "\t" << std_err(expdE) << "\t" 
-				<< av(dE) << "\t" << std_err(dE) << "\t" 
-				<< av(plq) << "\t" << std_err(plq) << "\t" 
-				<< av(poly) << "\t" << std_err(poly) << "\t"
-				<< av(pbp) << "\t" << std_err(pbp) << "\t"
-		 		<< acc/static_cast<double>(n_traj+n_therm) << std::endl;
+	// gauge config generation
+	log("");
+	log("Main run:");
+	log("");
+	acc = 0;
+	for(int i=1; i<=n_traj; ++i) {
+		acc += hmc.trajectory (U, D);
+		dE.push_back(hmc.deltaE);
+		expdE.push_back(exp(-hmc.deltaE));
+		plq.push_back(hmc.plaq(U));
+		poly.push_back(hmc.polyakov_loop(U));
+		std::cout << "# iter " << i << " / " << n_traj 
+				  << "\tplaq: " << hmc.plaq(U) 
+				  << "\t acc: " << static_cast<double>(acc)/static_cast<double>(i) << std::endl;
+		if(i%n_save==0) {
+			// save gauge config
+			write_gauge_field(U, base_name, i/n_save);
+		}
+	}
+
+	// print average, error & integrated autocorrelation time of measured observables
+	log("Acceptance", static_cast<double>(acc)/static_cast<double>(n_traj));
+	log("");
+	std::cout << "# " << std::left << std::setw(20) << "observable" << "average\t\terror\t\t\ttau_int\t\terror" << std::endl;
+	print_av(expdE, "<1-exp(-dE)>");
+	print_av(dE, "<dE>");
+	print_av(plq, "<plaq>");
+	print_av(poly, "<polyakov>");
 
 	return(0);
 }

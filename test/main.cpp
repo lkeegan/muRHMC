@@ -331,6 +331,7 @@ TEST_CASE( "Reversibility of HMC", "[hmc]" ) {
 	field<gauge> U (grid);
 	field<gauge> P (grid);
 	field<gauge> U_old (grid);
+	hmc_params.n_steps = 3;
 	hmc hmc (hmc_params);
 	dirac_op D (grid);
 	hmc.random_U(U, 10.0);
@@ -376,11 +377,11 @@ TEST_CASE( "HMC conserves action for small tau", "[hmc]" ) {
 	field<gauge> U (grid);
 	field<gauge> P (grid);
 	hmc_params.tau = 0.05;
-	hmc_params.n_steps = 5;
-	hmc_params.MD_eps = 1.e-8;
+	hmc_params.n_steps = 7;
+	hmc_params.MD_eps = 1.e-10;
 	hmc hmc (hmc_params);
 	dirac_op D (grid);
-	hmc.random_U(U, 10.0);
+	hmc.random_U(U, 0.2);
 	hmc.trajectory(U, D);
 	INFO("HMC deltaE: " << hmc.deltaE << "\t MD_eps: " << hmc_params.MD_eps 
 		 << "\t tau: " << hmc_params.tau << "\t n_steps: " << hmc_params.n_steps);
@@ -441,8 +442,34 @@ TEST_CASE( "Read/Write gauge fields to file", "[IO]") {
 	hmc.random_U(U1, 0.7);
 
 	double plaq1 = hmc.plaq(U1);
-	write_gauge_field(U1, "tmp.dat");
-	read_gauge_field(U2, "tmp.dat");
+	write_gauge_field(U1, "tmp_test_data", 666);
+	read_gauge_field(U2, "tmp_test_data", 666);
 	double plaq2 = hmc.plaq(U2);
 	REQUIRE ( plaq1 == approx(plaq2));
+}
+
+TEST_CASE( "Explicit Dirac op matrix equivalent to sparse MVM op", "[Eigenvalues]") {
+	lattice grid (4);
+	field<gauge> U (grid);
+	hmc hmc (hmc_params);
+	dirac_op D (grid);
+	hmc.random_U(U, 10.0);
+	field<fermion> phi (grid);
+	field<fermion> chi (grid);
+	field<fermion> psi (grid);
+	// construct explicit dense dirac matrix
+	Eigen::MatrixXcd D_matrix = D.D_dense_matrix(U, hmc_params.mass, hmc_params.mu_I);
+	// chi = D_dense phi
+	Eigen::MatrixXcd D_vec = Eigen::VectorXcd::Random(3*U.V);
+	Eigen::MatrixXcd Dvec_vec = D_matrix * D_vec;
+	for(int ix=0; ix<U.V; ++ix) {
+		phi[ix] = D_vec.block<3,1>(3*ix,0);
+		chi[ix] = Dvec_vec.block<3,1>(3*ix,0);
+	}
+	// psi = D phi
+	D.D(psi, phi, U, hmc_params.mass, hmc_params.mu_I);
+	// psi ?= chi
+	double dev = is_field_equal(psi, chi);
+	INFO ("matrix Dirac op deviation from sparse MVM op: " << dev);	
+	REQUIRE ( dev == approx(0) );
 }

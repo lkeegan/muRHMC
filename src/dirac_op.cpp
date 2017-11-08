@@ -38,12 +38,57 @@ void dirac_op::apbs_in_time (field<gauge>& U) const {
 	}
 }
 
+// explicitly construct dirac op as dense (3xVOL)x(3xVOL) matrix
+Eigen::MatrixXcd dirac_op::D_dense_matrix (field<gauge>& U, double mass, double mu_I) const {
+	Eigen::MatrixXcd D_matrix = Eigen::MatrixXcd::Zero(3*U.V, 3*U.V);
+	apbs_in_time(U);
+	double mu_I_plus_factor = exp(mu_I);
+	double mu_I_minus_factor = exp(-mu_I);
+	for(int ix=0; ix<U.V; ++ix) {
+		D_matrix.block<3,3>(3*ix,3*ix) = mass * SU3mat::Identity();
+		// mu=0 terms have extra chemical potential isospin factors exp(+-\mu_I/2):
+		// NB eta[ix][0] is just 1 so dropped from this expression
+		D_matrix.block<3,3>(3*ix,3*U.iup(ix,0)) = 0.5 * mu_I_plus_factor * U[ix][0];
+		D_matrix.block<3,3>(3*ix,3*U.idn(ix,0)) = -0.5 * mu_I_minus_factor * U.dn(ix,0)[0].adjoint();
+		for(int mu=1; mu<4; ++mu) {
+			D_matrix.block<3,3>(3*ix,3*U.iup(ix,mu)) = 0.5 * eta[ix][mu] * U[ix][mu]; 
+			D_matrix.block<3,3>(3*ix,3*U.idn(ix,mu)) = -0.5 * eta[ix][mu] * U.dn(ix,mu)[mu].adjoint();
+		}
+	}
+	// undo flip to restore original U's
+	apbs_in_time(U);
+	return D_matrix;
+}
+
+Eigen::MatrixXcd dirac_op::D_eigenvalues (field<gauge>& U, double mass, double mu_I) const {
+	// construct explicit dense dirac matrix
+	Eigen::MatrixXcd D_matrix = D_dense_matrix(U, mass, mu_I);
+	// find all eigenvalues of dirac operator matrix
+	Eigen::ComplexEigenSolver<Eigen::MatrixXcd> ces;
+	ces.compute(D_matrix);
+	// return complex phase of determinant (product of all eigenvalues) of D
+	return ces.eigenvalues();
+	// return complex phase of determinant (product of all eigenvalues) of D
+}
+
+Eigen::MatrixXcd dirac_op::DDdagger_eigenvalues (field<gauge>& U, double mass, double mu_I) const {
+	// construct explicit dense dirac matrix
+	Eigen::MatrixXcd D_matrix = D_dense_matrix(U, mass, mu_I);
+	D_matrix = D_matrix * D_matrix.adjoint();
+	// find all eigenvalues of dirac operator matrix
+	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXcd> saes;
+	saes.compute(D_matrix);
+	// return complex phase of determinant (product of all eigenvalues) of D
+	return saes.eigenvalues();
+	// return complex phase of determinant (product of all eigenvalues) of D
+}
+
 void dirac_op::D (field<fermion>& lhs, const field<fermion>& rhs, field<gauge>& U, double mass, double mu_I) const {
 	// flip sign of timelike U's at boundary to impose anti-periodic bcs on fermions 
 	apbs_in_time(U);
 
-	double mu_I_plus_factor = exp(0.5 * mu_I);
-	double mu_I_minus_factor = exp(-0.5 * mu_I);
+	double mu_I_plus_factor = exp(mu_I);
+	double mu_I_minus_factor = exp(-mu_I);
 	// default static scheduling, with N threads, split loop into N chunks, one per thread 
 	#pragma omp parallel for
 	for(int ix=0; ix<rhs.V; ++ix) {
@@ -197,5 +242,4 @@ int dirac_op::cg_multishift(std::vector<field<fermion>>& x, const field<fermion>
 		}
 	}
 	return iter;	
-
 }
