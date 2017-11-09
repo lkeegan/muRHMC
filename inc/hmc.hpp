@@ -85,12 +85,11 @@ public:
 	// average of plaquette over N_c, mu,nu and volume: range [0, 1]
 	double plaq (const field<gauge>& U);
 
-	// average of real part of polyakov loops in time (x_0) direction
-	double polyakov_loop (const field<gauge>& U);
+	// average of polyakov loops in time (x_0) direction
+	std::complex<double> polyakov_loop (const field<gauge> &U);
 
 	// returns estimate of chiral_condensate using 1 random gaussian fermion vector
 	double chiral_condensate (field<gauge> &U, dirac_op& D);
-
 };
 
 #endif //LATTICE_HMC_H

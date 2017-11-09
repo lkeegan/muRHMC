@@ -21,7 +21,7 @@ int main(int argc, char *argv[]) {
 	hmc_pars.beta = atof(argv[1]);
 	hmc_pars.mass = atof(argv[2]);
 	hmc_pars.mu_I = atof(argv[3]);
-	hmc_pars.tau = 1.0;
+	hmc_pars.tau = 1.0;	
 	hmc_pars.n_steps = static_cast<int>(atof(argv[4]));
 	hmc_pars.MD_eps = 1.e-6;
 	hmc_pars.seed = static_cast<int>(atof(argv[8]));
@@ -64,7 +64,8 @@ int main(int argc, char *argv[]) {
 	std::vector<double> dE;
 	std::vector<double> expdE;
 	std::vector<double> plq;
-	std::vector<double> poly;
+	std::vector<double> poly_re;
+	std::vector<double> poly_im;
 
 	// thermalisation
 	log("");
@@ -89,7 +90,9 @@ int main(int argc, char *argv[]) {
 		dE.push_back(hmc.deltaE);
 		expdE.push_back(exp(-hmc.deltaE));
 		plq.push_back(hmc.plaq(U));
-		poly.push_back(hmc.polyakov_loop(U));
+		std::complex<double> tmp_poly = hmc.polyakov_loop(U);
+		poly_re.push_back(tmp_poly.real());
+		poly_im.push_back(tmp_poly.imag());
 		std::cout << "# iter " << i << " / " << n_traj 
 				  << "\tplaq: " << hmc.plaq(U) 
 				  << "\t acc: " << static_cast<double>(acc)/static_cast<double>(i) << std::endl;
@@ -103,10 +106,11 @@ int main(int argc, char *argv[]) {
 	log("Acceptance", static_cast<double>(acc)/static_cast<double>(n_traj));
 	log("");
 	std::cout << "# " << std::left << std::setw(20) << "observable" << "average\t\terror\t\t\ttau_int\t\terror" << std::endl;
-	print_av(expdE, "<1-exp(-dE)>");
+	print_av(expdE, "<exp(-dE)>");
 	print_av(dE, "<dE>");
 	print_av(plq, "<plaq>");
-	print_av(poly, "<polyakov>");
+	print_av(poly_re, "Re<polyakov>");
+	print_av(poly_im, "Im<polyakov>");
 
 	return(0);
 }

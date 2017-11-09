@@ -8,31 +8,35 @@
 
 int main(int argc, char *argv[]) {
 
+/*
     if (argc != 6) {
         std::cout << "This program requires 5 arguments:" << std::endl;
         std::cout << "beta mass mu_I n_measurements seed" << std::endl;
         std::cout << "e.g. ./hmc 4.4 0.14 0.25 1e3 12345" << std::endl;
         return 1;
     }
+*/
 
-	// HMC parameters
-	hmc_params hmc_pars;
-	hmc_pars.beta = atof(argv[1]);
-	hmc_pars.mass = atof(argv[2]);
-	hmc_pars.mu_I = atof(argv[3]);
-	hmc_pars.tau = 1.0;
-	hmc_pars.n_steps = 1;
-	hmc_pars.MD_eps = 1.e-6;
-	hmc_pars.seed = atoi(argv[5]);
+    if (argc-1 != 3) {
+        std::cout << "This program requires 3 arguments:" << std::endl;
+        std::cout << "mass mu_I initial_config" << std::endl;
+        std::cout << "e.g. ./hmc 0.14 0.25 23" << std::endl;
+        return 1;
+    }
 
-	int n_meas = static_cast<int>(atof(argv[4])); //10000;
-	double eps = 1.e-10;
+	double mass = atof(argv[1]);
+	double mu_I = atof(argv[2]);
+	int n_initial = static_cast<int>(atof(argv[3])); //10000;
+
+	std::string str_mu(argv[2]);
+	std::string base_name = "mu" + str_mu;	
 
 	// make 4^4 lattice
 	lattice grid (4);
 
 	std::cout.precision(17);
-
+/*
+	double eps = 1.e-10;
 	std::cout << "# Measurement run with parameters:" << std::endl;
 	std::cout << "# L\t" << grid.L0 << std::endl;
 	std::cout << "# beta\t" << hmc_pars.beta << std::endl;
@@ -41,23 +45,27 @@ int main(int argc, char *argv[]) {
 	std::cout << "# inverter precision\t" << eps << std::endl;
 	std::cout << "# number of measurements\t" << n_meas << std::endl;
 	std::cout << "# seed\t" << hmc_pars.seed << std::endl;
-
+*/
 	// make U[mu] field on lattice
 	field<gauge> U (grid);
 	// initialise Dirac Op
 	dirac_op D (grid);
 
+	// read philippe gauge config
+	// Initialise HMC
+/*
+	hmc_params hmc_pars;
+	hmc hmc (hmc_pars);
+	read_fortran_gauge_field(U, "fort.1");
+	std::cout << "# FORTRAN GAUGE CONFIG PLAQ: " << hmc.plaq(U) << std::endl;
+	std::cout << "# FORTRAN GAUGE CONFIG POLY: " << hmc.polyakov_loop(U) << std::endl;
+*/
+	// Gaussian noise observables:
+	/*
 	field<fermion> phi(U.grid);
 	field<fermion> chi(U.grid);
 	field<fermion> psi(U.grid);
 
-	// Initialise HMC
-	hmc hmc (hmc_pars);
-
-	// read philippe gauge config
-	read_fortran_gauge_field(U, "fort.1");
-	std::cout << "# FORTRAN GAUGE CONFIG PLAQ: " << hmc.plaq(U) << std::endl;
-	std::cout << "# FORTRAN GAUGE CONFIG POLY: " << hmc.polyakov_loop(U) << std::endl;
 
 	std::vector<double> psibar_psi, pion_susceptibility, isospin_density;
 	
@@ -94,22 +102,28 @@ int main(int argc, char *argv[]) {
 				<< av(psibar_psi) << "\t" << std_err(psibar_psi) << "\t"
 				<< av(pion_susceptibility) << "\t" << std_err(pion_susceptibility) << "\t"
 				<< av(isospin_density) << "\t" << std_err(isospin_density) << std::endl;
+	*/
 
-	// Calculate all eigenvalues of Dirac op:
-	Eigen::MatrixXcd eigenvalues = D.D_eigenvalues (U, hmc_pars.mass, hmc_pars.mu_I);				
-	// phase of determinant:
-	// Det[D] = \prod_i \lambda_i
-	double phase_det = std::arg(eigenvalues.prod());
-	std::cout << "phase of determinant: " << phase_det << std::endl;
+	for(int i=n_initial; ; ++i) {
+		read_gauge_field(U, base_name, i);
 
-	// Trace[D^-1] = \sum_i \lambda_i^-1:
-	std::cout << "pbp exact: " << eigenvalues.cwiseInverse().sum()/static_cast<double>(3*U.V) << std::endl;
+		// Calculate all eigenvalues of Dirac op:
+		Eigen::MatrixXcd eigenvalues = D.D_eigenvalues (U, mass, mu_I);				
+		// phase of determinant:
+		// Det[D] = \prod_i \lambda_i
+		log("[evals] complex-det", eigenvalues.prod()/static_cast<double>(3*U.V));
+		double phase_det = std::arg(eigenvalues.prod());
+		log("[evals] det-phase", phase_det);
 
-	// Calculate all eigenvalues of DDdagger op:
-	Eigen::MatrixXcd eigenvaluesDDdag = D.DDdagger_eigenvalues (U, hmc_pars.mass, hmc_pars.mu_I);				
+		// Trace[D^-1] = \sum_i \lambda_i^-1:
+		log("[evals] psibar-psi", eigenvalues.cwiseInverse().sum()/static_cast<double>(3*U.V));
 
-	// Trace[D^-1] = \sum_i \lambda_i^-1:
-	std::cout << "psuscept_hermitian exact: " << ((eigenvalues.cwiseInverse()).adjoint() * (eigenvalues.cwiseInverse()))/static_cast<double>(3*U.V) << std::endl;
-	std::cout << "psuscept exact: " << eigenvaluesDDdag.cwiseInverse().sum()/static_cast<double>(3*U.V) << std::endl;
+		// Calculate all eigenvalues of DDdagger op:
+		Eigen::MatrixXcd eigenvaluesDDdag = D.DDdagger_eigenvalues (U, mass, mu_I);				
+		log("[evals] pion-suscept", eigenvaluesDDdag.cwiseInverse().sum().real()/static_cast<double>(3*U.V));
+		log("[evals] mineval-DDdag", eigenvaluesDDdag.real().minCoeff());
+		log("[evals] maxeval-DDdag", eigenvaluesDDdag.real().maxCoeff());
+	}
+//	std::cout << "psuscept_assuming_hermitian exact: " << ((eigenvalues.cwiseInverse()).adjoint() * (eigenvalues.cwiseInverse()))/static_cast<double>(3*U.V) << std::endl;
 	return(0);
 }

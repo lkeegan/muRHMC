@@ -2,12 +2,14 @@
 #define LATTICE_IO_H
 #include <fstream>
 #include <string>
+#include <complex>
 #include "4d.hpp"
 #include "su3.hpp"
 
 // output message and variables to log file
 void log(const std::string& message);
 void log(const std::string& message, double value);
+void log(const std::string& message, std::complex<double> value);
 
 // Read a gauge field from file in Philippe's fortran format
 void read_fortran_gauge_field(field<gauge>& U, const std::string& filename);

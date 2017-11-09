@@ -2,13 +2,17 @@
 #include <iostream>
 #include <iomanip>
 
-constexpr int STRING_WIDTH = 17;
+constexpr int STRING_WIDTH = 22;
 
 void log(const std::string& message) {
 	std::cout << "# " << std::left << std::setw(STRING_WIDTH) << message << std::endl;
 }
 
 void log(const std::string& message, double value) {
+	std::cout << "# " << std::left << std::setw(STRING_WIDTH) << message << std::left << std::setw(STRING_WIDTH) << value << std::endl;
+}
+
+void log(const std::string& message, std::complex<double> value) {
 	std::cout << "# " << std::left << std::setw(STRING_WIDTH) << message << std::left << std::setw(STRING_WIDTH) << value << std::endl;
 }
 
@@ -78,7 +82,7 @@ void read_gauge_field (field<gauge>& U, const std::string& base_name, int config
 		input.read(reinterpret_cast<char*>(&(U[0][0](0,0))), U.V*4*9*sizeof(std::complex<double>));
 		// check that plaquette matches checksum
 		double plaq = checksum_plaquette(U);
-		if(fabs(plaq - plaq_check) > 1.e-15) {
+		if(fabs(plaq - plaq_check) > 5.e-15) {
 			log("ERROR: read_gauge_field CHECKSUM fail!");
 			log("filename: " + filename);
 			log("checksum plaquette in file", plaq_check);
@@ -89,7 +93,8 @@ void read_gauge_field (field<gauge>& U, const std::string& base_name, int config
 		log("Gauge field [" + filename + "] read with plaquette: ", plaq);
 	}
 	else {
-		log("Failed to read from file: " + filename);		
+		log("Failed to read from file: " + filename);
+		exit(0);
 	}
 }
 
