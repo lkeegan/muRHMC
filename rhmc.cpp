@@ -23,7 +23,7 @@ int main(int argc, char *argv[]) {
 	hmc_pars.mu_I = atof(argv[3]);
 	hmc_pars.tau = 1.0;	
 	hmc_pars.n_steps = static_cast<int>(atof(argv[4]));
-	hmc_pars.MD_eps = 1.e-6;
+	hmc_pars.MD_eps = 1.e-7;
 	hmc_pars.seed = static_cast<int>(atof(argv[8]));
 
 	// run parameters
@@ -74,10 +74,17 @@ int main(int argc, char *argv[]) {
 	int acc = 0;
 	for(int i=1; i<=n_therm; ++i) {
 		acc += hmc.trajectory (U, D);
-		std::cout << "# iter " << i << " / " << n_therm 
+
+		//Eigen::MatrixXcd eigenvaluesDDdag = D.DDdagger_eigenvalues (U, hmc_pars.mass, hmc_pars.mu_I);				
+		//double effective_mass = sqrt(eigenvaluesDDdag.real().minCoeff());
+
+		std::cout << "# therm " << i << "/" << n_therm 
 				  << "\tplaq: " << hmc.plaq(U) 
-				  << "\t acc: " << acc/static_cast<double>(i) << std::endl;
-	}
+				  << "\t acc: " << acc/static_cast<double>(i)
+				  << "\t dE: " << hmc.deltaE
+				  //<< "\t m_eff: " << effective_mass
+ 				  << std::endl;
+ 	}
 	log("Thermalisation acceptance", static_cast<double>(acc)/static_cast<double>(n_therm));
 
 	// gauge config generation
@@ -93,9 +100,11 @@ int main(int argc, char *argv[]) {
 		std::complex<double> tmp_poly = hmc.polyakov_loop(U);
 		poly_re.push_back(tmp_poly.real());
 		poly_im.push_back(tmp_poly.imag());
-		std::cout << "# iter " << i << " / " << n_traj 
+		std::cout << "# iter " << i << "/" << n_traj 
 				  << "\tplaq: " << hmc.plaq(U) 
-				  << "\t acc: " << static_cast<double>(acc)/static_cast<double>(i) << std::endl;
+				  << "\t acc: " << static_cast<double>(acc)/static_cast<double>(i)
+				  << "\t dE: " << hmc.deltaE
+				  << std::endl;
 		if(i%n_save==0) {
 			// save gauge config
 			write_gauge_field(U, base_name, i/n_save);

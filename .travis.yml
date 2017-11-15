@@ -12,7 +12,7 @@ before_install:
   #- sudo apt-get -qq update
   #- sudo apt-get install -y [PACKAGE_NAME]
 install:
-  # install eigen3 library
+  # download and install eigen3 library
   - wget https://bitbucket.org/eigen/eigen/get/default.tar.gz
   - tar zxf default.tar.gz
   - cd eigen-eigen-*

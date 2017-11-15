@@ -10,13 +10,19 @@ Requires the [Eigen](http://eigen.tuxfamily.org) C++ template library for matrix
 - Gauge observables
 	- Plaquette
 	- Polyakov loop
-- Fermionic observables
-	- psibar-psi
+- Fermionic gaussian noise observables
+	- Quark condensate
+	- Pion susceptibility
+	- Isospin density
+- Fermionic exact diagonalisation observables
+	- Quark condensate
+	- Pion susceptibility
+	- Phase of determinant of Dirac op
 - Gauge field I/O
  
 ## In progress
 - Isospin observables
-- Brute force inversion of explicitly constructed Dirac operator via Lapack
+- Eigenvalues of Dirac op via Sparse MVM Arpack routines
 
 ## To do
 - RHMC: remez algorithm, maybe also zolotarev for square roots
@@ -25,4 +31,3 @@ Requires the [Eigen](http://eigen.tuxfamily.org) C++ template library for matrix
 - OMF4 integrator
 - Even/odd preconditioning
 - Input file
-- Measurement program

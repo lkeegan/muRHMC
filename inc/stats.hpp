@@ -134,7 +134,7 @@ void print_av(std::vector<double>& vec, const std::string& name) {
 	double tau, tau_err;
 	double mean = av(vec);
 	double err = std_err(vec, tau, tau_err);
-	std::cout << "# " << std::left << std::setw(20) << name
+	std::cout << "# " << std::left << std::setw(22) << name
 			  << mean << "\t" << err << "\t"
 			  << tau << "\t" << tau_err << std::endl;
 }

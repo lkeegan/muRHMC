@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.1)
-project (LATTICE)
+project (muRHMC)
 
 set(CMAKE_VERBOSE_MAKEFILE ON)
 set(CMAKE_CXX_STANDARD 11)
@@ -37,8 +37,9 @@ target_link_libraries(tests Catch)
 # Make rhmc executable
 add_executable(rhmc rhmc.cpp ${SRCS})
 
-# Make measurements executable
-add_executable(measure measure.cpp ${SRCS})
+# Make measurements executables
+add_executable(measure_exact measure_exact.cpp ${SRCS})
+add_executable(measure_noise measure_noise.cpp ${SRCS})
 
 #enable_testing()
 add_test(NAME Addition COMMAND tests)

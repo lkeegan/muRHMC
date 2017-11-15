@@ -33,7 +33,7 @@
 \maketitle
 
 \section{Introduction}
-A simple RHMC code to simulate $n_f+n_f$ QCD with isospin chemical potential $\mu_u = -\mu_d = 2 \mu_I$, using unimproved staggered fermions and the Wilson SU(3) gauge action.
+A simple RHMC code to simulate $n_f+n_f$ QCD with isospin chemical potential $\mu_u = -\mu_d \equiv \mu_I$, using unimproved staggered fermions and the Wilson SU(3) gauge action.
 
 \section{QCD formulation}
 \subsection{Gauge Action}
@@ -59,14 +59,14 @@ which is related to the full action by
 \end{equation}
 
 \subsection{Fermion Action}
-The fermion action for $4+4$ staggered flavors with isospin chemical potential $\mu_u = -\mu_d = 2 \mu_I$ and mass $m$ is given by
+The fermion action for $4+4$ staggered flavors with isospin chemical potential $\mu_u = -\mu_d = \mu_I$ and mass $m$ is given by
 \begin{equation}
 \label{eq:action_fermion}
  S_f[U] = \phi^{\dagger} [D(\mu_I,m) D^{\dagger}(\mu_I,m)]^{-1} \phi
 \end{equation}
 where $D(\mu_I,m)$ is the staggered lattice Dirac operator
 \begin{align}
- [D(\mu_I,m)]_{xy} &= e^{\mu_I} U_{0}(x) \delta_{n,m-\hat0} - e^{-\mu_I} U_{0}^{\dagger}(x-\hat0) \delta_{n,m+\hat0} \\
+ [D(\mu_I,m)]_{xy} &= e^{\mu_I/2} U_{0}(x) \delta_{n,m-\hat0} - e^{-\mu_I/2} U_{0}^{\dagger}(x-\hat0) \delta_{n,m+\hat0} \\
  &+ \sum_{\mu=1}^{3} \eta_{\mu}(x) \left[ U_{\mu}(x) \delta_{n,m-\hat\mu} - U_{\mu}^{\dagger}(x-\hat\mu) \delta_{n,m+\hat\mu} \right]
 \end{align}
 and $\eta_{\mu}(x) = -1^{\sum_{\nu<\mu}x_{\nu}}$ are the space-dependent staggered equivalent of Dirac $\gamma$-matrices, i.e.
@@ -112,7 +112,7 @@ D(\mu_I,0)D^{\dagger}(\mu_I,0) + m^2 & m\hat D(\mu_I) \\
 \end{equation}
 where
 \begin{equation}
- [\hat D(\mu_I)]_{xy} = \sinh(\mu_I)\left[U_0(x)\delta_{x,y-\hat0} + U_0(x-\hat0)\delta_{x,y+\hat0}\right]
+ [\hat D(\mu_I)]_{xy} = \sinh(\mu_I/2)\left[U_0(x)\delta_{x,y-\hat0} + U_0(x-\hat0)\delta_{x,y+\hat0}\right]
 \end{equation}
 and the LU preconditioning results in a non-hermitian operator (which is ok but means BiCGstab instead of CG will need to be used for the inversion).
 
@@ -229,7 +229,7 @@ The polyakov loop is the product of links in the time direction, averaged over t
 
 \subsection{Fermionic Observables}
 Fermionic observables generally involve traces of the inverse of the Dirac operator, which can be estimated stochastically by 
-inverting gaussian noise vectors. For this purpose we define here $\phi$ as a gaussian noise vector with unit norm, $\phi^{\dagger}.\phi=1$,
+inverting gaussian noise vectors. For this purpose we define here $\phi$ as a gaussian noise vector with unit norm, $\phi^{\dagger}.\phi=1$ NB should this be 1 or 3??,
 which we use as a source vector to find
 \begin{equation}
  \chi = \left[D(\mu_I,m) D^{\dagger}(\mu_I,m)\right]^{-1} \phi = -\left[D(\mu_I,m) D(-\mu_I,-m)\right]^{-1} \phi
@@ -256,9 +256,10 @@ from which we can construct estimators of various fermionic observables.
 \end{equation}
 where
 \begin{equation}
- \left[\frac{\partial D(\mu_I,m)}{\partial\mu_I}\psi\right]_x =\frac{\mu_I}{2}\left[ e^{\mu_I} U_0(x) \psi(x+\hat0) + e^{-\mu_I} U^{\dagger}_0(x-\hat0) \psi(x-\hat0)\right]
+ \left[\frac{\partial D(\mu_I,m)}{\partial\mu_I}\psi\right]_x =\frac{\mu_I}{4}\left[ e^{\mu_I/2} U_0(x) \psi(x+\hat0) + e^{-\mu_I/2} U^{\dagger}_0(x-\hat0) \psi(x-\hat0)\right]
 \end{equation}
 
+\newpage
 \appendix
 \section{SU(3) Matrix Algebra}
 

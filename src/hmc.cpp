@@ -189,8 +189,8 @@ int hmc::force_fermion (field<gauge> &force, field<gauge> &U, const field<fermio
 	D.D(psi, chi, U, -params.mass, -params.mu_I);
 
 	// mu=0 terms have extra chemical potential isospin factors exp(+-\mu_I/2):
-	double mu_I_plus_factor = exp(params.mu_I);
-	double mu_I_minus_factor = exp(-params.mu_I);
+	double mu_I_plus_factor = exp(0.5 * params.mu_I);
+	double mu_I_minus_factor = exp(-0.5 * params.mu_I);
 	SU3_Generators T;
 	#pragma omp parallel for
 	for(int ix=0; ix<U.V; ++ix) {

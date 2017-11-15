@@ -42,8 +42,8 @@ void dirac_op::apbs_in_time (field<gauge>& U) const {
 Eigen::MatrixXcd dirac_op::D_dense_matrix (field<gauge>& U, double mass, double mu_I) const {
 	Eigen::MatrixXcd D_matrix = Eigen::MatrixXcd::Zero(3*U.V, 3*U.V);
 	apbs_in_time(U);
-	double mu_I_plus_factor = exp(mu_I);
-	double mu_I_minus_factor = exp(-mu_I);
+	double mu_I_plus_factor = exp(0.5 * mu_I);
+	double mu_I_minus_factor = exp(-0.5 * mu_I);
 	for(int ix=0; ix<U.V; ++ix) {
 		D_matrix.block<3,3>(3*ix,3*ix) = mass * SU3mat::Identity();
 		// mu=0 terms have extra chemical potential isospin factors exp(+-\mu_I/2):
@@ -63,32 +63,28 @@ Eigen::MatrixXcd dirac_op::D_dense_matrix (field<gauge>& U, double mass, double 
 Eigen::MatrixXcd dirac_op::D_eigenvalues (field<gauge>& U, double mass, double mu_I) const {
 	// construct explicit dense dirac matrix
 	Eigen::MatrixXcd D_matrix = D_dense_matrix(U, mass, mu_I);
-	// find all eigenvalues of dirac operator matrix
+	// find all eigenvalues of non-hermitian dirac operator matrix D
 	Eigen::ComplexEigenSolver<Eigen::MatrixXcd> ces;
 	ces.compute(D_matrix);
-	// return complex phase of determinant (product of all eigenvalues) of D
 	return ces.eigenvalues();
-	// return complex phase of determinant (product of all eigenvalues) of D
 }
 
 Eigen::MatrixXcd dirac_op::DDdagger_eigenvalues (field<gauge>& U, double mass, double mu_I) const {
 	// construct explicit dense dirac matrix
 	Eigen::MatrixXcd D_matrix = D_dense_matrix(U, mass, mu_I);
 	D_matrix = D_matrix * D_matrix.adjoint();
-	// find all eigenvalues of dirac operator matrix
+	// find all eigenvalues of hermitian dirac operator matrix DDdagger
 	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXcd> saes;
 	saes.compute(D_matrix);
-	// return complex phase of determinant (product of all eigenvalues) of D
 	return saes.eigenvalues();
-	// return complex phase of determinant (product of all eigenvalues) of D
 }
 
 void dirac_op::D (field<fermion>& lhs, const field<fermion>& rhs, field<gauge>& U, double mass, double mu_I) const {
 	// flip sign of timelike U's at boundary to impose anti-periodic bcs on fermions 
 	apbs_in_time(U);
 
-	double mu_I_plus_factor = exp(mu_I);
-	double mu_I_minus_factor = exp(-mu_I);
+	double mu_I_plus_factor = exp(0.5 * mu_I);
+	double mu_I_minus_factor = exp(-0.5 * mu_I);
 	// default static scheduling, with N threads, split loop into N chunks, one per thread 
 	#pragma omp parallel for
 	for(int ix=0; ix<rhs.V; ++ix) {
