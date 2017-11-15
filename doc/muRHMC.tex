@@ -173,6 +173,23 @@ F_g(x,\mu) &= \sum_{ab} \frac{i\beta}{6} \Tr \left[ T_a c_b T_b \right] T_a = \f
 \end{align}
 
 \subsection{Fermion Force}
+The fermion force is given by
+\begin{equation}
+F_f(x,\mu) = \sum F_f^a(x,\mu) T_a
+\end{equation}
+where
+\begin{align}
+F_f^a(x,\mu) &= \frac{\partial S_f[U]}{\partial U_{\mu}^{(a)}(x)} = \phi^{\dagger} \frac{\partial }{\partial U_{\mu}^{(a)}(x)} [D(\mu_I,m) D^{\dagger}(\mu_I,m)]^{-1} \phi \\
+&= \chi^{\dagger} \left[ \frac{\partial D(\mu_I,m)}{\partial U_{\mu}^{(a)}(x)} D^{\dagger}(\mu_I,m) +  D(\mu_I,m) \frac{\partial D^{\dagger}(\mu_I,m)}{\partial U_{\mu}^{(a)}(x)}  \right] \chi \\
+&= -\chi^{\dagger} \frac{\partial D(\mu_I,m)}{\partial U_{\mu}^{(a)}(x)} \psi + h.c. \\
+&= \Im m \left\{ \chi^{\dagger}(x) e^{\mu_I/2} T_a U_0(x)\psi(x+\hat0) + \chi^{\dagger}(x+\hat0) e^{-\mu_I/2} U_0^{\dagger}(x) T_a \psi(x) \right\} \nonumber \\
+&+ \sum_{\mu=1}^{3} \eta_\mu(x) \Im m \left\{ \chi^{\dagger}(x) T_a U_\mu(x)\psi(x+\hat\mu) + \chi^{\dagger}(x+\hat\mu) U_\mu^{\dagger}(x) T_a \psi(x) \right\}
+\end{align}
+where
+\begin{align}
+\chi &\equiv [D(\mu_I,m) D^{\dagger}(\mu_I,m)]^{-1} \phi \\
+\psi &\equiv -D^{\dagger}(\mu_I,m) \chi = D(-\mu_I, m) \chi
+\end{align}
 
 \subsection{Force Integration}
 The integration of the force terms is done by alternating two discrete steps,
@@ -252,7 +269,7 @@ from which we can construct estimators of various fermionic observables.
 
 \subsubsection{Isospin density}
 \begin{equation}
- density = 2 \Re \left\langle \chi^{\dagger}.\left(\frac{\partial D(\mu_I,m)}{\partial\mu_I}\psi\right) \right\rangle
+ density = 2 \Re e \left\langle \chi^{\dagger}.\left(\frac{\partial D(\mu_I,m)}{\partial\mu_I}\psi\right) \right\rangle
 \end{equation}
 where
 \begin{equation}
