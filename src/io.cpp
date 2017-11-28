@@ -1,6 +1,7 @@
 #include "io.hpp"
 #include <iostream>
 #include <iomanip>
+#include <fstream>
 
 constexpr int STRING_WIDTH = 22;
 
@@ -8,12 +9,47 @@ void log(const std::string& message) {
 	std::cout << "# " << std::left << std::setw(STRING_WIDTH) << message << std::endl;
 }
 
+void log(const std::string& message, const std::string& value) {
+	std::cout << "# " << std::left << std::setw(STRING_WIDTH) << message
+	 				  << std::left << std::setw(STRING_WIDTH) << value << std::endl;
+}
+
 void log(const std::string& message, double value) {
-	std::cout << "# " << std::left << std::setw(STRING_WIDTH) << message << std::left << std::setw(STRING_WIDTH) << value << std::endl;
+	std::cout << "# " << std::left << std::setw(STRING_WIDTH) << message
+			  		  << std::left << std::setw(STRING_WIDTH) << value << std::endl;
 }
 
 void log(const std::string& message, std::complex<double> value) {
-	std::cout << "# " << std::left << std::setw(STRING_WIDTH) << message << std::left << std::setw(STRING_WIDTH) << value << std::endl;
+	std::cout << "# " << std::left << std::setw(STRING_WIDTH) << message
+					  << std::left << std::setw(STRING_WIDTH) << value << std::endl;
+}
+
+void read_input_file(const std::string& filename, hmc_params& hmc_params, run_params& run_params) {
+	std::ifstream input(filename.c_str());
+	std::string var_name;
+
+	if(input.good()) {
+		input >> var_name >> run_params.base_name;
+		input >> var_name >> run_params.L;
+		input >> var_name >> hmc_params.beta;
+		input >> var_name >> hmc_params.mass;
+		input >> var_name >> hmc_params.mu_I;
+		input >> var_name >> hmc_params.tau;
+		input >> var_name >> hmc_params.n_steps;
+		input >> var_name >> hmc_params.MD_eps;
+		input >> var_name >> hmc_params.seed;
+		input >> var_name >> hmc_params.constrained;
+		input >> var_name >> hmc_params.suscept_central;
+		input >> var_name >> hmc_params.suscept_delta;
+		input >> var_name >> run_params.initial_config;
+		input >> var_name >> run_params.n_therm;
+		input >> var_name >> run_params.n_traj;
+		input >> var_name >> run_params.n_save;		
+	}
+	else {
+		log("Failed to open input file: " + filename);
+		exit(1);
+	}
 }
 
 void read_fortran_gauge_field(field<gauge>& U, const std::string& filename) {
@@ -63,7 +99,8 @@ void read_fortran_gauge_field(field<gauge>& U, const std::string& filename) {
 		log("Gauge field read with plaquette: ", checksum_plaquette(U));
 	}
 	else {
-		log("Failed to open file: " + filename);		
+		log("Failed to open file: " + filename);
+		exit(1);		
 	}
 }
 
@@ -88,13 +125,13 @@ void read_gauge_field (field<gauge>& U, const std::string& base_name, int config
 			log("checksum plaquette in file", plaq_check);
 			log("measured plaquette", plaq);
 			log("deviation", plaq - plaq_check);
-			exit(0);
+			exit(1);
 		}
 		log("Gauge field [" + filename + "] read with plaquette: ", plaq);
 	}
 	else {
 		log("Failed to read from file: " + filename);
-		exit(0);
+		exit(1);
 	}
 }
 

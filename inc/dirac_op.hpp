@@ -49,6 +49,12 @@ public:
 	// Same for DDdagger, but much faster since we can use a hermitian solver.
 	Eigen::MatrixXcd DDdagger_eigenvalues (field<gauge>& U, double mass, double mu_I) const;
 
+	// Returns phase angle of determinant of D by explicitly constructing and diagonalising D
+	double D_phase_angle (field<gauge>& U, double mass, double mu_I) const;
+
+	// Returns real part of isospin density by exlpicitly constructing and diagonalising DDdagger
+	double pion_susceptibility_exact (field<gauge>& U, double mass, double mu_I) const;
+
 	// explicitly construct dirac op as dense (3*VOL)x(3*VOL) matrix
 	Eigen::MatrixXcd D_dense_matrix (field<gauge>& U, double mass, double mu_I) const;
 

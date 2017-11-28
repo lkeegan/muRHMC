@@ -1,0 +1,16 @@
+base_name		mu0.500_sus3.7_0.1
+L				4
+beta			4.4
+mass			0.14
+mu_I			0.50
+tau				1.0
+n_steps			17
+MD_eps			1.e-7
+seed			12345
+constrained		1
+suscept_central 3.7
+suscept_delta	0.1
+initial_config	-1
+n_therm			500
+n_traj			1000
+n_save			100

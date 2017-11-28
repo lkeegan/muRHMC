@@ -40,6 +40,7 @@ add_executable(rhmc rhmc.cpp ${SRCS})
 # Make measurements executables
 add_executable(measure_exact measure_exact.cpp ${SRCS})
 add_executable(measure_noise measure_noise.cpp ${SRCS})
+add_executable(measure measure.cpp ${SRCS})
 
 #enable_testing()
 add_test(NAME Addition COMMAND tests)

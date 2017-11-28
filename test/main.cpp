@@ -19,7 +19,10 @@ hmc_params hmc_params = {
 	1.0, 	// tau
 	7, 		// n_steps
 	1.e-6,	// MD_eps
-	1234	// seed
+	1234,	// seed
+	false,	// constrained HMC (fixed allowed range for pion susceptibility)
+	3.0, 	// suscept_central
+	0.05	// suscept_eps
 };
 
 // returns average deviation from hermitian per matrix, should be ~1e-15

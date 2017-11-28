@@ -5,11 +5,16 @@
 #include <complex>
 #include "4d.hpp"
 #include "su3.hpp"
+#include "hmc.hpp"
 
 // output message and variables to log file
 void log(const std::string& message);
+void log(const std::string& message, const std::string& value);
 void log(const std::string& message, double value);
 void log(const std::string& message, std::complex<double> value);
+
+// read hmc and run parameters from input file
+void read_input_file(const std::string& filename, hmc_params& hmc_params, run_params& run_params);
 
 // Read a gauge field from file in Philippe's fortran format
 void read_fortran_gauge_field(field<gauge>& U, const std::string& filename);

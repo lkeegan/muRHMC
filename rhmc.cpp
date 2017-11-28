@@ -7,10 +7,9 @@
 #include <random>
 
 int main(int argc, char *argv[]) {
-    if (argc-1 != 8) {
-        std::cout << "This program requires 8 arguments:" << std::endl;
-        std::cout << "beta mass mu_I n_integrator_steps n_therm n_traj n_save seed, e.g." << std::endl;
-        std::cout << "./rhmc 4.4 0.14 0.25 17 500 1000 100 12345" << std::endl;
+    if (argc-1 != 1) {
+        std::cout << "Input file not specified, e.g." << std::endl;
+        std::cout << "./rhmc input_file.txt" << std::endl;
         return 1;
     }
 
@@ -18,26 +17,23 @@ int main(int argc, char *argv[]) {
 
 	// HMC parameters
 	hmc_params hmc_pars;
-	hmc_pars.beta = atof(argv[1]);
-	hmc_pars.mass = atof(argv[2]);
-	hmc_pars.mu_I = atof(argv[3]);
-	hmc_pars.tau = 1.0;	
-	hmc_pars.n_steps = static_cast<int>(atof(argv[4]));
-	hmc_pars.MD_eps = 1.e-7;
-	hmc_pars.seed = static_cast<int>(atof(argv[8]));
+	run_params run_pars;
 
-	// run parameters
-	int n_therm = static_cast<int>(atof(argv[5]));
-	int n_traj = static_cast<int>(atof(argv[6]));
-	int n_save = static_cast<int>(atof(argv[7]));
-	std::string str_mu(argv[3]);
-	std::string base_name = "mu" + str_mu;	
+	read_input_file(argv[1], hmc_pars, run_pars);
 
-	// make 4^4 lattice
-	lattice grid (4);
+	// make L^4 lattice
+	lattice grid (run_pars.L);
 
-	log("RHMC run with parameters:");
-	log("L", grid.L0);
+	log("");
+	if(hmc_pars.constrained) {
+		log("Constrained HMC with parameters:");
+		log("suscept_central", hmc_pars.suscept_central);
+		log("suscept_delta", hmc_pars.suscept_delta);
+	}
+	else {
+		log("Unconstrained HMC with parameters:");
+	}
+	log("");
 	log("beta", hmc_pars.beta);
 	log("mass", hmc_pars.mass);
 	log("mu_I", hmc_pars.mu_I);
@@ -45,54 +41,143 @@ int main(int argc, char *argv[]) {
 	log("n_steps", hmc_pars.n_steps);
 	log("MD epsilon", hmc_pars.MD_eps);
 	log("RNG seed", hmc_pars.seed);
-	log("n_traj", n_traj);
-	log("n_therm", n_therm);
-	log("n_save", n_save);
 
-	// make U[mu] field on lattice
-	field<gauge> U (grid);
-	// initialise Dirac Op
-	dirac_op D (grid);
+	log("");
+	log("Run parameters:");
+	log("");
+	log("base_name", run_pars.base_name);
+	log("L", grid.L0);
+	log("n_traj", run_pars.n_traj);
+	log("n_therm", run_pars.n_therm);
+	log("n_save", run_pars.n_save);
+	log("initial_config", run_pars.initial_config);
 
 	// Initialise HMC
 	hmc hmc (hmc_pars);
+	if(!hmc_pars.constrained) {
+		hmc.suscept = 0;
+	}
 
-	// start from random gauge field: 2nd param = roughness
-	// so 0.0 gives unit gauge links, large value = random
-	hmc.random_U (U, 0.5);
+	// make U[mu] field on lattice
+	field<gauge> U (grid);
 
+	// initialise Dirac Op
+	dirac_op D (grid);
+
+	if(run_pars.initial_config < 0) {
+		log("initial config negative i.e. RANDOM");
+		run_pars.initial_config = 0;
+		// start from random gauge field: 2nd param = roughness
+		// so 0.0 gives unit gauge links, large value = random
+		hmc.random_U (U, 0.5);
+	}
+	else {
+		// load specified gauge config
+		read_gauge_field (U, run_pars.base_name, run_pars.initial_config);
+	}
+
+	// observables to measure
 	std::vector<double> dE;
 	std::vector<double> expdE;
 	std::vector<double> plq;
 	std::vector<double> poly_re;
 	std::vector<double> poly_im;
+/*
+	if (hmc_pars.constrained) {
+		// pre-thermalisation: find a random U matrix with 
+		// pion susceptibility in desired range
+		log("");
+		log("Pre-pre-thermalisation (find good initial random gauge field):");
+		log("");
+		double roughness = 0.5;
+		double epsilon = 0.05;
+		hmc.random_U (U, roughness);
+		double sus = D.pion_susceptibility_exact(U, hmc_pars.mass, hmc_pars.mu_I);
+		log("Plaquette", hmc.plaq(U));
+		log("Pion susceptibility", sus);
+		double sus_dev = sus - hmc_pars.suscept_central;
+		while( (fabs(sus_dev) > hmc_pars.suscept_delta) ) {
+			roughness -= epsilon * (sus_dev / sus);
+			hmc.random_U (U, roughness);
+			sus = D.pion_susceptibility_exact(U, hmc_pars.mass, hmc_pars.mu_I);
+			sus_dev = sus - hmc_pars.suscept_central;
+			hmc.suscept = sus;
+			log("Plaquette", hmc.plaq(U));
+			log("Pion susceptibility", sus);
+		}
+	}
+*/
+
+		// ALTERNATIVE pre-thermalisation: adjust suscept range to force suscept 
+		// to go in the right direction until we get a value in the desired range
+		// obviously this is only efficient if we are moving towards the value
+		// that minimises the action, i.e. the susceptibility is initially too low
+	if (hmc_pars.constrained) {
+		hmc.suscept = D.pion_susceptibility_exact(U, hmc_pars.mass, hmc_pars.mu_I);
+		if (run_pars.n_therm > 0) {
+			log("");
+			log("Pre-thermalisation (until we get a pion suscept in the desired range):");
+			log("");
+			// make random U with suscept below desired value
+			hmc.random_U (U, 0.5);
+			// use larger tau for pre-therm
+			hmc.params.tau = 1.0;
+			hmc.params.n_steps = 19;
+			std::cout << hmc.suscept << std::endl;
+			while(hmc.suscept < (hmc_pars.suscept_central - hmc_pars.suscept_delta)) {
+				hmc.params.suscept_central = 0.5 * (hmc_pars.suscept_central + hmc_pars.suscept_delta + hmc.suscept);
+				hmc.params.suscept_delta = 0.5 * (hmc_pars.suscept_central + hmc_pars.suscept_delta - hmc.suscept);
+				hmc.trajectory (U, D);
+				std::cout << hmc.suscept << std::endl;
+			}
+			/*
+			while(hmc.suscept > (hmc_pars.suscept_central + hmc_pars.suscept_delta)) {
+				hmc.params.suscept_central = 0.0;
+				hmc.params.suscept_delta = hmc.suscept;
+				hmc.trajectory (U, D);
+				std::cout << hmc.suscept << std::endl;
+			}
+			*/
+			std::cout << hmc.suscept << std::endl;
+			// reset suscept bounds to original desired values
+			hmc.params.suscept_central = hmc_pars.suscept_central;
+			hmc.params.suscept_delta = hmc_pars.suscept_delta;
+			hmc.params.tau = hmc_pars.tau;
+			hmc.params.n_steps = hmc_pars.n_steps;
+		}
+	}
 
 	// thermalisation
 	log("");
 	log("Thermalisation:");
 	log("");
 	int acc = 0;
-	for(int i=1; i<=n_therm; ++i) {
+	// use smaller tau for therm
+	//hmc.params.tau *= 0.25;
+	for(int i=1; i<=run_pars.n_therm; ++i) {
 		acc += hmc.trajectory (U, D);
 
 		//Eigen::MatrixXcd eigenvaluesDDdag = D.DDdagger_eigenvalues (U, hmc_pars.mass, hmc_pars.mu_I);				
 		//double effective_mass = sqrt(eigenvaluesDDdag.real().minCoeff());
 
-		std::cout << "# therm " << i << "/" << n_therm 
+		std::cout << "# therm " << i << "/" << run_pars.n_therm 
 				  << "\tplaq: " << hmc.plaq(U) 
 				  << "\t acc: " << acc/static_cast<double>(i)
 				  << "\t dE: " << hmc.deltaE
-				  //<< "\t m_eff: " << effective_mass
+				  << "\t suscept: " << hmc.suscept
  				  << std::endl;
  	}
-	log("Thermalisation acceptance", static_cast<double>(acc)/static_cast<double>(n_therm));
+	log("Thermalisation acceptance", static_cast<double>(acc)/static_cast<double>(run_pars.n_therm));
 
 	// gauge config generation
+	// reset tau
+	//hmc.params.tau = hmc_pars.tau;
 	log("");
 	log("Main run:");
 	log("");
 	acc = 0;
-	for(int i=1; i<=n_traj; ++i) {
+	int i_save = run_pars.initial_config;
+	for(int i=1; i<=run_pars.n_traj; ++i) {
 		acc += hmc.trajectory (U, D);
 		dE.push_back(hmc.deltaE);
 		expdE.push_back(exp(-hmc.deltaE));
@@ -100,19 +185,21 @@ int main(int argc, char *argv[]) {
 		std::complex<double> tmp_poly = hmc.polyakov_loop(U);
 		poly_re.push_back(tmp_poly.real());
 		poly_im.push_back(tmp_poly.imag());
-		std::cout << "# iter " << i << "/" << n_traj 
+		std::cout << "# iter " << i << "/" << run_pars.n_traj 
 				  << "\tplaq: " << hmc.plaq(U) 
 				  << "\t acc: " << static_cast<double>(acc)/static_cast<double>(i)
 				  << "\t dE: " << hmc.deltaE
+				  << "\t suscept: " << hmc.suscept
 				  << std::endl;
-		if(i%n_save==0) {
+		if(i%run_pars.n_save==0) {
 			// save gauge config
-			write_gauge_field(U, base_name, i/n_save);
+			++i_save;
+			write_gauge_field(U, run_pars.base_name, i_save);
 		}
 	}
 
 	// print average, error & integrated autocorrelation time of measured observables
-	log("Acceptance", static_cast<double>(acc)/static_cast<double>(n_traj));
+	log("Acceptance", static_cast<double>(acc)/static_cast<double>(run_pars.n_traj));
 	log("");
 	std::cout << "# " << std::left << std::setw(20) << "observable" << "average\t\terror\t\t\ttau_int\t\terror" << std::endl;
 	print_av(expdE, "<exp(-dE)>");

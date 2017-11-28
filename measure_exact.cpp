@@ -8,18 +8,17 @@
 
 int main(int argc, char *argv[]) {
 
-    if (argc-1 != 3) {
-        std::cout << "This program requires 3 arguments:" << std::endl;
-        std::cout << "mass mu_I initial_config" << std::endl;
-        std::cout << "e.g. ./hmc 0.14 0.25 23" << std::endl;
+    if (argc-1 != 4) {
+        std::cout << "This program requires 4 arguments:" << std::endl;
+        std::cout << "mass mu_I base_name initial_config" << std::endl;
+        std::cout << "e.g. ./hmc 0.14 0.25 mu0.25_sus_3.1_3.3 23" << std::endl;
         return 1;
     }
 
 	double mass = atof(argv[1]);
 	double mu_I = atof(argv[2]);
-	int n_initial = static_cast<int>(atof(argv[3]));
-	std::string str_mu(argv[2]);
-	std::string base_name = "mu" + str_mu;	
+	std::string base_name(argv[3]);
+	int n_initial = static_cast<int>(atof(argv[4]));
 
 	// make 4^4 lattice
 	lattice grid (4);
@@ -54,13 +53,13 @@ int main(int argc, char *argv[]) {
 		// phase{D} = \sum_i phase{lambda_i}
 		double sum = 0;
 		for (int i=0; i<eigenvalues.size(); ++i) {
-			std::cout << std::arg(eigenvalues(i)) << std::endl;
+			//std::cout << std::arg(eigenvalues(i)) << std::endl;
 			sum += std::arg(eigenvalues(i));
 		}
-		log("[evals] sum-phase", sum);
+		log("[evals] det-phase", sum);
 		//log("[evals]phase complex-det", eigenvalues.prod()/static_cast<double>(3*U.V));
-		double phase_det = std::arg(eigenvalues.prod());
-		log("[evals] det-phase", phase_det);
+		//double phase_det = std::arg(eigenvalues.prod());
+		//log("[evals] det-phase", phase_det);
 
 		// Trace[D^-1] = \sum_i \lambda_i^-1:
 		log("[evals] psibar-psi", eigenvalues.cwiseInverse().sum()/static_cast<double>(3*U.V));

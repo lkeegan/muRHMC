@@ -79,6 +79,22 @@ Eigen::MatrixXcd dirac_op::DDdagger_eigenvalues (field<gauge>& U, double mass, d
 	return saes.eigenvalues();
 }
 
+double dirac_op::D_phase_angle (field<gauge>& U, double mass, double mu_I) const {
+	Eigen::MatrixXcd eigenvalues = D_eigenvalues(U, mass, mu_I);				
+	// phase{Det[D]} = phase{\prod_i \lambda_i} = \sum_i phase{lambda_i}
+	double sum = 0;
+	for (int i=0; i<eigenvalues.size(); ++i) {
+		sum += std::arg(eigenvalues(i));
+	}
+	return sum;
+}
+
+double dirac_op::pion_susceptibility_exact (field<gauge>& U, double mass, double mu_I) const {
+	Eigen::MatrixXcd eigenvaluesDDdag = DDdagger_eigenvalues (U, mass, mu_I);				
+	return eigenvaluesDDdag.cwiseInverse().sum().real()/static_cast<double>(3*U.V);
+}
+
+
 void dirac_op::D (field<fermion>& lhs, const field<fermion>& rhs, field<gauge>& U, double mass, double mu_I) const {
 	// flip sign of timelike U's at boundary to impose anti-periodic bcs on fermions 
 	apbs_in_time(U);

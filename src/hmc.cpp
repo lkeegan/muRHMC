@@ -1,6 +1,7 @@
 #include "hmc.hpp"
 #include <complex>
 #include <iostream> //FOR DEBUGGING
+#include "io.hpp" //DEBUGGING
 
 hmc::hmc (const hmc_params& params) : rng(params.seed), params(params) {
 }
@@ -23,9 +24,41 @@ int hmc::trajectory (field<gauge>& U, dirac_op& D) {
 	double action_old = action(U, phi, P, D);
 	// do integration
 	OMF2 (U, phi, P, D);
+	// calculate change in action
 	double action_new = action(U, phi, P, D);
 	deltaE = action_new - action_old;
-	return accept_reject (U, U_old, action_new - action_old);
+
+	if(params.constrained) {
+		// this value is stored from the last trajectory
+		//log("[HMC] old-sus", suscept);
+		double new_suscept = D.pion_susceptibility_exact(U, params.mass, params.mu_I);
+		if (new_suscept > (params.suscept_central + params.suscept_delta)) {
+			// suscept too high: reject proposed update, restore old U
+			U = U_old;
+			//log("[HMC] sus too high - rejected: upper bound:", params.suscept_central + params.suscept_delta);
+			return 0;
+		}
+		else if (new_suscept < (params.suscept_central - params.suscept_delta)) {
+			// suscept too low: reject proposed update, restore old U
+			U = U_old;
+			//log("[HMC] sus too low - rejected: lower bound:", params.suscept_central - params.suscept_delta);
+			return 0;
+		}
+		else {
+			// susceptibility is in acceptable range: do standard accept/reject step on dE
+			if(accept_reject (U, U_old, action_new - action_old)) {
+				// if accepted update cached susceptibility and return 1
+				suscept = new_suscept;
+				return 1;
+			}
+			else {
+				return 0;
+			}
+		}
+	}
+	else {
+		return accept_reject (U, U_old, action_new - action_old);
+	}
 }
 
 int hmc::accept_reject (field<gauge>& U, const field<gauge>& U_old, double dE) {

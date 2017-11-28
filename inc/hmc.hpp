@@ -5,6 +5,7 @@
 #include "dirac_op.hpp"
 #include <random>
 #include <unsupported/Eigen/MatrixFunctions>
+#include <string>
 
 struct hmc_params {
 	double beta;
@@ -14,6 +15,18 @@ struct hmc_params {
 	int n_steps;
 	double MD_eps;
 	int seed;
+	bool constrained;
+	double suscept_central;
+	double suscept_delta;
+};
+
+struct run_params {
+	std::string base_name;
+	int L;
+	int initial_config;
+	int n_therm;
+	int n_traj;
+	int n_save;	
 };
 
 class hmc {
@@ -24,7 +37,8 @@ public:
 
 	std::ranlux48 rng;
 	hmc_params params;
-	double deltaE;
+	double deltaE; // dE of proposed change at end of last trajectory
+	double suscept; // pion susceptibility after last trajectory
 	explicit hmc (const hmc_params& params);
 
 	// Does a full HMC trajectory using parameters in params, returns 1 if update was accepted
