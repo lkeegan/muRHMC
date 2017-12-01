@@ -38,6 +38,7 @@ public:
 	std::ranlux48 rng;
 	hmc_params params;
 	double deltaE; // dE of proposed change at end of last trajectory
+	double suscept_proposed; // proposed pion susceptibility from last trajectory
 	double suscept; // pion susceptibility after last trajectory
 	explicit hmc (const hmc_params& params);
 

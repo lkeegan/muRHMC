@@ -32,6 +32,7 @@ int hmc::trajectory (field<gauge>& U, dirac_op& D) {
 		// this value is stored from the last trajectory
 		//log("[HMC] old-sus", suscept);
 		double new_suscept = D.pion_susceptibility_exact(U, params.mass, params.mu_I);
+		suscept_proposed = new_suscept;
 		if (new_suscept > (params.suscept_central + params.suscept_delta)) {
 			// suscept too high: reject proposed update, restore old U
 			U = U_old;

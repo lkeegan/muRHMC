@@ -83,6 +83,7 @@ int main(int argc, char *argv[]) {
 	std::vector<double> poly_re;
 	std::vector<double> poly_im;
 /*
+// Doesn't work: subsequent constrained thermalisation very painful
 	if (hmc_pars.constrained) {
 		// pre-thermalisation: find a random U matrix with 
 		// pion susceptibility in desired range
@@ -107,7 +108,7 @@ int main(int argc, char *argv[]) {
 		}
 	}
 */
-
+	// A bit better, but still not very effective for larger mu_I
 		// ALTERNATIVE pre-thermalisation: adjust suscept range to force suscept 
 		// to go in the right direction until we get a value in the desired range
 		// obviously this is only efficient if we are moving towards the value
@@ -119,10 +120,6 @@ int main(int argc, char *argv[]) {
 			log("Pre-thermalisation (until we get a pion suscept in the desired range):");
 			log("");
 			// make random U with suscept below desired value
-			hmc.random_U (U, 0.5);
-			// use larger tau for pre-therm
-			hmc.params.tau = 1.0;
-			hmc.params.n_steps = 19;
 			std::cout << hmc.suscept << std::endl;
 			while(hmc.suscept < (hmc_pars.suscept_central - hmc_pars.suscept_delta)) {
 				hmc.params.suscept_central = 0.5 * (hmc_pars.suscept_central + hmc_pars.suscept_delta + hmc.suscept);
@@ -130,20 +127,18 @@ int main(int argc, char *argv[]) {
 				hmc.trajectory (U, D);
 				std::cout << hmc.suscept << std::endl;
 			}
-			/*
+			
 			while(hmc.suscept > (hmc_pars.suscept_central + hmc_pars.suscept_delta)) {
 				hmc.params.suscept_central = 0.0;
 				hmc.params.suscept_delta = hmc.suscept;
 				hmc.trajectory (U, D);
 				std::cout << hmc.suscept << std::endl;
 			}
-			*/
+			
 			std::cout << hmc.suscept << std::endl;
 			// reset suscept bounds to original desired values
 			hmc.params.suscept_central = hmc_pars.suscept_central;
 			hmc.params.suscept_delta = hmc_pars.suscept_delta;
-			hmc.params.tau = hmc_pars.tau;
-			hmc.params.n_steps = hmc_pars.n_steps;
 		}
 	}
 
@@ -152,26 +147,19 @@ int main(int argc, char *argv[]) {
 	log("Thermalisation:");
 	log("");
 	int acc = 0;
-	// use smaller tau for therm
-	//hmc.params.tau *= 0.25;
 	for(int i=1; i<=run_pars.n_therm; ++i) {
 		acc += hmc.trajectory (U, D);
-
-		//Eigen::MatrixXcd eigenvaluesDDdag = D.DDdagger_eigenvalues (U, hmc_pars.mass, hmc_pars.mu_I);				
-		//double effective_mass = sqrt(eigenvaluesDDdag.real().minCoeff());
 
 		std::cout << "# therm " << i << "/" << run_pars.n_therm 
 				  << "\tplaq: " << hmc.plaq(U) 
 				  << "\t acc: " << acc/static_cast<double>(i)
 				  << "\t dE: " << hmc.deltaE
 				  << "\t suscept: " << hmc.suscept
+				  << "\t proposed_sus: " << hmc.suscept_proposed
  				  << std::endl;
  	}
 	log("Thermalisation acceptance", static_cast<double>(acc)/static_cast<double>(run_pars.n_therm));
 
-	// gauge config generation
-	// reset tau
-	//hmc.params.tau = hmc_pars.tau;
 	log("");
 	log("Main run:");
 	log("");
@@ -190,6 +178,7 @@ int main(int argc, char *argv[]) {
 				  << "\t acc: " << static_cast<double>(acc)/static_cast<double>(i)
 				  << "\t dE: " << hmc.deltaE
 				  << "\t suscept: " << hmc.suscept
+				  << "\t proposed_sus: " << hmc.suscept_proposed
 				  << std::endl;
 		if(i%run_pars.n_save==0) {
 			// save gauge config
