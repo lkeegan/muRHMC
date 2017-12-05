@@ -16,6 +16,8 @@ set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}
 endif()
 
 find_package(Eigen3 REQUIRED)
+# for anubis/euler instead of find_package set:
+set(EIGEN3_INCLUDE_DIR "/home/keeganl/include/eigen3")
 include_directories(${EIGEN3_INCLUDE_DIR})
 message("Found Eigen3 in: ${EIGEN3_INCLUDE_DIR}")
 
