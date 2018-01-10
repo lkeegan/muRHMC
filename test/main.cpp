@@ -326,6 +326,59 @@ TEST_CASE( "CG inversion of (D+m)(D+m)^dagger", "[inverters]") {
 	}
 }
 
+TEST_CASE( "CG_singleshift inversion of [(D+m)(D+m)^dagger + shift]", "[inverters]") {
+	lattice grid (4);
+	field<gauge> U (grid);
+	hmc hmc (hmc_params);
+	hmc.random_U(U, 10.0);
+	dirac_op D (grid);
+	double shift = 0.05961;
+
+	// make random fermion field chi
+	field<fermion> chi (grid);
+	hmc.gaussian_fermion (chi);
+
+	field<fermion> x (grid);
+	field<fermion> y (grid);
+	double eps=1.e-10;
+	// x = (DD' + shift)^-1 chi
+	int iter = D.cg_singleshift(x, chi, U, hmc_params.mass, hmc_params.mu_I, shift, eps);
+
+	// y = (DD' + shift) x ?= chi
+	D.DDdagger(y, x, U, hmc_params.mass, hmc_params.mu_I);
+	y.add(shift, x);
+	double dev = is_field_equal(y, chi);
+	INFO("CG_singleshift: eps = " << eps << "\t iterations = " << iter << "\t error = " << dev);
+	REQUIRE( dev == Approx(0).epsilon(5e-13 + 10.0*eps) );
+}
+
+TEST_CASE( "CG_multishift single shift inversion of [(D+m)(D+m)^dagger + shift]", "[inverters]") {
+	lattice grid (4);
+	field<gauge> U (grid);
+	hmc hmc (hmc_params);
+	hmc.random_U(U, 10.0);
+	dirac_op D (grid);
+	std::vector<double> shift = { 0.05961 };
+
+	// make random fermion field chi
+	field<fermion> chi (grid);
+	hmc.gaussian_fermion (chi);
+
+	std::vector<field<fermion>> x;
+	x.push_back(field<fermion>(grid));
+	field<fermion> y (grid);
+	double eps = 1.e-10;
+	// x = (DD' + shift)^-1 chi
+	int iter = D.cg_multishift(x, chi, U, hmc_params.mass, hmc_params.mu_I, shift, eps);
+
+	// y = (DD' + shift) x ?= chi
+	D.DDdagger(y, x[0], U, hmc_params.mass, hmc_params.mu_I);
+	y.add(shift[0], x[0]);
+	double dev = is_field_equal(y, chi);
+	INFO("CG_multishift: eps = " << eps << "\t iterations = " << iter << "\t error = " << dev);
+	REQUIRE( dev == Approx(0).epsilon(5e-13 + 10.0*eps) );
+}
+
 TEST_CASE( "Reversibility of HMC", "[hmc]" ) {
 	// create 4^4 lattice with random U[mu] at each site, random gaussian P
 	// integrate by tau, P -> -P, integrate by tau, compare to original U
@@ -375,7 +428,6 @@ TEST_CASE( "Reversibility of HMC", "[hmc]" ) {
 TEST_CASE( "HMC conserves action for small tau", "[hmc]" ) {
 	// create 4^4 lattice with random U[mu] at each site, random gaussian P
 	// integrate by a small amount, check action is conserved within some eps
-
 	lattice grid (4);
 	field<gauge> U (grid);
 	field<gauge> P (grid);
@@ -391,14 +443,13 @@ TEST_CASE( "HMC conserves action for small tau", "[hmc]" ) {
 	REQUIRE( hmc.deltaE == approx(0).epsilon(1.e-6 * U.V) );		
 }
 
-/*
-TEST_CASE( "CG vs CG-multishift inversion", "[inverters]") {
+TEST_CASE( "CG-singleshift vs CG-multishift inversion", "[inverters]") {
 	double eps = 1.e-10;
 	lattice grid (4);
 	field<gauge> U (grid);
 	hmc hmc (hmc_params);
 	hmc.random_U(U, 10.0);
-	std::vector<double> sigma = {0.1285, 0.158, 0.201};
+	std::vector<double> sigma = {0.01285, 0.158, 0.86, 287.201};
 	dirac_op D (grid);
 
 	// make random fermion field chi
@@ -409,23 +460,24 @@ TEST_CASE( "CG vs CG-multishift inversion", "[inverters]") {
 	std::vector<field<fermion>> x;
 	for(int i_m=0; i_m<static_cast<int>(sigma.size()); ++i_m) {
 		x.push_back(field<fermion>(grid));
-	}	
+	}
 	field<fermion> y (grid), z(grid);
 
-	// x_i = (DD' + m_i^2)^-1 chi
+	// x_i = (DD' + sigma[i])^-1 chi
 	int iter = D.cg_multishift(x, chi, U, hmc_params.mass, hmc_params.mu_I, sigma, eps);
 	INFO("CG_multishift: eps = " << eps << "\t iterations = " << iter << "\t lowest shift = " << sigma[0]);
 
 	for(int i_m=0; i_m<static_cast<int>(sigma.size()); ++i_m) {
-		// y = (DD' + m^2)^-1 chi
-		double effective_mass = sqrt(hmc_params.mass*hmc_params.mass + sigma[i_m]*sigma[i_m]);
-		int iter = D.cg(y, chi, U, effective_mass, hmc_params.mu_I, eps);
-		INFO("CG: eps = " << eps << "\t\t iterations = " << iter << "\t shift" << sigma[i_m]);
+		// y = (DD' + sigma[i_m])^-1 chi
+		int iter = D.cg_singleshift(y, chi, U, hmc_params.mass, hmc_params.mu_I, sigma[i_m], eps);
+		INFO("CG_singleshift: eps = " << eps << "\t\t iterations = " << iter << "\t shift" << sigma[i_m]);
 
-		D.DDdagger(z, y, U, effective_mass, hmc_params.mu_I);
+		D.DDdagger(z, y, U, hmc_params.mass, hmc_params.mu_I);
+		z.add(sigma[i_m], y);
 		double devCG = is_field_equal(z, chi);
 
-		D.DDdagger(z, x[i_m], U, effective_mass, hmc_params.mu_I);
+		D.DDdagger(z, x[i_m], U, hmc_params.mass, hmc_params.mu_I);
+		z.add(sigma[i_m], x[i_m]);
 		double devCG_multishift = is_field_equal(z, chi);
 
 		INFO("shift: " << sigma[i_m] << "\tCG deviation: " << devCG 
@@ -434,7 +486,61 @@ TEST_CASE( "CG vs CG-multishift inversion", "[inverters]") {
 		REQUIRE( devCG_multishift == Approx(0).epsilon(5e-13 + 10.0*eps) );
 	}
 }
-*/
+
+TEST_CASE( "thinQR decomposition", "[inverters]") {
+	lattice grid (4);
+	field<gauge> U (grid);
+	hmc hmc (hmc_params);
+	hmc.random_U(U, 10.0);
+	int N = 8;
+	dirac_op D (grid);
+
+	// make vector of random fermion fields M, empty Q
+	std::vector<field<fermion>> Q, M;
+	field<fermion> chi (grid);
+	for(int i=0; i<N; ++i) {
+ 		Q.push_back(field<fermion>(grid));
+		hmc.gaussian_fermion (chi);
+		M.push_back(chi);
+	}
+
+	Eigen::MatrixXcd R = Eigen::MatrixXcd::Zero(N, N);
+	D.thinQR(Q, R, M);
+
+	// Q should be orthornormal
+	//NOTE: poor numerical accuracy of orthornormality - is this expected?
+	for(int i=N-1; i>=0; --i) {
+		for(int j=N-1; j>=0; --j) {
+			if(i==j) {
+				REQUIRE( std::abs(Q[i].dot(Q[j])) == Approx(1) );
+			}
+			else {
+				REQUIRE( std::abs(Q[i].dot(Q[j])) == Approx(0) );				
+			}
+		}
+	}
+
+	// R should be upper triangular
+	double norm = 0;
+	for(int i=0; i<N; ++i) {
+		for(int j=i+1; j<i; ++j) {
+			norm += std::abs(R(j, i));
+		}
+	}
+	REQUIRE( norm == Approx(0) );
+
+	// QR should reconstruct original M
+	for(int i=0; i<N; ++i) {
+		field<fermion> M_reconstructed (grid);
+		M_reconstructed.setZero();
+		for(int j=0; j<N; ++j) {
+			M_reconstructed.add(R(j,i), Q[j]);
+		}
+		double dev = is_field_equal(M_reconstructed, M[i]);
+		REQUIRE( dev == Approx(0) );
+	}
+}
+
 TEST_CASE( "Read/Write gauge fields to file", "[IO]") {
 	// create random U, measure plaquette, write to file
 	// load U from file, check plaquette matches

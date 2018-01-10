@@ -22,6 +22,7 @@ struct hmc_params {
 
 struct run_params {
 	std::string base_name;
+	int T;
 	int L;
 	int initial_config;
 	int n_therm;

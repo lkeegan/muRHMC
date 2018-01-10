@@ -27,6 +27,9 @@ public:
 	// assume L^4 if only one length specified
 	explicit lattice (int L) : lattice::lattice (L, L, L, L) {}
 
+	// assume TxL^3 if only one length specified
+	lattice (int T, int L) : lattice::lattice (T, L, L, L) {}
+
 	// default destructor is fine:
 	//~lattice ();
 

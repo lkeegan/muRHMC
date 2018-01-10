@@ -21,8 +21,8 @@ int main(int argc, char *argv[]) {
 
 	read_input_file(argv[1], hmc_pars, run_pars);
 
-	// make L^4 lattice
-	lattice grid (run_pars.L);
+	// make TxL^3 lattice
+	lattice grid (run_pars.T, run_pars.L);
 
 	log("");
 	if(hmc_pars.constrained) {
@@ -46,7 +46,10 @@ int main(int argc, char *argv[]) {
 	log("Run parameters:");
 	log("");
 	log("base_name", run_pars.base_name);
-	log("L", grid.L0);
+	log("T", grid.L0);
+	log("L1", grid.L1);
+	log("L2", grid.L2);
+	log("L3", grid.L3);
 	log("n_traj", run_pars.n_traj);
 	log("n_therm", run_pars.n_therm);
 	log("n_save", run_pars.n_save);

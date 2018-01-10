@@ -7,6 +7,7 @@ set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -pedantic -Wextra -Wno-int-in-bool-context")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -march=native -g") #remove g if not profiling release code
 
+#Comment out following line to disable openMP
 FIND_PACKAGE(OpenMP REQUIRED)
 if(OPENMP_FOUND)
 message("OPENMP FOUND")
@@ -16,8 +17,8 @@ set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}
 endif()
 
 find_package(Eigen3 REQUIRED)
-# for anubis/euler instead of find_package set:
-set(EIGEN3_INCLUDE_DIR "/home/keeganl/include/eigen3")
+# for anubis/euler comment out above line and instead use:
+#set(EIGEN3_INCLUDE_DIR "/home/keeganl/include/eigen3")
 include_directories(${EIGEN3_INCLUDE_DIR})
 message("Found Eigen3 in: ${EIGEN3_INCLUDE_DIR}")
 
@@ -42,7 +43,9 @@ add_executable(rhmc rhmc.cpp ${SRCS})
 # Make measurements executables
 add_executable(measure_exact measure_exact.cpp ${SRCS})
 add_executable(measure_noise measure_noise.cpp ${SRCS})
+add_executable(eigenvalues eigenvalues.cpp ${SRCS})
 add_executable(measure measure.cpp ${SRCS})
+add_executable(CG CG.cpp ${SRCS})
 
 #enable_testing()
 add_test(NAME Addition COMMAND tests)

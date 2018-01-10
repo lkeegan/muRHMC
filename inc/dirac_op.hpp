@@ -58,15 +58,26 @@ public:
 	// explicitly construct dirac op as dense (3*VOL)x(3*VOL) matrix
 	Eigen::MatrixXcd D_dense_matrix (field<gauge>& U, double mass, double mu_I) const;
 
+	// explicitly construct (dD/d\mu) as dense (3xVOL)x(3xVOL) matrix
+	Eigen::MatrixXcd dD_dmu_dense_matrix (field<gauge>& U, double mu_I) const;
+
+	void thinQR(std::vector<field<fermion>>& Q, Eigen::MatrixXcd& R, std::vector<field<fermion>>& M);
+
 	// CG inversion of D D^{\dagger} x = b: given b solves for x
 	// returns number of times Dirac operator was called
 	int cg(field<fermion>& x, const field<fermion>& b, field<gauge>& U, double m, double mu_I, double eps);
 
+	// As above but inverts shifted (DD^dag + shift): for debugging only
+	int cg_singleshift(field<fermion>& x, const field<fermion>& b, field<gauge>& U, double mass, double mu_I, double shift, double eps);
+
 	// CG multishift inversion of (D D^{\dagger} + sigma_a^2) x_a = b: given b solves for x_a for each shift sigma_a
 	// returns number of times Dirac operator was called
-	// without isospin sigma is a shift in the mass parameter, so should take same number of inversions as
-	// CG inverting DD^dagger with mass^2 = m^2 + sigma[0]^2
+	// note larger shifts converge faster: currently only stop iterating a given shift if residual is zero to avoid NaN issues
+	// could add vector of eps values for each shift in the future
 	int cg_multishift(std::vector<field<fermion>>& x, const field<fermion>& b, field<gauge>& U, double m, double mu_I, std::vector<double>& sigma, double eps);
+
+	// BlockCGrQ as described in arXiv:1710.09745
+	int cg_block(std::vector<field<fermion>>& x, const std::vector<field<fermion>>& b, field<gauge>& U, double mass, double mu_I, double eps);
 };
  
 #endif //LATTICE_DIRAC_OP_H

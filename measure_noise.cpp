@@ -58,7 +58,7 @@ int main(int argc, char *argv[]) {
 	field<fermion> chi(U.grid);
 	field<fermion> psi(U.grid);
 
-	std::vector<double> psibar_psi, pion_susceptibility, isospin_density;
+	std::vector<double> psibar_psi, pion_susceptibility, isospin_density_real, isospin_density_imag;
 	
 	for(int i=n_initial; ; ++i) {
 		read_gauge_field(U, base_name, i);
@@ -78,20 +78,23 @@ int main(int argc, char *argv[]) {
 			D.D(psi, chi, U, -hmc_pars.mass, -hmc_pars.mu_I);
 			psibar_psi.push_back(-phi.dot(psi).real());
 
+			// NOTE: changed definition!!
 			// isospin_density = (d/dmu)Tr[{D(mu,m)D(mu,m)^dag}^-1]
 			// 2 Re{ <chi|(dD/dmu)|psi> }
 			double mu_I_plus_factor = exp(0.5 * hmc_pars.mu_I);
 			double mu_I_minus_factor = exp(-0.5 * hmc_pars.mu_I);
-			double sum_iso = 0;
+			std::complex<double> sum_iso = 0;
 			for(int ix=0; ix<U.V; ++ix) {
-				sum_iso += mu_I_plus_factor * chi[ix].dot( U[ix][0] * psi.up(ix,0) ).real();
-				sum_iso += mu_I_minus_factor * chi[ix].dot( U.dn(ix,0)[0].adjoint() * psi.dn(ix,0) ).real();
+				sum_iso += mu_I_plus_factor * phi[ix].dot( U[ix][0] * psi.up(ix,0) );
+				sum_iso += mu_I_minus_factor * phi[ix].dot( U.dn(ix,0)[0].adjoint() * psi.dn(ix,0) );
 			}
-			isospin_density.push_back(0.5 * hmc_pars.mu_I * sum_iso);
+			isospin_density_real.push_back(-0.5 * hmc_pars.mu_I * sum_iso.real());
+			isospin_density_imag.push_back(-0.5 * hmc_pars.mu_I * sum_iso.imag());
 		}
 		print_av(psibar_psi, "[noise] psibar-psi");
 		print_av(pion_susceptibility, "[noise] pion-suscept");
-		print_av(isospin_density, "[noise] iso-density");
+		print_av(isospin_density_real, "[noise] Re iso-density");
+		print_av(isospin_density_imag, "[noise] Im iso-density");
 	}
 
 	return(0);

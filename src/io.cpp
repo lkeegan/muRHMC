@@ -30,6 +30,7 @@ void read_input_file(const std::string& filename, hmc_params& hmc_params, run_pa
 
 	if(input.good()) {
 		input >> var_name >> run_params.base_name;
+		input >> var_name >> run_params.T;
 		input >> var_name >> run_params.L;
 		input >> var_name >> hmc_params.beta;
 		input >> var_name >> hmc_params.mass;
