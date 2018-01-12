@@ -101,6 +101,12 @@ public:
 	// average of plaquette over N_c, mu,nu and volume: range [0, 1]
 	double plaq (const field<gauge>& U);
 
+	// average of spatial plaquette over N_c, mu,nu and volume: range [0, 1]
+	double plaq_spatial (const field<gauge>& U);
+
+	// average of timelike plaquette over N_c, mu,nu and volume: range [0, 1]
+	double plaq_timelike (const field<gauge>& U);
+
 	// average of polyakov loops in time (x_0) direction
 	std::complex<double> polyakov_loop (const field<gauge> &U);
 

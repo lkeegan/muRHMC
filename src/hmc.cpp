@@ -286,6 +286,30 @@ double hmc::plaq (const field<gauge> &U) {
 	return p / static_cast<double>(3*6*U.V);
 }
 
+double hmc::plaq_spatial (const field<gauge> &U) {
+	double p = 0;
+	#pragma omp parallel for reduction (+:p)
+	for(int ix=0; ix<U.V; ++ix) {
+		for(int mu=1; mu<4; ++mu) {
+			for(int nu=1; nu<mu; nu++) {
+				p += plaq (ix, mu, nu, U);
+			}
+		}
+	}
+	return p / static_cast<double>(3*3*U.V);
+}
+
+double hmc::plaq_timelike (const field<gauge> &U) {
+	double p = 0;
+	#pragma omp parallel for reduction (+:p)
+	for(int ix=0; ix<U.V; ++ix) {
+		for(int mu=1; mu<4; ++mu) {
+			p += plaq (ix, mu, 0, U);
+		}
+	}
+	return p / static_cast<double>(3*3*U.V);
+}
+
 std::complex<double> hmc::polyakov_loop (const field<gauge> &U) {
 	std::complex<double> p = 0;
 	// NB: no openmp reduction for std::complex, would have to split into real and imag parts

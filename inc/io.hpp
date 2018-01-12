@@ -16,8 +16,11 @@ void log(const std::string& message, std::complex<double> value);
 // read hmc and run parameters from input file
 void read_input_file(const std::string& filename, hmc_params& hmc_params, run_params& run_params);
 
-// Read a gauge field from file in Philippe's fortran format
+// Read a gauge field from file in Philippe's fortran binary format
 void read_fortran_gauge_field(field<gauge>& U, const std::string& filename);
+
+// Read a gauge field from file in Massimo's text format
+void read_massimo_gauge_field(field<gauge>& U, const std::string& filename);
 
 // returns a filename for config with given number
 std::string make_fileName (const std::string& base_name, int config_number);

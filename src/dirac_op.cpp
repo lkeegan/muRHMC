@@ -208,7 +208,7 @@ int dirac_op::cg(field<fermion>& x, const field<fermion>& b, field<gauge>& U, do
 		alpha = r2_new / r2_old;
 		// p = alpha p + r
 		p.scale_add(alpha, 1.0, r);
-		//std::cout << r2_new/b2 << std::endl;
+		//std::cout << iter << "\t" << sqrt(r2_new) << std::endl;
 		if(iter>1e5)
 		{
 			std::cout << "CG not converging: iter=" << iter << " error=" << sqrt(r2_new) << std::endl; 
@@ -418,8 +418,8 @@ int dirac_op::cg_block(std::vector<field<fermion>>& X, const std::vector<field<f
 			}
 		}
 		// Find inverse of beta via cholesky decomposition
+		// and solving beta beta^-1 = I
 		beta = beta.llt().solve(Eigen::MatrixXcd::Identity(N, N));
-		// improvement would be to do forward/back substitution using cholesky L matrix
 
 		// X = X + P beta C
 		betaC = beta * C;
@@ -443,7 +443,7 @@ int dirac_op::cg_block(std::vector<field<fermion>>& X, const std::vector<field<f
 		C = S * C;
 		// FOR NOW using sqrt(|C^dag C|^2)/N, i.e. average of residuals, as residual
 		residual = sqrt((C.adjoint()*C).norm())/static_cast<double>(N);
-		std::cout << iter << "\t" << residual << std::endl;
+		std::cout << "#BLOCK-CG " << iter << "\t" << residual << std::endl;
 	}
 	return iter;
 }

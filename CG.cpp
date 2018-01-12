@@ -4,6 +4,7 @@
 #include "stats.hpp"
 #include <iostream>
 #include <random>
+#include <chrono>
 
 // returns sqrt(\sum_i |lhs_i-rhs_i|^2)
 double is_field_equal (const field<fermion>& lhs, const field<fermion>& rhs) {
@@ -16,40 +17,47 @@ double is_field_equal (const field<fermion>& lhs, const field<fermion>& rhs) {
 
 int main(int argc, char *argv[]) {
 
-    if (argc-1 != 1) {
-        std::cout << "This program requires 1 argument:" << std::endl;
-        std::cout << "number of rhs's in block CG" << std::endl;
-        std::cout << "e.g. ./CG 8" << std::endl;
+    if (argc-1 != 2) {
+        std::cout << "This program requires 2 arguments:" << std::endl;
+        std::cout << "config_name n_RHS" << std::endl;
+        std::cout << "e.g. ./CG conf_20_40_m0.002_b5.144 12" << std::endl;
         return 1;
     }
 
-	int N = static_cast<int>(atof(argv[1]));
+	std::string config_name(argv[1]);
+	int N = static_cast<int>(atof(argv[2]));
+
 	hmc_params hmc_params = {
-		5.4, 	// beta
-		0.01, 	// mass
+		5.144, 	// beta
+		0.0134,	// mass
 		0.000, 	// mu_I
 		1.0, 	// tau
 		7, 		// n_steps
 		1.e-6,	// MD_eps
 		1234,	// seed
-		false,	// constrained HMC (fixed allowed range for pion susceptibility)
+		false,	// constrained HMC
 		3.0, 	// suscept_central
 		0.05	// suscept_eps
 	};
-
-	// make 4^4 lattice
-	lattice grid (4);
-	// make U[mu] field on lattice
-	field<gauge> U (grid);
 	hmc hmc (hmc_params);
-	hmc.random_U(U, 10.0);
+
+	lattice grid (32, 16, 16, 16);
+	field<gauge> U (grid);
+	//read_massimo_gauge_field(U, config_name);
+	read_gauge_field(U, config_name, 1);
+	log("Spatial plaquette", hmc.plaq_spatial(U));
+	log("Timelike plaquette", hmc.plaq_timelike(U));
+
 	// initialise Dirac Op
 	dirac_op D (grid);
 	double eps = 1.e-15;
 
 	std::cout.precision(17);
 	log("CG test program");
-	log("L", grid.L0);
+	log("L0", grid.L0);
+	log("L1", grid.L1);
+	log("L2", grid.L2);
+	log("L3", grid.L3);
 	log("mass", hmc_params.mass);
 	log("mu_I", hmc_params.mu_I);
 	log("eps", eps);
@@ -66,11 +74,11 @@ int main(int argc, char *argv[]) {
 	}
 	field<fermion> y (grid), z(grid);
 
+    auto timer_start = std::chrono::high_resolution_clock::now();
 	// x_i = (DD')^-1 chi_i
 	int iterBLOCK = D.cg_block(x, chi, U, hmc_params.mass, hmc_params.mu_I, eps);
-
-	Eigen::MatrixXcd R = Eigen::MatrixXcd::Zero(N, N);
-	D.thinQR(Q, R, chi);
+    auto timer_stop = std::chrono::high_resolution_clock::now();
+    auto timer_count = std::chrono::duration_cast<std::chrono::milliseconds>(timer_stop-timer_start).count();
 
 	int iterCG = 0;
 	for(int i=0; i<N; ++i) {
@@ -88,5 +96,6 @@ int main(int argc, char *argv[]) {
 
 	log("CG iterations", iterCG);
 	log("BlockCG iterations", iterBLOCK);
+	std::cout << N << "\t" << iterCG << "\t" << iterBLOCK << "\t" << timer_count << std::endl;
 	return(0);
 }

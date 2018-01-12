@@ -105,6 +105,69 @@ void read_fortran_gauge_field(field<gauge>& U, const std::string& filename) {
 	}
 }
 
+void read_massimo_gauge_field(field<gauge>& U, const std::string& filename) {
+	// gauge links contain +/-1 eta factors
+	double eta[4];
+	// open file in binary mode
+	log(("Reading massimo format gauge field from file: " + filename));
+	std::ifstream input(filename.c_str());
+    std::string line;
+	// first line is a header listing:
+	// L1 L2 L3 L0 beta mass int int
+	int L1, L2, L3, L0;
+	double beta, mass;
+	if (input.good()) {
+        getline(input, line);
+        std::stringstream(line) >> L1 >> L2 >> L3 >> L0 >> beta >> mass;
+		// loop over directions
+		for (int muF=0; muF<4; ++muF) {
+			// convert muF=[x,y,z,t] to mu=[t,x,y,z] 
+			int mu = (muF+1)%4;
+			// loop over even/odd flag
+			for (int eo=0; eo<2; ++eo) {
+				// loop over position indices
+				for (int nt=0; nt<U.L0; ++nt) {
+					for (int nz=0; nz<U.L3; ++nz) {
+						for (int ny=0; ny<U.L2; ++ny) {
+							for (int nx=0; nx<U.L1; ++nx) {
+								if((nx+ny+nz+nt)%2 == eo) {
+									// convert (nx,ny,nz,nt) to ix
+									int ix = U.grid.index(nt, nx, ny, nz);
+									// construct eta's
+									eta[0] = 1.0;
+									eta[1] = +1.0-2.0*(nt%2);
+									eta[2] = +1.0-2.0*((nt+nx)%2);
+									eta[3] = +1.0-2.0*((nt+nx+ny)%2);
+
+									// loop over rows of U_ji matrix
+									for (int i=0; i<3; ++i) {
+										std::complex<double> u0, u1, u2;
+										// read row of 3 complex doubles
+        								getline(input, line);
+        								std::stringstream(line) >> u0 >> u1 >> u2;
+										// assign to corresponding U element
+										// and undo eta sign by multiplying again by same
+										U[ix][mu](i,0) = eta[mu]*u0;
+										U[ix][mu](i,1) = eta[mu]*u1;
+										U[ix][mu](i,2) = eta[mu]*u2;
+									}
+									//std::cout << ix << "\t" << mu << "\t" << U[ix][mu] << std::endl;
+					                getline(input, line); // skip empty line
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+		log("Gauge field read with plaquette: ", checksum_plaquette(U));
+	}
+	else {
+		log("Failed to open file: " + filename);
+		exit(1);		
+	}
+}
+
 std::string make_filename (const std::string& base_name, int config_number) {
 	return base_name + "_" + std::to_string(config_number) + ".cnfg";
 }
