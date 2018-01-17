@@ -322,7 +322,7 @@ TEST_CASE( "CG inversion of (D+m)(D+m)^dagger", "[inverters]") {
 		D.DDdagger(y, x, U, hmc_params.mass, hmc_params.mu_I);
 		double dev = is_field_equal(y, chi);
 		INFO("CG: eps = " << eps << "\t iterations = " << iter << "\t error = " << dev);
-		REQUIRE( dev == Approx(0).epsilon(5e-13 + 10.0*eps) );
+		REQUIRE( dev == Approx(0).epsilon(5e-13 + 50.0*eps) );
 	}
 }
 
@@ -349,7 +349,7 @@ TEST_CASE( "CG_singleshift inversion of [(D+m)(D+m)^dagger + shift]", "[inverter
 	y.add(shift, x);
 	double dev = is_field_equal(y, chi);
 	INFO("CG_singleshift: eps = " << eps << "\t iterations = " << iter << "\t error = " << dev);
-	REQUIRE( dev == Approx(0).epsilon(5e-13 + 10.0*eps) );
+	REQUIRE( dev == Approx(0).epsilon(5e-13 + 50.0*eps) );
 }
 
 TEST_CASE( "CG_multishift single shift inversion of [(D+m)(D+m)^dagger + shift]", "[inverters]") {
@@ -376,7 +376,7 @@ TEST_CASE( "CG_multishift single shift inversion of [(D+m)(D+m)^dagger + shift]"
 	y.add(shift[0], x[0]);
 	double dev = is_field_equal(y, chi);
 	INFO("CG_multishift: eps = " << eps << "\t iterations = " << iter << "\t error = " << dev);
-	REQUIRE( dev == Approx(0).epsilon(5e-13 + 10.0*eps) );
+	REQUIRE( dev == Approx(0).epsilon(5e-13 + 50.0*eps) );
 }
 
 TEST_CASE( "Reversibility of HMC", "[hmc]" ) {
@@ -482,8 +482,8 @@ TEST_CASE( "CG-singleshift vs CG-multishift inversion", "[inverters]") {
 
 		INFO("shift: " << sigma[i_m] << "\tCG deviation: " << devCG 
 		 	 << "\t CG_multishift deviation: " << devCG_multishift);
-		REQUIRE( devCG == Approx(0).epsilon(5e-13 + 10.0*eps) );
-		REQUIRE( devCG_multishift == Approx(0).epsilon(5e-13 + 10.0*eps) );
+		REQUIRE( devCG == Approx(0).epsilon(5e-13 + 50.0*eps) );
+		REQUIRE( devCG_multishift == Approx(0).epsilon(5e-13 + 50.0*eps) );
 	}
 }
 

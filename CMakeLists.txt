@@ -4,7 +4,7 @@ project (muRHMC)
 set(CMAKE_VERBOSE_MAKEFILE ON)
 set(CMAKE_CXX_STANDARD 11)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -pedantic -Wextra -Wno-int-in-bool-context")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -pedantic -Wextra -Wno-int-in-bool-context -std=c++11")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -march=native -g") #remove g if not profiling release code
 
 #Comment out following line to disable openMP
@@ -19,10 +19,11 @@ endif()
 find_package(Eigen3 REQUIRED)
 # for anubis/euler comment out above line and instead use:
 #set(EIGEN3_INCLUDE_DIR "/home/keeganl/include/eigen3")
+#set(EIGEN3_INCLUDE_DIR "/cluster/home/keeganl/include/eigen3")
 include_directories(${EIGEN3_INCLUDE_DIR})
 message("Found Eigen3 in: ${EIGEN3_INCLUDE_DIR}")
 
-# Catch unit testing library
+# Catch unit testing library (disable for euler currently due to old cmake version not supporting interface)
 set(CATCH_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/catch)
 add_library(Catch INTERFACE)
 target_include_directories(Catch INTERFACE ${CATCH_INCLUDE_DIR})

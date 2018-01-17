@@ -188,10 +188,11 @@ int dirac_op::cg(field<fermion>& x, const field<fermion>& b, field<gauge>& U, do
 	r = b;
 	// p = r
 	p = r;
+	// b_norm = sqrt(<b|b>)
+	double b_norm = sqrt(b.squaredNorm());
 	// r2_new = <r|r>
 	r2_new = r.squaredNorm();
-	//double b2 = b.squaredNorm();
-	while (sqrt(r2_new) > eps)
+	while (sqrt(r2_new)/b_norm > eps)
 	{
 		// a = A p
 		DDdagger(a, p, U, mass, mu_I);
@@ -208,10 +209,10 @@ int dirac_op::cg(field<fermion>& x, const field<fermion>& b, field<gauge>& U, do
 		alpha = r2_new / r2_old;
 		// p = alpha p + r
 		p.scale_add(alpha, 1.0, r);
-		//std::cout << iter << "\t" << sqrt(r2_new) << std::endl;
+		//std::cout << iter << "\t" << sqrt(r2_new)/b_norm << std::endl;
 		if(iter>1e5)
 		{
-			std::cout << "CG not converging: iter=" << iter << " error=" << sqrt(r2_new) << std::endl; 
+			std::cout << "CG not converging: iter= " << iter << " residual= " << sqrt(r2_new)/b_norm << std::endl; 
 			exit(1); 
 		}
 	}
@@ -234,10 +235,11 @@ int dirac_op::cg_singleshift(field<fermion>& x, const field<fermion>& b, field<g
 	r = b;
 	// p = r
 	p = r;
+	// b_norm = sqrt(<b|b>)
+	double b_norm = sqrt(b.squaredNorm());
 	// r2_new = <r|r>
 	r2_new = r.squaredNorm();
-	//double b2 = b.squaredNorm();
-	while (sqrt(r2_new) > eps)
+	while (sqrt(r2_new)/b_norm > eps)
 	{
 		// a = (A + shift) p
 		DDdagger(a, p, U, mass, mu_I);
@@ -255,10 +257,9 @@ int dirac_op::cg_singleshift(field<fermion>& x, const field<fermion>& b, field<g
 		alpha = r2_new / r2_old;
 		// p = alpha p + r
 		p.scale_add(alpha, 1.0, r);
-		//std::cout << r2_new/b2 << std::endl;
 		if(iter>1e5)
 		{
-			std::cout << "cg_singleshift not converging: iter=" << iter << " error=" << sqrt(r2_new) << std::endl; 
+			std::cout << "cg_singleshift not converging: iter= " << iter << " residual= " << sqrt(r2_new)/b_norm << std::endl; 
 			exit(1); 
 		}
 	}
@@ -290,10 +291,11 @@ int dirac_op::cg_multishift(std::vector<field<fermion>>& x, const field<fermion>
 		alpha[i_shift] = 0.0;		
 	}
 	beta_m1[0] = 1.0;
+	// b_norm = sqrt(<b|b>)
+	double b_norm = sqrt(b.squaredNorm());
 	// r2_new = <r|r>
 	r2_new = r.squaredNorm();
-	//double b2 = b.squaredNorm();
-	while (sqrt(r2_new) > eps)
+	while (sqrt(r2_new)/b_norm > eps)
 	{
 		// a = A p_0
 		DDdagger(a, p[0], U, mass, mu_I);
@@ -353,7 +355,7 @@ int dirac_op::cg_multishift(std::vector<field<fermion>>& x, const field<fermion>
 		}
 		if(iter>1e5)
 		{
-			std::cout << "CG-multishift not converging: iter=" << iter << " error=" << sqrt(r2_new) << std::endl;
+			std::cout << "CG-multishift not converging: iter= " << iter << " residual= " << sqrt(r2_new)/b_norm << std::endl;
 			exit(1); 
 		}
 	}
@@ -389,8 +391,12 @@ int dirac_op::cg_block(std::vector<field<fermion>>& X, const std::vector<field<f
 
 	// main loop
 	int iter = 0;
-	// FOR NOW using sqrt(|C^dag C|^2)/N, i.e. average of residuals, as residual
-	double residual = sqrt((C.adjoint()*C).norm())/static_cast<double>(N);
+	// get norm of each vector b in matrix B,
+	// which for X=0 is also the norm of initial residual vectors r in matrix R:
+	// NB: v.norm() is sqrt(\sum_i v_i v_i^*) = l2 norm of vector v
+	// or sqrt(\sum_i\sum_j v_ij v_ij^*) = frobenius norm of matrix
+	Eigen::ArrayXd b_norm = C.rowwise().norm().array();
+	double residual = 1.0;
 	while(residual > eps) {
 		// P <- Q + P S^dag:
 		// S is upper triangular, so S^dag is lower triangular
@@ -421,6 +427,8 @@ int dirac_op::cg_block(std::vector<field<fermion>>& X, const std::vector<field<f
 		// and solving beta beta^-1 = I
 		beta = beta.llt().solve(Eigen::MatrixXcd::Identity(N, N));
 
+		// TODO: output condition number of C, maybe also beta?
+
 		// X = X + P beta C
 		betaC = beta * C;
 		for(int i=0; i<N; ++i) {
@@ -441,9 +449,15 @@ int dirac_op::cg_block(std::vector<field<fermion>>& X, const std::vector<field<f
 		thinQR(Q, S, tmpQ);
 
 		C = S * C;
-		// FOR NOW using sqrt(|C^dag C|^2)/N, i.e. average of residuals, as residual
-		residual = sqrt((C.adjoint()*C).norm())/static_cast<double>(N);
-		std::cout << "#BLOCK-CG " << iter << "\t" << residual << std::endl;
+		// use maximum over vectors of residual/b_norm as stopping crit
+		// worst vector should be equal to CG with same eps on that vector, others will be better
+		residual = (C.rowwise().norm().array()/b_norm).maxCoeff();
+
+		// [debugging] find eigenvalues of C
+		Eigen::SelfAdjointEigenSolver<Eigen::MatrixXcd> saes;
+		saes.compute(C);
+		Eigen::ArrayXd evals = saes.eigenvalues();
+		std::cout << "#BLOCK-CG " << iter << "\t" << residual << "\t" << evals.maxCoeff()/evals.minCoeff() << "\t" << evals.matrix().transpose() << std::endl;
 	}
 	return iter;
 }

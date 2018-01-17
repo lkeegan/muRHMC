@@ -92,6 +92,9 @@ public:
 	// staple for link U_{\mu}(ix)
 	SU3mat staple (int ix, int mu, const field<gauge>& U);
 
+	// Stout smearing as defined in arxiv:0311018 eqs (1-3) with rho_munu = rho = constant real
+	void stout_smear (double rho, field<gauge> &U);
+
 	// local plaquette Re Tr { P_{\mu\nu}(i) }: range [0, 3] 
 	double plaq (int i, int mu, int nu, const field<gauge>& U);
 
@@ -100,6 +103,9 @@ public:
 
 	// average of plaquette over N_c, mu,nu and volume: range [0, 1]
 	double plaq (const field<gauge>& U);
+
+	// average of 1x2 plaquette over N_c, mu,nu and volume: range [0, 1]
+	double plaq_1x2 (const field<gauge>& U);
 
 	// average of spatial plaquette over N_c, mu,nu and volume: range [0, 1]
 	double plaq_spatial (const field<gauge>& U);

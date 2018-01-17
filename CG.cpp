@@ -29,7 +29,7 @@ int main(int argc, char *argv[]) {
 
 	hmc_params hmc_params = {
 		5.144, 	// beta
-		0.0134,	// mass
+		0.002,	// mass
 		0.000, 	// mu_I
 		1.0, 	// tau
 		7, 		// n_steps
@@ -40,19 +40,32 @@ int main(int argc, char *argv[]) {
 		0.05	// suscept_eps
 	};
 	hmc hmc (hmc_params);
+	std::cout.precision(17);
 
-	lattice grid (32, 16, 16, 16);
+	lattice grid (12, 12, 12, 12);
 	field<gauge> U (grid);
 	//read_massimo_gauge_field(U, config_name);
+	//write_gauge_field(U, config_name, 1);
 	read_gauge_field(U, config_name, 1);
+	log("Average plaquette", hmc.plaq(U));
 	log("Spatial plaquette", hmc.plaq_spatial(U));
 	log("Timelike plaquette", hmc.plaq_timelike(U));
-
+	log("1x2 plaquette", hmc.plaq_1x2(U));
+/*
+	for(int i=0; i<2; ++i){
+		double rho = 0.15;
+		log("Stout smearing with rho:", rho);
+		hmc.stout_smear(rho, U);
+		log("Average plaquette", hmc.plaq(U));
+		log("Spatial plaquette", hmc.plaq_spatial(U));
+		log("Timelike plaquette", hmc.plaq_timelike(U));
+		log("1x2 plaquette", hmc.plaq_1x2(U));
+	}
+*/
 	// initialise Dirac Op
 	dirac_op D (grid);
 	double eps = 1.e-15;
 
-	std::cout.precision(17);
 	log("CG test program");
 	log("L0", grid.L0);
 	log("L1", grid.L1);
@@ -64,11 +77,10 @@ int main(int argc, char *argv[]) {
 	log("N_block", N);
 
 	// make vector of N fermion fields for random chi and empty Q, x
-	std::vector<field<fermion>> x, Q, chi;
+	std::vector<field<fermion>> x, chi;
 	field<fermion> tmp_chi (grid);
 	for(int i=0; i<N; ++i) {
 		x.push_back(field<fermion>(grid));
-		Q.push_back(field<fermion>(grid));
 		hmc.gaussian_fermion (tmp_chi);
 		chi.push_back(tmp_chi);
 	}
@@ -78,7 +90,8 @@ int main(int argc, char *argv[]) {
 	// x_i = (DD')^-1 chi_i
 	int iterBLOCK = D.cg_block(x, chi, U, hmc_params.mass, hmc_params.mu_I, eps);
     auto timer_stop = std::chrono::high_resolution_clock::now();
-    auto timer_count = std::chrono::duration_cast<std::chrono::milliseconds>(timer_stop-timer_start).count();
+    auto timer_count = std::chrono::duration_cast<std::chrono::seconds>(timer_stop-timer_start).count();
+	log("BlockCG_runtime_sec", timer_count);
 
 	int iterCG = 0;
 	for(int i=0; i<N; ++i) {

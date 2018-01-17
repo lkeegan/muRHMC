@@ -208,6 +208,24 @@ void hmc::force_gauge (field<gauge> &force, const field<gauge> &U) {
 	}
 }
 
+void hmc::stout_smear (double rho, field<gauge> &U) {
+	// construct Q: arxiv:0311018 eq (2)
+	// with rho_munu = rho = constant real
+	field<gauge> Q (U.grid);
+	#pragma omp parallel for
+	for(int ix=0; ix<U.V; ++ix) {
+		for(int mu=0; mu<4; ++mu) {
+			SU3mat A = staple (ix, mu, U);
+			SU3mat F = rho*U[ix][mu]*A;
+			A = F - F.adjoint();
+			Q[ix][mu] = ( A - (A.trace()/3.0)*SU3mat::Identity() ) * std::complex<double> (0.0, 0.5);
+		}
+	}
+	// arxiv:0311018 eq (3)
+	// U <- exp(i Q) U
+	step_U (Q, U, 1.0);
+}
+
 int hmc::force_fermion (field<gauge> &force, field<gauge> &U, const field<fermion>& phi, dirac_op& D) {
 	// anti-periodic boundary conditions:
 	// want to set F -> -F at end of this for [x0=T-1, mu=0]
@@ -284,6 +302,25 @@ double hmc::plaq (const field<gauge> &U) {
 		}
 	}
 	return p / static_cast<double>(3*6*U.V);
+}
+
+double hmc::plaq_1x2 (const field<gauge> &U) {
+	double p = 0;
+	#pragma omp parallel for reduction (+:p)
+	for(int ix=0; ix<U.V; ++ix) {
+		for(int mu=0; mu<4; ++mu) {
+			for(int nu=0; nu<4; nu++) {
+				if(mu!=nu) {
+					int ix_mu = U.iup(ix,mu); 
+					int ix_nu = U.iup(ix,nu); 
+					int ix_mu_mu = U.iup(ix_mu,mu); 
+					int ix_nu_mu = U.iup(ix_nu,mu); 
+					p += ((U[ix][mu]*U[ix_mu][mu]*U[ix_mu_mu][nu])*((U[ix][nu]*U[ix_nu][mu]*U[ix_nu_mu][mu]).adjoint())).trace().real();
+				}
+			}
+		}
+	}
+	return p / static_cast<double>(3*12*U.V);
 }
 
 double hmc::plaq_spatial (const field<gauge> &U) {
