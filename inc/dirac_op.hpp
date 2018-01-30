@@ -61,7 +61,11 @@ public:
 	// explicitly construct (dD/d\mu) as dense (3xVOL)x(3xVOL) matrix
 	Eigen::MatrixXcd dD_dmu_dense_matrix (field<gauge>& U, double mu_I) const;
 
-	void thinQR(std::vector<field<fermion>>& Q, Eigen::MatrixXcd& R, std::vector<field<fermion>>& M);
+	// in-place thinQR decomposition of Q, making Q orthonormal, R is upper triangular matrix such that Q^{new} R = Q^{old}
+	void thinQR(std::vector<field<fermion>>& Q, Eigen::MatrixXcd& R);
+
+	// in-place QR A-orthonormalisation of V and AV, rotates V and AV such that [V^dag AV] = I:
+	void thinQRA(std::vector<field<fermion>>& V, std::vector<field<fermion>>& AV, Eigen::MatrixXcd& R);
 
 	// CG inversion of D D^{\dagger} x = b: given b solves for x
 	// returns number of times Dirac operator was called
@@ -76,8 +80,8 @@ public:
 	// could add vector of eps values for each shift in the future
 	int cg_multishift(std::vector<field<fermion>>& x, const field<fermion>& b, field<gauge>& U, double m, double mu_I, std::vector<double>& sigma, double eps);
 
-	// BlockCGrQ as described in arXiv:1710.09745
-	int cg_block(std::vector<field<fermion>>& x, const std::vector<field<fermion>>& b, field<gauge>& U, double mass, double mu_I, double eps);
+	// BlockCG(A)(dQ/dQA)(rQ) as described in arXiv:1710.09745
+	int cg_block(std::vector<field<fermion>>& X, const std::vector<field<fermion>>& B, field<gauge>& U, double mass, double mu_I, double eps, bool BCGA, bool dQ, bool dQA, bool rQ);
 };
  
 #endif //LATTICE_DIRAC_OP_H

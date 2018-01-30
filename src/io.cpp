@@ -183,7 +183,7 @@ void read_gauge_field (field<gauge>& U, const std::string& base_name, int config
 		input.read(reinterpret_cast<char*>(&(U[0][0](0,0))), U.V*4*9*sizeof(std::complex<double>));
 		// check that plaquette matches checksum
 		double plaq = checksum_plaquette(U);
-		if(fabs(plaq - plaq_check) > 5.e-14) {
+		if(fabs(plaq - plaq_check) > 1.e-13) {
 			log("ERROR: read_gauge_field CHECKSUM fail!");
 			log("filename: " + filename);
 			log("checksum plaquette in file", plaq_check);

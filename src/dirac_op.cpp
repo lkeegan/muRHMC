@@ -144,31 +144,62 @@ void dirac_op::DDdagger (field<fermion>& lhs, const field<fermion>& rhs, field<g
 	lhs *= -1.0;
 }
 
-// thin QR decomposition of M using Algorithm 2 from arXiv:1710.09745
-// input: M is a vector of N fermion fields
-// output: R is a NxN complex matrix
-// output: Q is a vector of N orthogonal fermion fields
-void dirac_op::thinQR(std::vector<field<fermion>>& Q, Eigen::MatrixXcd& R, std::vector<field<fermion>>& M) {
-	int N = M.size();
-	// Construct H_ij = M_i^dag M_j = hermitian, 
+// in-place thin QR decomposition of Q using Algorithm 2 from arXiv:1710.09745
+// input: Q is a vector of N fermion fields
+// output: R is a NxN complex hermitian matrix such that Q_input R = Q_output
+// output: Q is a now a vector of N orthogonal fermion fields
+void dirac_op::thinQR(std::vector<field<fermion>>& Q, Eigen::MatrixXcd& R) {
+	int N = Q.size();
+	// Construct H_ij (using R for storage) = Q_i^dag Q_j = hermitian, 
 	// so only need to do the dot products needed for lower triangular part of matrix
-	Eigen::MatrixXcd H = Eigen::MatrixXcd::Zero(N, N);
+	R.setZero();
 	for(int i=0; i<N; ++i) {
 		for(int j=0; j<=i; ++j) {
-			H(i, j) = M[i].dot(M[j]);
+			R(i, j) = Q[i].dot(Q[j]);
 		}
 	}
-
-	// Find upper triangular R such that R^dag R = H = M^dag M
+	// Find upper triangular R such that R^dag R = H (i.e. previous contents of R) = Q^dag Q
 	// i.e. adjoint of cholesky decomposition L matrix: L L^dag = H
-	R = H.llt().matrixL().adjoint();
-	// Solve QR = M for Q, where R is upper triangular
-	Q = M;
+	R = R.llt().matrixL().adjoint();
+	// Solve Q_new R = Q for Q_new, where R is upper triangular
 	for(int i=0; i<N; ++i) {
 		for(int j=0; j<i; ++j) {
 			Q[i].add(-R(j,i), Q[j]);
 		}
 		Q[i] /= R(i,i);
+	}
+}
+
+// in-place A-orthonormalisation of V and AV:
+// input/output: V is a vector of N fermion fields
+// input/ouput: AV is the result of hermitian matrix A acting on V
+// output: R is upper triangular such that V_new R = V_old, AV_new R = AV_old
+// we want PR = V, and P^dag AP = I, with upper triangular R,
+// so [V^dag AV] = R^dag [P^dag AP] R = R^dag R i.e.
+// can do cholesky decomposition to find R, then back substitution:
+// V <- P = V R^-1
+// AV <- AP = AV R^-1
+void dirac_op::thinQRA(std::vector<field<fermion>>& V, std::vector<field<fermion>>& AV, Eigen::MatrixXcd& R) {
+	int N = V.size();
+	// Construct [V^dag AV]_ij (using R for storage) - hermitian, 
+	// so only need to do the dot products needed for lower triangular part of matrix
+	R.setZero();
+	for(int i=0; i<N; ++i) {
+		for(int j=0; j<=i; ++j) {
+			R(i, j) = V[i].dot(AV[j]);
+		}
+	}
+	// Find upper triangular R such that R^dag R = [V^dag AV]
+	// i.e. adjoint of cholesky decomposition L matrix
+	R = R.llt().matrixL().adjoint();
+	// Solve V_new R = V and AV_new R = AV where R is upper triangular
+	for(int i=0; i<N; ++i) {
+		for(int j=0; j<i; ++j) {
+			V[i].add(-R(j,i), V[j]);
+			AV[i].add(-R(j,i), AV[j]);
+		}
+		V[i] /= R(i,i);
+		AV[i] /= R(i,i);
 	}
 }
 
@@ -362,28 +393,53 @@ int dirac_op::cg_multishift(std::vector<field<fermion>>& x, const field<fermion>
 	return iter;	
 }
 
-int dirac_op::cg_block(std::vector<field<fermion>>& X, const std::vector<field<fermion>>& B, field<gauge>& U, double mass, double mu_I, double eps) {
+int dirac_op::cg_block(std::vector<field<fermion>>& X, const std::vector<field<fermion>>& B, field<gauge>& U, double mass, double mu_I, double eps, bool BCGA, bool dQ, bool dQA, bool rQ) {
 	int N = static_cast<int>(B.size());
 	// S = 1 [NxN]
 	Eigen::MatrixXcd S = Eigen::MatrixXcd::Identity(N, N);
-	// C = 0 [NxN]
-	Eigen::MatrixXcd C = Eigen::MatrixXcd::Zero(N, N);
+	// C = 1 [NxN]
+	Eigen::MatrixXcd C = Eigen::MatrixXcd::Identity(N, N);
 	// beta = 0 [NxN]
 	Eigen::MatrixXcd beta = Eigen::MatrixXcd::Zero(N, N);
 	// betaC = 0 [NxN]
 	Eigen::MatrixXcd betaC = Eigen::MatrixXcd::Zero(N, N);
-	// AP, P, Q, R are [NxVOL]
-	std::vector<field<fermion>> AP, P, R, Q, tmpQ;
+	// R = 1 [NxN]
+	Eigen::MatrixXcd R = Eigen::MatrixXcd::Identity(N, N);
+	// PQ, PAQ (for BCGA dot products) [NxN]
+	Eigen::MatrixXcd mPAPinv = Eigen::MatrixXcd::Identity(N, N);
+	Eigen::MatrixXcd mPQ = Eigen::MatrixXcd::Identity(N, N);
+	Eigen::MatrixXcd mPAQ = Eigen::MatrixXcd::Identity(N, N);
+	// AP, P, Q are [NxVOL]
+	std::vector<field<fermion>> AP, P, Q;
 	for(int i=0; i<N; ++i) {
  		AP.push_back(field<fermion>(grid));
  		P.push_back(field<fermion>(grid));
  		Q.push_back(field<fermion>(grid));
- 		tmpQ.push_back(field<fermion>(grid));
 	}
-	// start from X=0 initial guess, so R = B [NxVOL]
-	R = B;
-	// QR decomposition of R[N][VOL] into Q[N][VOL] and C[NxN]
-	thinQR(Q, C, R);
+	// for debugging:
+	field<fermion> tmpTrueResidual(grid);
+	// start from X=0 initial guess, so residual Q = B [NxVOL]
+	Q = B;
+	if(rQ) {
+		// in place thinQR decomposition of residual Q[N][VOL] into orthonormal Q[N][VOL] and triangular C[NxN]
+		thinQR(Q, C);
+	} else if(BCGA) {
+		// set diagonal values of C to residuals Q^dag Q, only needed for residual stopping criterion
+		for(int i=0; i<N; ++i) {
+			C(i, i) = Q[i].dot(Q[i]);
+		}
+	} else {
+		// set C to hermitian matrix Q^dag Q
+		for(int i=0; i<N; ++i) {
+			for(int j=0; j<=i; ++j) {
+				C(i, j) = Q[i].dot(Q[j]);
+				C(j, i) = conj(C(i, j));
+			}
+		}
+		// S = C_old^-1 C_new = C since C_old=1.
+		S = C;
+	}
+
 	// P = 0 [NxVOL]
 	for(int i=0; i<N; ++i) {
 		P[i].setZero(); 
@@ -391,22 +447,48 @@ int dirac_op::cg_block(std::vector<field<fermion>>& X, const std::vector<field<f
 
 	// main loop
 	int iter = 0;
-	// get norm of each vector b in matrix B,
-	// which for X=0 is also the norm of initial residual vectors r in matrix R:
-	// NB: v.norm() is sqrt(\sum_i v_i v_i^*) = l2 norm of vector v
-	// or sqrt(\sum_i\sum_j v_ij v_ij^*) = frobenius norm of matrix
-	Eigen::ArrayXd b_norm = C.rowwise().norm().array();
+	// get norm of each vector b in matrix B
+	// NB: v.norm() == sqrt(\sum_i v_i v_i^*) = l2 norm of vector v
+	Eigen::ArrayXd b_norm = Eigen::ArrayXd::Zero(N);
+	if(rQ) {
+		// residual_i = sqrt(\sum_j Q_i^dag Q_j) = sqrt(\sum_j C_ij)
+		b_norm = C.rowwise().norm().array();
+	} else {
+		// residual_i = sqrt(Q_i^dag Q_i) = sqrt(C_ii)
+		b_norm = C.diagonal().real().array().sqrt();		
+	}
 	double residual = 1.0;
 	while(residual > eps) {
-		// P <- Q + P S^dag:
-		// S is upper triangular, so S^dag is lower triangular
-		// so if we do it in the right order no aliasing required
+
+		// P <- Q + PS
 		for(int i=0; i<N; ++i) {
-			P[i] *= std::conj(S(i,i));
-			for(int j=i+1; j<N; ++j) {
-				P[i].add(std::conj(S(i,j)), P[j]);
+			AP[i] = Q[i];
+			for(int j=0; j<N; ++j) {
+				AP[i].add((S(j,i)), P[j]);
 			}
-			P[i] += Q[i];
+		}
+		P = AP;
+
+		/*
+		// NOTE: for special case of BCGrQ S is triangular
+		// so we could do above P <- Q + P S without temporary storage
+		// and with less opertions:
+		if(rQ and !dQ) {
+			// P <- Q + P S or lower triangular S
+			for(int i=0; i<N; ++i) {
+				P[i] *= S(i,i);
+				for(int j=i+1; j<N; ++j) {
+					P[i].add(S(j,i), P[j]);
+				}
+				P[i] += Q[i];
+			}
+		}
+		*/
+
+		if(dQ) {
+			// in-place thinQR decomposition of descent matrix P
+			// such that P^dag P = I
+			thinQR(P, R);
 		}
 
 		// Apply dirac op to P:
@@ -414,50 +496,161 @@ int dirac_op::cg_block(std::vector<field<fermion>>& X, const std::vector<field<f
 			DDdagger(AP[i], P[i], U, mass, mu_I);
 			++iter;
 		}
+
+		if(dQA) {
+			// in-place thinQRA decomposition of descent matrix P and AP
+			// such that P^dag AP = I
+			thinQRA(P, AP, R);			
+		}
+
 		// construct NxN beta matrix:
 		// beta^-1 = P^dag AP [NxN hermitian matrix]
-		// note this is hermitian since A is hermitian we
-		// only need to calculate lower triangular elements of matrix
-		for(int i=0; i<N; ++i) {
-			for(int j=0; j<=i; ++j) {
-				beta(i,j) = P[i].dot(AP[j]);
+		if(dQA) {
+			// P^dag AP = I by construction
+			beta = Eigen::MatrixXcd::Identity(N, N);
+		} else {
+			// note beta is hermitian since A is hermitian so we
+			// only need to calculate lower triangular elements of matrix
+			for(int i=0; i<N; ++i) {
+				for(int j=0; j<=i; ++j) {
+					beta(i,j) = P[i].dot(AP[j]);
+				}
+			}
+			// Find inverse of beta via LDLT cholesky decomposition
+			// and solving beta beta^-1 = I
+			beta = beta.ldlt().solve(Eigen::MatrixXcd::Identity(N, N));
+		}
+
+		if((dQ || dQA) && !BCGA) {
+			// beta <- beta (R^dag)^-1
+			// Solve X (R^dag) = beta for X, then beta <- X
+			// Can be done in-place by back-substitution since R is upper-triangular
+			//std::cout << "beta\n" << beta << std::endl;
+			for(int i=0; i<N; ++i) {
+				for(int j=N-1; j>=0; --j) {
+					for(int k=N-1; k>j; --k) {
+						beta(i,j) -= beta(i,k) * conj(R(j,k));
+					}
+					beta(i,j) /= R(j,j);
+				}
+			}
+			//std::cout << "new beta\n" << beta << std::endl;
+			//std::cout << "beta R^dag\n" << beta*R.adjoint() << std::endl;
+		}
+
+		if(BCGA) {
+			mPAPinv = beta;
+			for(int i=0; i<N; ++i) {
+				for(int j=0; j<N; ++j) {
+					mPQ(i, j) = P[i].dot(Q[j]);
+				}
+			}
+			beta = beta * mPQ;
+			if(rQ) {
+				betaC = beta * C;
+			} else {
+				betaC = beta;
+			}			
+		} else {
+			betaC = beta * C;
+			if(!rQ) {
+				beta = betaC;
 			}
 		}
-		// Find inverse of beta via cholesky decomposition
-		// and solving beta beta^-1 = I
-		beta = beta.llt().solve(Eigen::MatrixXcd::Identity(N, N));
-
-		// TODO: output condition number of C, maybe also beta?
-
 		// X = X + P beta C
-		betaC = beta * C;
 		for(int i=0; i<N; ++i) {
 			for(int j=0; j<N; ++j) {
 				X[i].add(betaC(j,i), P[j]);
 			}
 		}
 
-		//tmpQ = Q - AP beta
-		tmpQ = Q;
+		//Q -= AP beta
 		for(int i=0; i<N; ++i) {
 			for(int j=0; j<N; ++j) {
-				tmpQ[i].add(-beta(j,i), AP[j]);
+				Q[i].add(-beta(j,i), AP[j]);
 			}
 		}
 
-		//QS = tmpQ
-		thinQR(Q, S, tmpQ);
+		if(BCGA) {
+			if(rQ) {
+				// in-place thinQR decomposition of residuals matrix Q
+				thinQR(Q, S);
+				C = S * C;
+			} else {
+				// update diagonal values of C for residual
+				for(int i=0; i<N; ++i) {
+					C(i, i) = Q[i].dot(Q[i]);
+				}				
+			}
+			// S <- -[P^dag AP]^-1 [Q^dag AP] = - PQ [Q^dag AP]
+			for(int i=0; i<N; ++i) {
+				for(int j=0; j<N; ++j) {
+					mPAQ(i, j) = Q[i].dot(AP[j]);
+				}
+			}
+			S = -mPAPinv * mPAQ.adjoint();
+		} else {
+			if(rQ) {
+				// in-place thinQR decomposition of residuals matrix Q
+				thinQR(Q, S);
+				C = S * C;
+				// S <- S^dag:
+				S.adjointInPlace();
+			} else {
+				// find inverse of C = Q_old^dagQ_old by cholesky decomposition
+				S = C.ldlt().solve(Eigen::MatrixXcd::Identity(N, N));
+				// update C to hermitian matrix Q^dag Q
+				for(int i=0; i<N; ++i) {
+					for(int j=0; j<=i; ++j) {
+						C(i, j) = Q[i].dot(Q[j]);
+						C(j, i) = conj(C(i, j));
+					}
+				}
+				// S = [Q_old^dag Q_old]^-1 [Q_new^dag Q_new]
+				S = S * C;
+			}
+			if(dQ || dQA) {
+				// S <- RS:
+				S = R * S;
+			}
+		}
 
-		C = S * C;
 		// use maximum over vectors of residual/b_norm as stopping crit
 		// worst vector should be equal to CG with same eps on that vector, others will be better
-		residual = (C.rowwise().norm().array()/b_norm).maxCoeff();
+		if(rQ) {
+			residual = (C.rowwise().norm().array()/b_norm).maxCoeff();
+		}
+		else {
+			// C_ii = Q_i^dag Q_i
+			residual = (C.diagonal().real().array().sqrt()/b_norm).maxCoeff();
+		}
+
+		// debugging: do an extra dirac op to get true residual for first block vector
+		DDdagger(tmpTrueResidual, X[0], U, mass, mu_I);
+		double norm = 0.0;
+		for(int ix=0; ix<tmpTrueResidual.V; ++ix) {
+			norm += (tmpTrueResidual[ix]-B[0][ix]).squaredNorm();
+		}
+		std::cout << "#True Residual " << sqrt(norm)/b_norm[0] << std::endl;
 
 		// [debugging] find eigenvalues of C
 		Eigen::SelfAdjointEigenSolver<Eigen::MatrixXcd> saes;
 		saes.compute(C);
 		Eigen::ArrayXd evals = saes.eigenvalues();
-		std::cout << "#BLOCK-CG " << iter << "\t" << residual << "\t" << evals.maxCoeff()/evals.minCoeff() << "\t" << evals.matrix().transpose() << std::endl;
+		std::cout << "#BCG";
+		if(BCGA) {
+			std::cout << "A";
+		}
+		if(dQ) {
+			std::cout << "dQ";
+		}
+		if(dQA) {
+			std::cout << "dQA";
+		}
+		if(rQ) {
+			std::cout << "rQ";
+		}
+		std::cout << " " << iter << "\t" << residual << "\t" << evals.maxCoeff()/evals.minCoeff() << "\t" << evals.matrix().transpose() << std::endl;
 	}
 	return iter;
 }

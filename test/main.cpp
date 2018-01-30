@@ -382,6 +382,7 @@ TEST_CASE( "CG_multishift single shift inversion of [(D+m)(D+m)^dagger + shift]"
 TEST_CASE( "Reversibility of HMC", "[hmc]" ) {
 	// create 4^4 lattice with random U[mu] at each site, random gaussian P
 	// integrate by tau, P -> -P, integrate by tau, compare to original U
+	// NB: what is the reversibility requirement on the HMC? exact/machine prec/inverter prec/..?
 
 	lattice grid (4);
 	field<gauge> U (grid);
@@ -504,11 +505,11 @@ TEST_CASE( "thinQR decomposition", "[inverters]") {
 		M.push_back(chi);
 	}
 
+	Q = M;
 	Eigen::MatrixXcd R = Eigen::MatrixXcd::Zero(N, N);
-	D.thinQR(Q, R, M);
+	D.thinQR(Q, R);
 
 	// Q should be orthornormal
-	//NOTE: poor numerical accuracy of orthornormality - is this expected?
 	for(int i=N-1; i>=0; --i) {
 		for(int j=N-1; j>=0; --j) {
 			if(i==j) {
@@ -533,7 +534,7 @@ TEST_CASE( "thinQR decomposition", "[inverters]") {
 	for(int i=0; i<N; ++i) {
 		field<fermion> M_reconstructed (grid);
 		M_reconstructed.setZero();
-		for(int j=0; j<N; ++j) {
+		for(int j=0; j<=i; ++j) {
 			M_reconstructed.add(R(j,i), Q[j]);
 		}
 		double dev = is_field_equal(M_reconstructed, M[i]);
