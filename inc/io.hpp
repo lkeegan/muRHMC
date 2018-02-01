@@ -31,6 +31,12 @@ void read_gauge_field(field<gauge>& U, const std::string& base_name, int config_
 // write gauge field to file
 void write_gauge_field(field<gauge>& U, const std::string& base_name, int config_number);
 
+// read fermion vector field from file
+bool read_fermion_field(field<fermion>& f, const std::string& filename);
+
+// write fermion vector field to file
+bool write_fermion_field(field<fermion>& f, const std::string& filename);
+
 // calculate average plaqutte for use as checksum
 double checksum_plaquette (const field<gauge> &U);
 

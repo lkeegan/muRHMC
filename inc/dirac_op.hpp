@@ -67,6 +67,12 @@ public:
 	// in-place QR A-orthonormalisation of V and AV, rotates V and AV such that [V^dag AV] = I:
 	void thinQRA(std::vector<field<fermion>>& V, std::vector<field<fermion>>& AV, Eigen::MatrixXcd& R);
 
+	// Bartels–Stewart - O(N^3) algorithm to solve Sylvester equation for X:
+	// AX + XB = C
+	// Computes Schur form of A and B, then transforms equation to triangular form,
+	// solves by back substitution, then transforms solution back to give X
+	void bartels_stewart(Eigen::MatrixXcd& X, const Eigen::MatrixXcd& A, const Eigen::MatrixXcd& B, const Eigen::MatrixXcd& C);
+
 	// CG inversion of D D^{\dagger} x = b: given b solves for x
 	// returns number of times Dirac operator was called
 	int cg(field<fermion>& x, const field<fermion>& b, field<gauge>& U, double m, double mu_I, double eps);
@@ -80,8 +86,8 @@ public:
 	// could add vector of eps values for each shift in the future
 	int cg_multishift(std::vector<field<fermion>>& x, const field<fermion>& b, field<gauge>& U, double m, double mu_I, std::vector<double>& sigma, double eps);
 
-	// BlockCG(A)(dQ/dQA)(rQ) as described in arXiv:1710.09745
-	int cg_block(std::vector<field<fermion>>& X, const std::vector<field<fermion>>& B, field<gauge>& U, double mass, double mu_I, double eps, bool BCGA, bool dQ, bool dQA, bool rQ);
+	// BlockCG[A][dQ/dQA][rQ] as described in arXiv:1710.09745
+	int cg_block(std::vector<field<fermion>>& X, const std::vector<field<fermion>>& B, field<gauge>& U, double mass, double mu_I, double eps, bool BCGA, bool dQ, bool dQA, bool rQ, const field<fermion>& x0_star);
 };
  
 #endif //LATTICE_DIRAC_OP_H

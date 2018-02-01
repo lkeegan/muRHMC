@@ -117,14 +117,14 @@ public:
 	}
 
 	// *this += rhs_multiplier * rhs
-	field& add(std::complex<double> rhs_multiplier, field& rhs)
+	field& add(std::complex<double> rhs_multiplier, const field& rhs)
 	{
 		for(int ix=0; ix<V; ++ix) {
 			data_[ix] += rhs_multiplier * rhs[ix];
 		}
 	    return *this;
 	}
-	field& add(double rhs_multiplier, field& rhs)
+	field& add(double rhs_multiplier, const field& rhs)
 	{
 		for(int ix=0; ix<V; ++ix) {
 			data_[ix] += rhs_multiplier * rhs[ix];

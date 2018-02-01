@@ -157,7 +157,7 @@ void dirac_op::thinQR(std::vector<field<fermion>>& Q, Eigen::MatrixXcd& R) {
 		for(int j=0; j<=i; ++j) {
 			R(i, j) = Q[i].dot(Q[j]);
 		}
-	}
+	}	
 	// Find upper triangular R such that R^dag R = H (i.e. previous contents of R) = Q^dag Q
 	// i.e. adjoint of cholesky decomposition L matrix: L L^dag = H
 	R = R.llt().matrixL().adjoint();
@@ -201,6 +201,44 @@ void dirac_op::thinQRA(std::vector<field<fermion>>& V, std::vector<field<fermion
 		V[i] /= R(i,i);
 		AV[i] /= R(i,i);
 	}
+}
+
+// Bartels–Stewart: O(N^3) algorithm to solve Sylvester equation for X:
+// AX + XB = C
+// (NB there also exists the Hessenberg-Schur method that only requires one Schur decomposition)
+void dirac_op::bartels_stewart(Eigen::MatrixXcd& X, const Eigen::MatrixXcd& A, const Eigen::MatrixXcd& B, const Eigen::MatrixXcd& C) {
+	int N = X.rows();
+	// Compute Schur form U T U^dag of A and B
+	Eigen::ComplexSchur<Eigen::MatrixXcd> schurA(A);
+	Eigen::ComplexSchur<Eigen::MatrixXcd> schurB(B);
+
+	// Can now transform equation to the form
+	// TA X_tilde + X_tilde TB = C_tilde
+	// where TA, TB are upper triangular,
+	// X_tilde = UA^dag X UB
+	// C_tilde = UA^dag C UB
+	Eigen::MatrixXcd C_tilde = schurA.matrixU().adjoint() * C * schurB.matrixU();
+	Eigen::MatrixXcd X_tilde = Eigen::MatrixXcd::Zero(N, N);
+
+	// Solve triangular system by back substitution
+	// consider k-th vector of transformed equation
+	for(int k=0; k<N; ++k) {
+		// do subtractions from C_tilde
+		Eigen::MatrixXcd C_sub = C_tilde.col(k);
+		for(int l=0; l<k; ++l) {
+			C_sub -= schurB.matrixT()(l,k) * X_tilde.col(l);
+		}
+		// do back substitution to solve for X_tilde^(k)
+		for(int i=N-1; i>=0 ; --i) {
+			X_tilde(i,k) = C_sub(i);
+			for(int j=i+1; j<N; j++) {
+				X_tilde(i,k) -= schurA.matrixT()(i,j) * X_tilde(j,k);
+			}
+			X_tilde(i,k) /= (schurA.matrixT()(i,i) + schurB.matrixT()(k,k));
+		} 
+	}
+	// Transform solution X_tilde back to X
+	X = schurA.matrixU() * X_tilde * schurB.matrixU().adjoint();
 }
 
 int dirac_op::cg(field<fermion>& x, const field<fermion>& b, field<gauge>& U, double mass, double mu_I, double eps) {
@@ -393,7 +431,7 @@ int dirac_op::cg_multishift(std::vector<field<fermion>>& x, const field<fermion>
 	return iter;	
 }
 
-int dirac_op::cg_block(std::vector<field<fermion>>& X, const std::vector<field<fermion>>& B, field<gauge>& U, double mass, double mu_I, double eps, bool BCGA, bool dQ, bool dQA, bool rQ) {
+int dirac_op::cg_block(std::vector<field<fermion>>& X, const std::vector<field<fermion>>& B, field<gauge>& U, double mass, double mu_I, double eps, bool BCGA, bool dQ, bool dQA, bool rQ, const field<fermion>& x0_star) {
 	int N = static_cast<int>(B.size());
 	// S = 1 [NxN]
 	Eigen::MatrixXcd S = Eigen::MatrixXcd::Identity(N, N);
@@ -416,8 +454,14 @@ int dirac_op::cg_block(std::vector<field<fermion>>& X, const std::vector<field<f
  		P.push_back(field<fermion>(grid));
  		Q.push_back(field<fermion>(grid));
 	}
-	// for debugging:
-	field<fermion> tmpTrueResidual(grid);
+	// for debugging (error norms of first vector):
+	field<fermion> tmpE0(grid), tmpAE0(grid);
+	// get error norms for X=0 to normalise all to 1 intially
+	double norm0_x0_star = sqrt(x0_star.squaredNorm());
+	DDdagger(tmpAE0, x0_star, U, mass, mu_I);
+	double norm1_x0_star = sqrt(x0_star.dot(tmpAE0).real());
+	// note norm2 is just the residual so we already have the normalisation
+
 	// start from X=0 initial guess, so residual Q = B [NxVOL]
 	Q = B;
 	if(rQ) {
@@ -625,13 +669,14 @@ int dirac_op::cg_block(std::vector<field<fermion>>& X, const std::vector<field<f
 			residual = (C.diagonal().real().array().sqrt()/b_norm).maxCoeff();
 		}
 
-		// debugging: do an extra dirac op to get true residual for first block vector
-		DDdagger(tmpTrueResidual, X[0], U, mass, mu_I);
-		double norm = 0.0;
-		for(int ix=0; ix<tmpTrueResidual.V; ++ix) {
-			norm += (tmpTrueResidual[ix]-B[0][ix]).squaredNorm();
-		}
-		std::cout << "#True Residual " << sqrt(norm)/b_norm[0] << std::endl;
+		// debugging: use known solution to get error norms for first block vector
+		tmpE0 = X[0];
+		tmpE0.add(-1.0, x0_star);
+		DDdagger(tmpAE0, tmpE0, U, mass, mu_I);
+		double norm0 = sqrt(tmpE0.squaredNorm())/norm0_x0_star;
+		double norm1 = sqrt(tmpE0.dot(tmpAE0).real())/norm1_x0_star;
+		double norm2 = sqrt(tmpAE0.squaredNorm())/b_norm[0];
+		std::cout << "#Error-norms <(x-x*)|(1,sqrt(A),A)|(x-x*)> " << norm0 << "\t" << norm1 << "\t" << norm2 << std::endl;
 
 		// [debugging] find eigenvalues of C
 		Eigen::SelfAdjointEigenSolver<Eigen::MatrixXcd> saes;
@@ -650,7 +695,8 @@ int dirac_op::cg_block(std::vector<field<fermion>>& X, const std::vector<field<f
 		if(rQ) {
 			std::cout << "rQ";
 		}
-		std::cout << " " << iter << "\t" << residual << "\t" << evals.maxCoeff()/evals.minCoeff() << "\t" << evals.matrix().transpose() << std::endl;
+		std::cout << " " << iter << "\t" << residual << "\t" << evals.maxCoeff()/evals.minCoeff() << std::endl;
+		// "\t" << evals.matrix().transpose() << std::endl;
 	}
 	return iter;
 }

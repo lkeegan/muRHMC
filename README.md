@@ -6,7 +6,7 @@ Requires the [Eigen](http://eigen.tuxfamily.org) C++ template library for matrix
 ## Current working features
 - HMC for pure gauge + n_f=4+4 isospin chemical potential
 - Leapfrog and OMF2 integrator
-- CG and CG-multishift inverter
+- CG, BCG and CG-multishift inverters
 - Gauge observables
 	- Plaquette
 	- Polyakov loop
@@ -30,4 +30,3 @@ Requires the [Eigen](http://eigen.tuxfamily.org) C++ template library for matrix
 - Mutiple timescale integration
 - OMF4 integrator
 - Even/odd preconditioning
-- Input file

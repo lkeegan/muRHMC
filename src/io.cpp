@@ -172,6 +172,34 @@ std::string make_filename (const std::string& base_name, int config_number) {
 	return base_name + "_" + std::to_string(config_number) + ".cnfg";
 }
 
+bool read_fermion_field(field<fermion>& f, const std::string& filename) {
+	std::ifstream input(filename.c_str(), std::ios::binary);
+	if (input.good()) {
+		// read f
+		input.read(reinterpret_cast<char*>(&(f[0][0])), f.V*3*sizeof(std::complex<double>));
+		log("Fermion field [" + filename + "] read from file");
+		return true;
+	}
+	else {
+		log("Failed to read fermion field from file: " + filename);
+		return false;
+	}
+}
+
+bool write_fermion_field(field<fermion>& f, const std::string& filename) {
+	std::ofstream output(filename.c_str(), std::ios::binary);
+	if (output.good()) {
+		// write f
+		output.write(reinterpret_cast<char*>(&(f[0][0])), f.V*3*sizeof(std::complex<double>));
+		log("Fermion field [" + filename + "] written to file");
+		return true;
+	}
+	else {
+		log("Failed to write fermion field to file: " + filename);
+		return false;
+	}
+}
+
 void read_gauge_field (field<gauge>& U, const std::string& base_name, int config_number) {
 	std::string filename = make_filename (base_name, config_number);
 	std::ifstream input(filename.c_str(), std::ios::binary);

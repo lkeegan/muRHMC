@@ -231,6 +231,16 @@ TEST_CASE( "Gaussian pseudofermions have expected mean < |chi^2| > = 3 * VOL", "
 	REQUIRE( av == approx(3.0).epsilon(eps) );
 }
 
+TEST_CASE( "x.squaredNorm() and x.dot(x) equivalent", "[4d]" ) {
+	lattice grid (4);
+	field<fermion> chi (grid);
+	hmc hmc (hmc_params);
+	hmc.gaussian_fermion(chi);
+	double dev = chi.dot(chi).real() - chi.squaredNorm();
+	INFO("squaredNorm - dot = " << dev);
+	REQUIRE( dev == approx(0) );
+}
+
 TEST_CASE( "D(m, mu) = -eta_5 D(-m, mu) eta_5", "[staggered]") {
 	lattice grid (4);
 	field<gauge> U (grid);
@@ -406,7 +416,7 @@ TEST_CASE( "Reversibility of HMC", "[hmc]" ) {
 
 		double dev = is_field_equal(U, U_old);
 		INFO("HMC reversibility violation: " << dev << "\t MD_eps: " << hmc_params.MD_eps << "\t CG iter: " << iter);
-		REQUIRE( dev == approx(0).epsilon(10.0*hmc_params.MD_eps) );
+		REQUIRE( dev == approx(0).epsilon(100.0*hmc_params.MD_eps) );
 		REQUIRE( is_field_hermitian(P) == approx(0) );
 		REQUIRE( is_field_SU3(U) == approx(0) );		
 	}
@@ -419,7 +429,7 @@ TEST_CASE( "Reversibility of HMC", "[hmc]" ) {
 
 		double dev = is_field_equal(U, U_old);
 		INFO("HMC reversibility violation: " << dev << "\t MD_eps: " << hmc_params.MD_eps << "\t CG iter: " << iter);
-		REQUIRE( dev == approx(0).epsilon(10.0*hmc_params.MD_eps) );
+		REQUIRE( dev == approx(0).epsilon(100.0*hmc_params.MD_eps) );
 		REQUIRE( is_field_hermitian(P) == approx(0) );
 		REQUIRE( is_field_SU3(U) == approx(0) );
 		
@@ -558,6 +568,21 @@ TEST_CASE( "Read/Write gauge fields to file", "[IO]") {
 	REQUIRE ( plaq1 == approx(plaq2));
 }
 
+TEST_CASE( "Read/Write fermion fields to file", "[IO]") {
+	// create random fermion field, write to file
+	// load fermion field from file, compare to original
+	lattice grid (4);
+	field<fermion> f1 (grid);
+	field<fermion> f2 (grid);
+	hmc hmc (hmc_params);
+	hmc.gaussian_fermion(f1);
+	hmc.gaussian_fermion(f2);
+
+	write_fermion_field(f1, "tmp_test_data_fermions");
+	read_fermion_field(f2, "tmp_test_data_fermions");
+	REQUIRE ( is_field_equal(f1, f2) == approx(0));
+}
+
 TEST_CASE( "Explicit Dirac op matrix equivalent to sparse MVM op", "[Eigenvalues]") {
 	lattice grid (4);
 	field<gauge> U (grid);
@@ -582,4 +607,22 @@ TEST_CASE( "Explicit Dirac op matrix equivalent to sparse MVM op", "[Eigenvalues
 	double dev = is_field_equal(psi, chi);
 	INFO ("matrix Dirac op deviation from sparse MVM op: " << dev);	
 	REQUIRE ( dev == approx(0) );
+}
+
+TEST_CASE( "Bartels-Stewart Matrix solution of AX + XB = C", "[Matrices]") {
+
+	int N = 12;
+	Eigen::MatrixXcd A = Eigen::MatrixXcd::Random(N, N);
+	Eigen::MatrixXcd B = Eigen::MatrixXcd::Random(N, N);
+	Eigen::MatrixXcd C = Eigen::MatrixXcd::Random(N, N);
+	Eigen::MatrixXcd X = Eigen::MatrixXcd::Zero(N, N);
+
+	lattice grid (4);
+	field<gauge> U (grid);
+	dirac_op D (grid);
+	D.bartels_stewart(X, A, B, C);
+
+	double dev = (A*X + X*B - C).norm();
+	INFO ("|| A*X + X*B - C || = " << dev);	
+	REQUIRE ( dev == approx(0).epsilon(1e-14*N*N) );
 }
