@@ -44,7 +44,7 @@ int main(int argc, char *argv[]) {
     }
 	std::string config_name(argv[1]);
 	int N = static_cast<int>(atof(argv[2]));
-	int N_shifts = static_cast<int>(atof(argv[2]));
+	int N_shifts = static_cast<int>(atof(argv[3]));
 
 	bool source_point = false;
 	bool source_multiplied_by_D = false;
@@ -64,7 +64,7 @@ int main(int argc, char *argv[]) {
 	hmc hmc (hmc_params);
 	std::cout.precision(17);
 
-	lattice grid (24, 24, 24, 24);
+	lattice grid (12);
 	field<gauge> U (grid);
 //	read_massimo_gauge_field(U, config_name);
 //	write_gauge_field(U, config_name, 1);
@@ -149,9 +149,11 @@ int main(int argc, char *argv[]) {
     auto timer_count = std::chrono::duration_cast<std::chrono::seconds>(timer_stop-timer_start).count();
 	log("BlockCG_runtime_sec", timer_count);
 */
-	std::vector<double> shifts = {0.005, 0.01, 0.02, 0.05, 0.1, 0.15, 0.2, 0.3, 0.5, 0.7123, 0.812, 1.1, 1.8, 2.1, 2.4, 8.0, 74.0, 177.3, 212, 1853.0};
+	std::vector<double> possible_shifts = {0.005, 0.01, 0.02, 0.05, 0.1, 0.15, 0.2, 0.3, 0.5, 0.7123, 0.812, 1.1, 1.8, 2.1, 2.4, 8.0, 74.0, 177.3, 212, 1853.0};
+	std::vector<double> shifts (N_shifts);
 	std::vector< std::vector< field<fermion> > > x_s;
 	for(int i_shift=0; i_shift<N_shifts; ++i_shift) {
+		shifts[i_shift] = possible_shifts[i_shift];
  		x_s.push_back(x);
 	}
     auto timer_start = std::chrono::high_resolution_clock::now();
@@ -160,6 +162,18 @@ int main(int argc, char *argv[]) {
     auto timer_stop = std::chrono::high_resolution_clock::now();
     auto timer_count = std::chrono::duration_cast<std::chrono::seconds>(timer_stop-timer_start).count();
 	log("SBCGrQ_runtime_sec", timer_count);
+
+	// Calculate and output true residuals for first solution vector for each shift
+	double norm = sqrt(chi[0].squaredNorm());
+	D.DDdagger(tmp_phi, x[0], U, hmc_params.mass, hmc_params.mu_I);
+	tmp_phi.add(-1.0, chi[0]);
+	log("true-res-shift", 0.0, sqrt(tmp_phi.squaredNorm())/norm);
+	for(int i_shift=0; i_shift<N_shifts; ++i_shift) {
+		D.DDdagger(tmp_phi, x_s[i_shift][0], U, hmc_params.mass, hmc_params.mu_I);
+		tmp_phi.add(shifts[i_shift], x_s[i_shift][0]);
+		tmp_phi.add(-1.0, chi[0]);
+		log("true-res-shift", shifts[i_shift], sqrt(tmp_phi.squaredNorm())/norm);
+	}
 
 	return(0);
 }
