@@ -17,13 +17,14 @@ double is_field_equal (const field<fermion>& lhs, const field<fermion>& rhs) {
 
 int main(int argc, char *argv[]) {
 
+	// For block CG(A)(dQ/dQA)(rQ):
+	/*
     if (argc-1 != 7) {
         std::cout << "This program requires 7 arguments:" << std::endl;
         std::cout << "config_name n_RHS BCGA dQ dQA rQ fermion_filename" << std::endl;
         std::cout << "e.g. ./CG conf_20_40_m0.002_b5.144 12 1 0 1 0 gaussian.fermion" << std::endl;
         return 1;
     }
-
 	std::string config_name(argv[1]);
 	int N = static_cast<int>(atof(argv[2]));
 	bool BCGA = static_cast<bool>(atoi(argv[3]));
@@ -31,9 +32,22 @@ int main(int argc, char *argv[]) {
 	bool dQA = static_cast<bool>(atoi(argv[5]));
 	bool rQ = static_cast<bool>(atoi(argv[6]));
 	std::string fermion_filename(argv[7]);
+	int N_shifts = 0;
+	*/
+    // For shifted blockCGrQ
+    
+    if (argc-1 != 3) {
+        std::cout << "This program requires 3 arguments:" << std::endl;
+        std::cout << "config_name n_RHS n_shifts" << std::endl;
+        std::cout << "e.g. ./CG conf_20_40_m0.002_b5.144 12 10" << std::endl;
+        return 1;
+    }
+	std::string config_name(argv[1]);
+	int N = static_cast<int>(atof(argv[2]));
+	int N_shifts = static_cast<int>(atof(argv[2]));
 
 	bool source_point = false;
-	bool source_multiplied_by_D = true;
+	bool source_multiplied_by_D = false;
 
 	hmc_params hmc_params = {
 		5.144, 	// beta
@@ -72,7 +86,7 @@ int main(int argc, char *argv[]) {
 */
 	// initialise Dirac Op
 	dirac_op D (grid);
-	double eps = 1.e-15;
+	double eps = 1.e-14;
 
 	log("CG test program");
 	log("L0", grid.L0);
@@ -83,6 +97,7 @@ int main(int argc, char *argv[]) {
 	log("mu_I", hmc_params.mu_I);
 	log("eps", eps);
 	log("N_block", N);
+	log("N_shifts", N_shifts);
 
 	// make vector of N fermion fields for random chi and empty Q, x
 	std::vector<field<fermion>> x, chi;
@@ -109,6 +124,8 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
+	// Single Inversion Block CG:
+/*
 	// We want to have the solution for the first vector to calculate the error norm
 	field<fermion> x0_star(grid);
 	// Try to load stored x0_star fermion field from file: 
@@ -131,6 +148,18 @@ int main(int argc, char *argv[]) {
     auto timer_stop = std::chrono::high_resolution_clock::now();
     auto timer_count = std::chrono::duration_cast<std::chrono::seconds>(timer_stop-timer_start).count();
 	log("BlockCG_runtime_sec", timer_count);
+*/
+	std::vector<double> shifts = {0.005, 0.01, 0.02, 0.05, 0.1, 0.15, 0.2, 0.3, 0.5, 0.7123, 0.812, 1.1, 1.8, 2.1, 2.4, 8.0, 74.0, 177.3, 212, 1853.0};
+	std::vector< std::vector< field<fermion> > > x_s;
+	for(int i_shift=0; i_shift<N_shifts; ++i_shift) {
+ 		x_s.push_back(x);
+	}
+    auto timer_start = std::chrono::high_resolution_clock::now();
+	// x_i = (DD')^-1 chi_i
+	int iterBLOCK = D.SBCGrQ(x, x_s, chi, shifts, U, hmc_params.mass, hmc_params.mu_I, eps);
+    auto timer_stop = std::chrono::high_resolution_clock::now();
+    auto timer_count = std::chrono::duration_cast<std::chrono::seconds>(timer_stop-timer_start).count();
+	log("SBCGrQ_runtime_sec", timer_count);
 
 	return(0);
 }

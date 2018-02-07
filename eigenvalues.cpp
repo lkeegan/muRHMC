@@ -21,80 +21,106 @@ hmc_params hmc_pars = {
 
 int main(int argc, char *argv[]) {
 
-    if (argc-1 != 4) {
-        std::cout << "This program requires 4 arguments:" << std::endl;
-        std::cout << "mass mu_I base_name initial_config" << std::endl;
-        std::cout << "e.g. ./hmc 0.14 0.25 mu0.25_sus_3.1_3.3 23" << std::endl;
+	std::cout.precision(17);
+
+    if (argc-1 != 6) {
+        std::cout << "This program requires 6 arguments:" << std::endl;
+        std::cout << "mass mu_I base_name config_number n_eigenvalues relative_error" << std::endl;
+        std::cout << "e.g. ./hmc 0.14 0.25 mu0.25_sus_3.1_3.3 1 64 1e-4" << std::endl;
         return 1;
     }
 
 	double mass = atof(argv[1]);
 	double mu_I = atof(argv[2]);
 	std::string base_name(argv[3]);
-	int n_initial = static_cast<int>(atof(argv[4]));
+	int config_number = static_cast<int>(atof(argv[4]));
+	int N_eigenvalues = static_cast<int>(atof(argv[5]));
+	double eps = atof(argv[6]);
 
-	// make 4^4 lattice
-	lattice grid (4);
+	lattice grid (12);
 
-	std::cout.precision(12);
+	log("Eigenvalues measurement run with parameters:");
+	log("T", grid.L0);
+	log("L", grid.L1);
+	log("mass", mass);
+	log("mu_I", mu_I);
+	log("N_eigenvalues", N_eigenvalues);
+	log("relative_error", eps);
 
-	std::cout << "# Eigenvalues measurement run with parameters:" << std::endl;
-	std::cout << "# L\t" << grid.L0 << std::endl;
-	std::cout << "# mass\t" << mass << std::endl;
-	std::cout << "# mu_I\t" << mu_I << std::endl;
-	// make U[mu] field on lattice
 	field<gauge> U (grid);
-	// initialise Dirac Op
+	read_gauge_field(U, base_name, config_number);
 	dirac_op D (grid);
-
 	hmc hmc (hmc_pars);
 
-	for(int i_config=n_initial; ; ++i_config) {
-		read_gauge_field(U, base_name, i_config);
-/*
-		// Calculate all eigenvalues lambda_i of Dirac op:
-		Eigen::MatrixXcd eigenvalues = D.D_eigenvalues (U, mass, mu_I);				
-		for (int i=0; i<eigenvalues.size(); ++i) {
-			std::cout << i_config << "\t" << eigenvalues(i).real() << "\t" << eigenvalues(i).imag() << std::endl;
+	// Power method gives strict lower bound on lambda_max
+	// Iterate until relative error < eps
+	field<fermion> x (grid), x2 (grid);
+	hmc.gaussian_fermion(x);
+	double x_norm = sqrt(x.squaredNorm());
+	double x2_norm;
+	double lambda_max = 1;
+	double lambda_max_err = 100;
+	int iter = 0;
+	while((lambda_max_err/lambda_max) > eps) {
+		for(int i=0; i<8; ++i) {
+			x /= x_norm;
+			D.DDdagger(x2, x, U, mass, mu_I);
+			x2_norm = sqrt(x2.squaredNorm());
+			x2 /= x2_norm;
+			D.DDdagger(x, x2, U, mass, mu_I);
+			x_norm = sqrt(x.squaredNorm());
+			iter += 2;
 		}
-		std::cout << eigenvalues.imag().minCoeff() << "\t" << eigenvalues.imag().maxCoeff() << std::endl;
-*/
-		//Noise vector approach to min/max eigenvalue bounds:
-		field<fermion> psi1 (grid), psi2(grid);
-		hmc.gaussian_fermion(psi1);
-
-		psi1 /= sqrt(psi1.squaredNorm());
-		double lambda_max = 0;
-		for(int i=0; i<100; ++i) {
-			D.DDdagger(psi2, psi1, U, mass, mu_I);
-			//lambda_max = psi1.dot(psi2).real();
-			psi2 /= sqrt(psi2.squaredNorm());
-			D.DDdagger(psi1, psi2, U, mass, mu_I);
-			lambda_max = psi2.dot(psi1).real();
-			psi1 /= sqrt(psi1.squaredNorm());
-			std::cout << "MAX: " << lambda_max << std::endl;
-		}
-
-		double c = 0.55*lambda_max + 0.55*mass*mass; // need c > 0.5(lambda_max + lambda_min)
-		hmc.gaussian_fermion(psi1);
-		psi1 /= sqrt(psi1.squaredNorm());
-		for(int i=0; i<1000000; ++i) {
-			// psi2 = (c - A) psi1
-			D.DDdagger(psi2, psi1, U, mass, mu_I);
-			psi2.scale_add(-1.0, c, psi1);
-			lambda_max = psi1.dot(psi2).real();
-			// normalise psi2
-			std::cout << "MIN: " << c - lambda_max << std::endl;
-			psi2 /= sqrt(psi2.squaredNorm());
-			// psi1 = (c - A) psi2
-			D.DDdagger(psi1, psi2, U, mass, mu_I);
-			psi1.scale_add(-1.0, c, psi2);
-			lambda_max = psi1.dot(psi2).real();
-			// normalise psi1
-			psi1 /= sqrt(psi1.squaredNorm());
-			std::cout << "MIN: " << c - lambda_max << std::endl;
-		}
-
+		lambda_max = x2.dot(x).real();
+		lambda_max_err = sqrt(x_norm * x_norm - lambda_max * lambda_max);
+		log("lambda_max", lambda_max, lambda_max_err);
 	}
+	// since lambda_max is a lower bound, and lambda_max + lamda_max_err is an upper bound:
+	log("iterations", iter);
+	log("final_lambda_max", lambda_max + 0.5 * lambda_max_err, 0.5 * lambda_max_err);
+
+	// Find N lowest eigenvalues of DDdagger.
+	// Uses chebyshev acceleration as described in Appendix A of hep-lat/0512021
+	Eigen::MatrixXcd R = Eigen::MatrixXcd::Zero(N_eigenvalues, N_eigenvalues);	
+	Eigen::MatrixXd Evals = Eigen::MatrixXd::Zero(N_eigenvalues, 2);	
+
+	// make initial fermion vector basis of gaussian noise vectors
+	std::vector<field<fermion>> X;
+	for(int i=0; i<N_eigenvalues; ++i) {
+		hmc.gaussian_fermion (x);
+		X.push_back(x);
+	}
+	// orthonormalise X
+	D.thinQR(X, R);
+	// make X A-orthormal and get eigenvalues of matrix <X_i AX_j>
+	D.thinQRA_evals(X, Evals, U, mass, mu_I);
+
+	// v is the upper bound on possible eigenvalues
+	// use 50% margin of safety on estimate of error to get safe upper bound
+	double v = lambda_max + 1.5 * lambda_max_err;
+	while((Evals.col(1).array()/Evals.col(0).array()).maxCoeff() > eps) {
+		// get current estimates of min/max eigenvalues
+		double lambda_min = Evals.col(0)[0]; 
+		double lambda_N = Evals.col(0)[N_eigenvalues-1];
+		// find optimal chebyshev order k 
+        int k = 2 * std::ceil(0.25*sqrt(((v-lambda_min)*8.33633354 - (v-lambda_N)*3.1072776)/(lambda_N - lambda_min)));
+		// find chebyshev lower bound
+		double u = lambda_N + (v - lambda_N)*(tanh(1.76275/(2.0*k)))*tanh(1.76275/(2.0*k));
+		log("Chebyshev order k:", k);
+		log("Chebyshev range u:", u);
+		log("Chebyshev range v:", v);
+		// apply chebyshev polynomial in DDdagger
+		D.chebyshev(k, u, v, X, U, mass, mu_I);		
+		// orthonormalise X
+		D.thinQR(X, R);
+		// make X A-orthormal and get eigenvalues of matrix <X_i AX_j>
+		D.thinQRA_evals(X, Evals, U, mass, mu_I);
+		// note the estimated errors for the eigenvalues are only correct
+		// if the eigevalues are separated more than the errors
+		// i.e. assumes residuals matrix is diagonal
+		// if this is not the case then errors are underestimated
+		std::cout << Evals << std::endl;
+	}
+
 	return(0);
 }

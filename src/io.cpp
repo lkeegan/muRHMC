@@ -24,6 +24,12 @@ void log(const std::string& message, std::complex<double> value) {
 					  << std::left << std::setw(STRING_WIDTH) << value << std::endl;
 }
 
+void log(const std::string& message, double value1, double value2) {
+	std::cout << "# " << std::left << std::setw(STRING_WIDTH) << message
+			  		  << std::left << std::setw(STRING_WIDTH) << value1
+			  		  << std::left << std::setw(STRING_WIDTH) << value2 << std::endl;
+}
+
 void read_input_file(const std::string& filename, hmc_params& hmc_params, run_params& run_params) {
 	std::ifstream input(filename.c_str());
 	std::string var_name;
