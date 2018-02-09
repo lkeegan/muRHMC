@@ -100,7 +100,9 @@ public:
 
 	// Shifted Block CG rQ:
 	// NB assumes vector of shifts are positive and in ascending order
-	int SBCGrQ(std::vector< field<fermion> >& X, std::vector< std::vector< field<fermion> > >& X_s, const std::vector<field<fermion>>& B, std::vector<double>& shifts, field<gauge>& U, double mass, double mu_I, double eps);
+	int SBCGrQ(std::vector< std::vector< field<fermion> > >& X, const std::vector<field<fermion>>& B, std::vector<double>& input_shifts, field<gauge>& U, double mass, double mu_I, double eps);
+
+	int SBCGAdQArQ(std::vector< std::vector< field<fermion> > >& X, const std::vector<field<fermion>>& B, std::vector<double>& input_shifts, field<gauge>& U, double mass, double mu_I, double eps);
 
 };
  

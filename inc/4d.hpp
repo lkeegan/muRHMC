@@ -157,7 +157,7 @@ public:
 			data_[ix].setZero();
 		}		
 	}
-	// equivalent to real part of dot with itself
+	// equivalent to real part of dot with itself i.e. l2-norm squared
 	double squaredNorm() const {
 		double norm = 0.0;
 		#pragma omp parallel for reduction(+:norm)
@@ -165,6 +165,10 @@ public:
 			norm += data_[ix].squaredNorm();
 		}
 		return norm;		
+	}
+	// returns square root of squaredNorm() above i.e. l2-norm
+	double norm() const {
+		return sqrt(squaredNorm());		
 	}
 	//complex conjugate of this dotted with rhs
 	std::complex<double> dot (const field& rhs) const {

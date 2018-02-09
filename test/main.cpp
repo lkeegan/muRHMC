@@ -15,7 +15,7 @@ Approx approx = Approx::custom().epsilon( 5e-14 );
 hmc_params hmc_params = {
 	5.4, 	// beta
 	0.292, 	// mass
-	0.157, 	// mu_I
+	0.0157, // mu_I
 	1.0, 	// tau
 	7, 		// n_steps
 	1.e-6,	// MD_eps
@@ -241,6 +241,17 @@ TEST_CASE( "x.squaredNorm() and x.dot(x) equivalent", "[4d]" ) {
 	REQUIRE( dev == approx(0) );
 }
 
+TEST_CASE( "sqrt(x.squaredNorm()) and x.norm equivalent", "[4d]" ) {
+	lattice grid (4);
+	field<fermion> chi (grid);
+	hmc hmc (hmc_params);
+	hmc.gaussian_fermion(chi);
+	double dev = chi.norm() - sqrt(chi.squaredNorm());
+	INFO("sqrt(squaredNorm) - norm = " << dev);
+	REQUIRE( dev == approx(0) );
+}
+
+
 TEST_CASE( "D(m, mu) = -eta_5 D(-m, mu) eta_5", "[staggered]") {
 	lattice grid (4);
 	field<gauge> U (grid);
@@ -387,6 +398,93 @@ TEST_CASE( "CG_multishift single shift inversion of [(D+m)(D+m)^dagger + shift]"
 	double dev = is_field_equal(y, chi);
 	INFO("CG_multishift: eps = " << eps << "\t iterations = " << iter << "\t error = " << dev);
 	REQUIRE( dev == Approx(0).epsilon(5e-13 + 50.0*eps) );
+}
+
+TEST_CASE( "BCG(A)(dQ/dQA)(rQ) with 3 RHS", "[inverters]") {
+	lattice grid (4);
+	field<gauge> U (grid);
+	hmc hmc (hmc_params);
+	hmc.random_U(U, 10.0);
+	dirac_op D (grid);
+	int N = 3;
+
+	// make block of random fermion fields B
+	field<fermion> x (grid);
+	std::vector< field<fermion> > B;
+	for(int i=0; i<N; ++i) {
+		hmc.gaussian_fermion(x);
+		B.push_back(x);
+	}
+
+	// and solution block vector X
+	std::vector< field<fermion> > X = B;
+
+	field<fermion> y (grid);
+	double eps = 1.e-10;
+	for (bool A: {false, true}) {
+		for (bool dQ: {false, true}) {
+			for (bool dQA: {false, true}) {
+				for (bool rQ: {false, true}) {
+					// can't have both dQ and dQA
+					if(!(dQ && dQA)) {
+						// X = (DD' + shift)^-1 B
+						int iter = D.cg_block(X, B, U, hmc_params.mass, hmc_params.mu_I, eps, A, dQ, dQA, rQ, B[0]);
+
+						// x = (DD' + shift) X[i] ?= B[i]
+						for(int i=0; i<N; ++i) {
+							D.DDdagger(x, X[i], U, hmc_params.mass, hmc_params.mu_I);
+							x -= B[i];
+							double residual = x.norm();
+							INFO("BCG: eps = " << eps << "\t iterations = " << iter << "\t residual = " << residual);
+							REQUIRE( residual == Approx(0).epsilon(5e-13 + 50.0*eps) );
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+TEST_CASE( "SBCGrQ with 3 RHS, 2 shifts", "[inverters]") {
+	lattice grid (4);
+	field<gauge> U (grid);
+	hmc hmc (hmc_params);
+	hmc.random_U(U, 10.0);
+	dirac_op D (grid);
+	int N = 3;
+	int N_shifts =2;
+	std::vector<double> shifts = {0.1, 0.3};
+
+	// make block of random fermion fields B
+	field<fermion> x (grid);
+	std::vector< field<fermion> > B;
+	for(int i=0; i<N; ++i) {
+		hmc.gaussian_fermion(x);
+		B.push_back(x);
+	}
+
+	// and solution block vector X
+	std::vector< std::vector< field<fermion> > > X;
+	for(int i=0; i<N_shifts; ++i) {
+		X.push_back(B);
+	}
+
+	field<fermion> y (grid);
+	double eps = 1.e-10;
+	// X = (DD' + shift)^-1 B
+	int iter = D.SBCGrQ(X, B, shifts, U, hmc_params.mass, hmc_params.mu_I, eps);
+
+	// x = (DD' + shift) X[i] ?= B[i]
+	for(int i_s=0; i_s<N_shifts; ++i_s) {
+		for(int i=0; i<N; ++i) {
+			D.DDdagger(x, X[i_s][i], U, hmc_params.mass, hmc_params.mu_I);
+			x.add(shifts[i_s], X[i_s][i]);
+			x -= B[i];
+			double residual = x.norm();
+			INFO("SBCGrQ[" << i_s << "][" << i << "]: eps = " << eps << "\t iterations = " << iter << "\t residual = " << residual);
+			REQUIRE( residual == Approx(0).epsilon(5e-13 + 50.0*eps) );
+		}
+	}
 }
 
 TEST_CASE( "Reversibility of HMC", "[hmc]" ) {

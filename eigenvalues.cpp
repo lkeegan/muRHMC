@@ -56,8 +56,7 @@ int main(int argc, char *argv[]) {
 	// Iterate until relative error < eps
 	field<fermion> x (grid), x2 (grid);
 	hmc.gaussian_fermion(x);
-	double x_norm = sqrt(x.squaredNorm());
-	double x2_norm;
+	double x_norm = x.norm();
 	double lambda_max = 1;
 	double lambda_max_err = 100;
 	int iter = 0;
@@ -65,10 +64,9 @@ int main(int argc, char *argv[]) {
 		for(int i=0; i<8; ++i) {
 			x /= x_norm;
 			D.DDdagger(x2, x, U, mass, mu_I);
-			x2_norm = sqrt(x2.squaredNorm());
-			x2 /= x2_norm;
+			x2 /= x2.norm();
 			D.DDdagger(x, x2, U, mass, mu_I);
-			x_norm = sqrt(x.squaredNorm());
+			x_norm = x.norm();
 			iter += 2;
 		}
 		lambda_max = x2.dot(x).real();
