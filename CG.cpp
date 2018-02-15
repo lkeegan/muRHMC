@@ -1,5 +1,6 @@
 #include "hmc.hpp"
 #include "dirac_op.hpp"
+#include "inverters.hpp"
 #include "io.hpp"
 #include "stats.hpp"
 #include <iostream>
@@ -165,6 +166,7 @@ int main(int argc, char *argv[]) {
 		7, 		// n_steps
 		1.e-6,	// MD_eps
 		1234,	// seed
+		false, 	// EE
 		false,	// constrained HMC
 		3.0, 	// suscept_central
 		0.05	// suscept_eps
@@ -193,7 +195,7 @@ int main(int argc, char *argv[]) {
 	}
 */
 	// initialise Dirac Op
-	dirac_op D (grid);
+	dirac_op D (grid, hmc_params.mass, hmc_params.mu_I);
 	double eps = 1.e-14;
 
 	log("CG test program");
@@ -225,7 +227,7 @@ int main(int argc, char *argv[]) {
 		if(source_multiplied_by_D) {
 			// multiply source by D, as in HMC
 			log("source <- D * source");
-			D.D(tmp_phi, tmp_chi, U, hmc_params.mass, hmc_params.mu_I);	
+			D.D(tmp_phi, tmp_chi, U);	
 			chi.push_back(tmp_phi);
 		} else {
 			chi.push_back(tmp_chi);
@@ -268,7 +270,7 @@ int main(int argc, char *argv[]) {
 	}
     auto timer_start = std::chrono::high_resolution_clock::now();
 	// x_i = (DD')^-1 chi_i
-	int iterBLOCK = D.SBCGrQ(x_s, chi, shifts, U, hmc_params.mass, hmc_params.mu_I, eps);
+	int iterBLOCK = SBCGrQ(x_s, chi, U, shifts, D, eps);
     auto timer_stop = std::chrono::high_resolution_clock::now();
     auto timer_count = std::chrono::duration_cast<std::chrono::seconds>(timer_stop-timer_start).count();
 	log("SBCGrQ_runtime_sec", timer_count);
@@ -276,7 +278,7 @@ int main(int argc, char *argv[]) {
 	// Calculate and output true residuals for first solution vector for each shift
 	double norm = chi[0].norm();
 	for(int i_shift=0; i_shift<N_shifts; ++i_shift) {
-		D.DDdagger(tmp_phi, x_s[i_shift][0], U, hmc_params.mass, hmc_params.mu_I);
+		D.DDdagger(tmp_phi, x_s[i_shift][0], U);
 		tmp_phi.add(shifts[i_shift], x_s[i_shift][0]);
 		tmp_phi.add(-1.0, chi[0]);
 		log("true-res-shift", shifts[i_shift], tmp_phi.norm()/norm);

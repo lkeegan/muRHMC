@@ -2,7 +2,7 @@
 #include "omp.h"
 #include <iostream> //FOR DEBUGGING
 
-dirac_op::dirac_op (const lattice& grid) : grid(grid), eta(grid) {
+dirac_op::dirac_op (const lattice& grid, double mass, double mu_I) : mass(mass), mu_I(mu_I), eta(grid) {
 	construct_eta(eta, grid);
 }
 
@@ -23,13 +23,7 @@ void dirac_op::construct_eta(field<gamma_matrices>& eta, const lattice& grid) {
 	}
 }
 
-void dirac_op::gamma5 (field<fermion>& phi) const {
-	for(int ix=0; ix<phi.V; ++ix) {
-		phi[ix] *= eta[ix][4];
-	}
-}
-
-void dirac_op::apbs_in_time (field<gauge>& U) const {
+void dirac_op::apbcs_in_time (field<gauge>& U) const {
 	if(ANTI_PERIODIC_BCS) {
 		for(int ix=0; ix<U.VOL3; ++ix) {
 			int i4x = U.it_ix(U.L0-1, ix);
@@ -38,10 +32,52 @@ void dirac_op::apbs_in_time (field<gauge>& U) const {
 	}
 }
 
+void dirac_op::apply_eta_bcs_to_U (field<gauge>& U) {
+	if (!GAUGE_LINKS_INCLUDE_ETA_BCS) {
+		for(int ix=0; ix<U.V; ++ix) {
+			for(int mu=1; mu<4; ++mu) {
+				// eta[mu=0] = 1 so skip it
+				U[ix][mu] *= eta[ix][mu];
+			}	
+		} //NB maybe can incorporate apbcs in eta's - need to check that etas are not used anywhere else...
+		// probably OK apart from massimo config format, so check this isn't broken by this..
+		if(ANTI_PERIODIC_BCS) {
+			for(int ix=0; ix<U.VOL3; ++ix) {
+				int i4x = U.it_ix(U.L0-1, ix);
+				U[i4x][0] *= -1;
+			}
+		}
+		GAUGE_LINKS_INCLUDE_ETA_BCS = true;
+	}
+}
+
+void dirac_op::remove_eta_bcs_from_U (field<gauge>& U) {
+	if (GAUGE_LINKS_INCLUDE_ETA_BCS) {
+		for(int ix=0; ix<U.V; ++ix) {
+			for(int mu=1; mu<4; ++mu) {
+				U[ix][mu] *= eta[ix][mu];
+			}	
+		}
+		if(ANTI_PERIODIC_BCS) {
+			for(int ix=0; ix<U.VOL3; ++ix) {
+				int i4x = U.it_ix(U.L0-1, ix);
+				U[i4x][0] *= -1;
+			}
+		}
+		GAUGE_LINKS_INCLUDE_ETA_BCS = false;
+	}
+}
+
+void dirac_op::gamma5 (field<fermion>& phi) const {
+	for(int ix=0; ix<phi.V; ++ix) {
+		phi[ix] *= eta[ix][4];
+	}
+}
+
 // explicitly construct dirac op as dense (3xVOL)x(3xVOL) matrix
-Eigen::MatrixXcd dirac_op::D_dense_matrix (field<gauge>& U, double mass, double mu_I) const {
+Eigen::MatrixXcd dirac_op::D_dense_matrix (field<gauge>& U){
 	Eigen::MatrixXcd D_matrix = Eigen::MatrixXcd::Zero(3*U.V, 3*U.V);
-	apbs_in_time(U);
+	apply_eta_bcs_to_U(U);
 	double mu_I_plus_factor = exp(0.5 * mu_I);
 	double mu_I_minus_factor = exp(-0.5 * mu_I);
 	for(int ix=0; ix<U.V; ++ix) {
@@ -51,19 +87,18 @@ Eigen::MatrixXcd dirac_op::D_dense_matrix (field<gauge>& U, double mass, double 
 		D_matrix.block<3,3>(3*ix,3*U.iup(ix,0)) = 0.5 * mu_I_plus_factor * U[ix][0];
 		D_matrix.block<3,3>(3*ix,3*U.idn(ix,0)) = -0.5 * mu_I_minus_factor * U.dn(ix,0)[0].adjoint();
 		for(int mu=1; mu<4; ++mu) {
-			D_matrix.block<3,3>(3*ix,3*U.iup(ix,mu)) = 0.5 * eta[ix][mu] * U[ix][mu]; 
-			D_matrix.block<3,3>(3*ix,3*U.idn(ix,mu)) = -0.5 * eta[ix][mu] * U.dn(ix,mu)[mu].adjoint();
+			D_matrix.block<3,3>(3*ix,3*U.iup(ix,mu)) = 0.5 * U[ix][mu]; 
+			D_matrix.block<3,3>(3*ix,3*U.idn(ix,mu)) = -0.5 * U.dn(ix,mu)[mu].adjoint();
 		}
 	}
-	// undo flip to restore original U's
-	apbs_in_time(U);
+	remove_eta_bcs_from_U(U);
 	return D_matrix;
 }
 
 // explicitly construct (dD/d\mu) as dense (3xVOL)x(3xVOL) matrix
-Eigen::MatrixXcd dirac_op::dD_dmu_dense_matrix (field<gauge>& U, double mu_I) const {
+Eigen::MatrixXcd dirac_op::dD_dmu_dense_matrix (field<gauge>& U) const {
 	Eigen::MatrixXcd D_matrix = Eigen::MatrixXcd::Zero(3*U.V, 3*U.V);
-	apbs_in_time(U);
+	apbcs_in_time(U);
 	double mu_I_plus_factor = exp(0.5 * mu_I);
 	double mu_I_minus_factor = exp(-0.5 * mu_I);
 	for(int ix=0; ix<U.V; ++ix) {
@@ -71,22 +106,22 @@ Eigen::MatrixXcd dirac_op::dD_dmu_dense_matrix (field<gauge>& U, double mu_I) co
 		D_matrix.block<3,3>(3*ix,3*U.idn(ix,0)) = mu_I * 0.25 * mu_I_minus_factor * U.dn(ix,0)[0].adjoint();
 	}
 	// undo flip to restore original U's
-	apbs_in_time(U);
+	apbcs_in_time(U);
 	return D_matrix;
 }
 
-Eigen::MatrixXcd dirac_op::D_eigenvalues (field<gauge>& U, double mass, double mu_I) const {
+Eigen::MatrixXcd dirac_op::D_eigenvalues (field<gauge>& U) {
 	// construct explicit dense dirac matrix
-	Eigen::MatrixXcd D_matrix = D_dense_matrix(U, mass, mu_I);
+	Eigen::MatrixXcd D_matrix = D_dense_matrix(U);
 	// find all eigenvalues of non-hermitian dirac operator matrix D
 	Eigen::ComplexEigenSolver<Eigen::MatrixXcd> ces;
 	ces.compute(D_matrix);
 	return ces.eigenvalues();
 }
 
-Eigen::MatrixXcd dirac_op::DDdagger_eigenvalues (field<gauge>& U, double mass, double mu_I) const {
+Eigen::MatrixXcd dirac_op::DDdagger_eigenvalues (field<gauge>& U) {
 	// construct explicit dense dirac matrix
-	Eigen::MatrixXcd D_matrix = D_dense_matrix(U, mass, mu_I);
+	Eigen::MatrixXcd D_matrix = D_dense_matrix(U);
 	D_matrix = D_matrix * D_matrix.adjoint();
 	// find all eigenvalues of hermitian dirac operator matrix DDdagger
 	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXcd> saes;
@@ -94,8 +129,8 @@ Eigen::MatrixXcd dirac_op::DDdagger_eigenvalues (field<gauge>& U, double mass, d
 	return saes.eigenvalues();
 }
 
-double dirac_op::D_phase_angle (field<gauge>& U, double mass, double mu_I) const {
-	Eigen::MatrixXcd eigenvalues = D_eigenvalues(U, mass, mu_I);				
+double dirac_op::D_phase_angle (field<gauge>& U) {
+	Eigen::MatrixXcd eigenvalues = D_eigenvalues(U);				
 	// phase{Det[D]} = phase{\prod_i \lambda_i} = \sum_i phase{lambda_i}
 	double sum = 0;
 	for (int i=0; i<eigenvalues.size(); ++i) {
@@ -104,15 +139,46 @@ double dirac_op::D_phase_angle (field<gauge>& U, double mass, double mu_I) const
 	return sum;
 }
 
-double dirac_op::pion_susceptibility_exact (field<gauge>& U, double mass, double mu_I) const {
-	Eigen::MatrixXcd eigenvaluesDDdag = DDdagger_eigenvalues (U, mass, mu_I);				
+double dirac_op::pion_susceptibility_exact (field<gauge>& U) {
+	Eigen::MatrixXcd eigenvaluesDDdag = DDdagger_eigenvalues (U);				
 	return eigenvaluesDDdag.cwiseInverse().sum().real()/static_cast<double>(3*U.V);
 }
 
-void dirac_op::D (field<fermion>& lhs, const field<fermion>& rhs, field<gauge>& U, double mass, double mu_I) const {
-	// flip sign of timelike U's at boundary to impose anti-periodic bcs on fermions 
-	apbs_in_time(U);
+// massless even_odd part of dirac op (assumes mu_I=0):
+// also assumes that gauge links contain eta matrices and bcs
+// rhs is only defined for odd sites, lhs for even sites
+void dirac_op::D_eo (field<fermion>& lhs, const field<fermion>& rhs, const field<gauge>& U) const {
+	// default static scheduling, with N threads, split loop into N chunks, one per thread 
+	//std::cout << "D_EO_" << lhs.eo_storage << rhs.eo_storage << std::endl;
+	#pragma omp parallel for
+	// loop over even ix_e = ix (no offset from true ix):
+	for(int ix=0; ix<lhs.V; ++ix) {
+		lhs[ix].setZero();
+		for(int mu=0; mu<4; ++mu) {
+			lhs[ix].noalias() += 0.5 * U[ix][mu] * rhs.up(ix,mu); 
+			lhs[ix].noalias() += -0.5 * U.dn(ix,mu)[mu].adjoint() * rhs.dn(ix,mu);
+		}
+	}
+}
 
+void dirac_op::D_oe (field<fermion>& lhs, const field<fermion>& rhs, const field<gauge>& U) const {
+	// default static scheduling, with N threads, split loop into N chunks, one per thread 
+	//std::cout << "D_OE_" << lhs.eo_storage << rhs.eo_storage << std::endl;
+	#pragma omp parallel for
+	// loop over odd ix_o = ix + V:
+	for(int ix_o=0; ix_o<lhs.V; ++ix_o) {
+		lhs[ix_o].setZero();
+		// true ix has V offset from ix_o:
+		int ix = ix_o + lhs.V; 
+		for(int mu=0; mu<4; ++mu) {
+			lhs[ix_o].noalias() += 0.5 * U[ix][mu] * rhs.up(ix,mu); 
+			lhs[ix_o].noalias() += -0.5 * U.dn(ix,mu)[mu].adjoint() * rhs.dn(ix,mu);
+		}
+	}
+}
+
+void dirac_op::D (field<fermion>& lhs, const field<fermion>& rhs, field<gauge>& U) {
+	apply_eta_bcs_to_U(U);
 	double mu_I_plus_factor = exp(0.5 * mu_I);
 	double mu_I_minus_factor = exp(-0.5 * mu_I);
 	// default static scheduling, with N threads, split loop into N chunks, one per thread 
@@ -124,34 +190,53 @@ void dirac_op::D (field<fermion>& lhs, const field<fermion>& rhs, field<gauge>& 
 		lhs[ix].noalias() += 0.5 * mu_I_plus_factor * U[ix][0] * rhs.up(ix,0);
 		lhs[ix].noalias() += -0.5 * mu_I_minus_factor * U.dn(ix,0)[0].adjoint() * rhs.dn(ix,0);
 		for(int mu=1; mu<4; ++mu) {
-			lhs[ix].noalias() += 0.5 * eta[ix][mu] * U[ix][mu] * rhs.up(ix,mu); 
-			lhs[ix].noalias() += -0.5 * eta[ix][mu] * U.dn(ix,mu)[mu].adjoint() * rhs.dn(ix,mu);
+			lhs[ix].noalias() += 0.5 * U[ix][mu] * rhs.up(ix,mu); 
+			lhs[ix].noalias() += -0.5 * U.dn(ix,mu)[mu].adjoint() * rhs.dn(ix,mu);
 		}
 	}
-	// undo flip to restore original U's
-	apbs_in_time(U);
+	remove_eta_bcs_from_U(U);
 }
 
-void dirac_op::DDdagger (field<fermion>& lhs, const field<fermion>& rhs, field<gauge>& U, double mass, double mu_I) {
+void dirac_op::DDdagger (field<fermion>& lhs, const field<fermion>& rhs, field<gauge>& U) {
 	// without isospin:
 	// (D+m)(D+m)^dagger = g5 D g5 D + m^2 = -D^2 + m^2
 	// however with isospin: D(mu)^dag(mu) = -D(-mu) so above no longer holds,
 	// instead here we do: 
 	// (D(mu)+m)*(D(mu)+m)^dagger = (D(mu)+m)*(-D(-mu)+m) = -D(m,mu)*D(-m,-mu)
-    field<fermion> tmp(rhs.grid);
-	D(tmp, rhs, U, -mass, -mu_I);
-	D(lhs, tmp, U, mass, mu_I);
-	lhs *= -1.0;
+	if(lhs.eo_storage == field<fermion>::EVEN_ONLY && rhs.eo_storage == field<fermion>::EVEN_ONLY) {
+		// if lhs and rhs are both even-only fields,
+		// then use even-even sub block of operator (and assume mu_I=0)
+		apply_eta_bcs_to_U(U);
+	    field<fermion> tmp_o(rhs.grid, field<fermion>::ODD_ONLY);
+		D_oe(tmp_o, rhs, U);
+		D_eo(lhs, tmp_o, U);
+		lhs.scale_add(-1.0, mass*mass, rhs);
+		remove_eta_bcs_from_U(U);
+	} else {
+		// otherwise do full operator with non-zero mu_I
+	    field<fermion> tmp(rhs.grid);
+	    // D^dagger(mass, mu_I) = -D(-mass, -mu_I)
+	    mass = -mass;
+	    mu_I = -mu_I;
+		D(tmp, rhs, U);
+		tmp *= -1.0;
+	    mass = -mass;
+	    mu_I = -mu_I;
+		D(lhs, tmp, U);
+	}
 }
 
 // in-place chebyshev polynomial of DDdag acting on vector of fermion fields
+// if supplied X is EVEN_ONLY then DDdagger_ee is used and mu_I is assumed to be zero
 // Uses recursive formula from hep-lat/0512021
 // c_{n+1}= 2*z*c_{n} - c_{n-1}
 // where z = ((v+u) - 2 DDdag) / (u - v)
 // c_0 = 1, c_1 = z
-void dirac_op::chebyshev (int k, double u, double v, std::vector<field<fermion>>& X, field<gauge>& U, double mass, double mu_I) {
+void dirac_op::chebyshev (int k, double u, double v, std::vector<field<fermion>>& X, field<gauge>& U) {
 	int n_block = X.size();
-	field<fermion> c_minus2 (X[0].grid), c_minus1 (X[0].grid), c_minus0 (X[0].grid);
+	field<fermion> c_minus2 (X[0].grid, X[0].eo_storage);
+	field<fermion> c_minus1 (X[0].grid, X[0].eo_storage);
+	field<fermion> c_minus0 (X[0].grid, X[0].eo_storage);
 	double norm = (v + u) / (v - u);
 	double inv_vmu = 1.0 / (v - u);
 	for(int i_b=0; i_b<n_block; ++i_b) {
@@ -159,7 +244,7 @@ void dirac_op::chebyshev (int k, double u, double v, std::vector<field<fermion>>
 		// c_0 = x
 		c_minus1 = X[i_b];
 		// c_1 = z(x) = norm x - inv_vmu DDdag x
-		DDdagger (c_minus0, c_minus1, U, mass, mu_I);
+		DDdagger (c_minus0, c_minus1, U);
 		c_minus0.scale_add(-inv_vmu, norm, c_minus1);
 		// c_k = 2 z(c_{k-1}) - c_{k-2}
 		for(int i_k=1; i_k<k; ++i_k) {
@@ -167,1000 +252,10 @@ void dirac_op::chebyshev (int k, double u, double v, std::vector<field<fermion>>
 			c_minus2 = c_minus1;
 			c_minus1 = c_minus0;
 			// calculate current c
-			DDdagger (c_minus0, c_minus1, U, mass, mu_I);
+			DDdagger (c_minus0, c_minus1, U);
 			c_minus0.scale_add(-inv_vmu, norm, c_minus1);
 			c_minus0.scale_add(2.0, -1.0, c_minus2);
 		}
 		X[i_b] = c_minus0;
 	}
-}
-
-// in-place thin QR decomposition of Q using Algorithm 2 from arXiv:1710.09745
-// input: Q is a vector of N fermion fields
-// output: R is a NxN complex hermitian matrix such that Q_input R = Q_output
-// output: Q is a now a vector of N orthogonal fermion fields
-void dirac_op::thinQR(std::vector<field<fermion>>& Q, Eigen::MatrixXcd& R) {
-	int N = Q.size();
-	// Construct H_ij (using R for storage) = Q_i^dag Q_j = hermitian, 
-	// so only need to do the dot products needed for lower triangular part of matrix
-	R.setZero();
-	for(int i=0; i<N; ++i) {
-		for(int j=0; j<=i; ++j) {
-			R(i, j) = Q[i].dot(Q[j]);
-		}
-	}	
-	// Find upper triangular R such that R^dag R = H (i.e. previous contents of R) = Q^dag Q
-	// i.e. adjoint of cholesky decomposition L matrix: L L^dag = H
-	R = R.llt().matrixL().adjoint();
-	// Solve Q_new R = Q for Q_new, where R is upper triangular
-	for(int i=0; i<N; ++i) {
-		for(int j=0; j<i; ++j) {
-			Q[i].add(-R(j,i), Q[j]);
-		}
-		Q[i] /= R(i,i);
-	}
-}
-
-// in-place A-orthonormalisation of V and AV:
-// input/output: V is a vector of N fermion fields
-// input/ouput: AV is the result of hermitian matrix A acting on V
-// output: R is upper triangular such that V_new R = V_old, AV_new R = AV_old
-// we want PR = V, and P^dag AP = I, with upper triangular R,
-// so [V^dag AV] = R^dag [P^dag AP] R = R^dag R i.e.
-// can do cholesky decomposition to find R, then back substitution:
-// V <- P = V R^-1
-// AV <- AP = AV R^-1
-void dirac_op::thinQRA(std::vector<field<fermion>>& V, std::vector<field<fermion>>& AV, Eigen::MatrixXcd& R) {
-	int N = V.size();
-	// Construct [V^dag AV]_ij (using R for storage) - hermitian, 
-	// so only need to do the dot products needed for lower triangular part of matrix
-	R.setZero();
-	for(int i=0; i<N; ++i) {
-		for(int j=0; j<=i; ++j) {
-			R(i, j) = V[i].dot(AV[j]);
-		}
-	}
-	// Find upper triangular R such that R^dag R = [V^dag AV]
-	// i.e. adjoint of cholesky decomposition L matrix
-	R = R.llt().matrixL().adjoint();
-	// Solve V_new R = V and AV_new R = AV where R is upper triangular
-	for(int i=0; i<N; ++i) {
-		for(int j=0; j<i; ++j) {
-			V[i].add(-R(j,i), V[j]);
-			AV[i].add(-R(j,i), AV[j]);
-		}
-		V[i] /= R(i,i);
-		AV[i] /= R(i,i);
-	}
-}
-
-// A-orthogonalise X in place, without having AX already, i.e. does a bunch of DDdag operations
-// Return the eigenvalues of the hermitian matrix <X_i|A|X_j> in first column of Evals [eigenvalues]
-// And the square root of the diagonal elemets only of the hermitian matrix <X_i|A^2|X_j> in 2nd [optimistic error estimates]
-// (Does not calculate or return the square root of the largest eigenvalue of <X_i|A^2|X_j> [conservative error estimate])
-void dirac_op::thinQRA_evals(std::vector<field<fermion>>& X, Eigen::MatrixXd& Evals, field<gauge>& U, double mass, double mu_I) {
-	int N = X.size();
-	field<fermion> x (X[0].grid);
-	// Construct lower triangular part of hermitian matrix <X_i|A|X_j> and diagonal part of <X_i|A^2|X_j> 
-	Eigen::MatrixXcd R = Eigen::MatrixXcd::Zero(N, N);
-	for(int i=0; i<N; ++i) {
-		// x = A X[i]
-		DDdagger (x, X[i], U, mass, mu_I);
-		Evals.col(1)[i] = sqrt(x.squaredNorm());
-		for(int j=0; j<=i; ++j) {
-			R(i, j) = x.dot(X[j]);
-		}
-	}
-	//find eigensystem of R - only references lower triangular part
-	//NB also finding eigenvectors here, but no need to..
-	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXcd> R_eigen_system(R);
-	Evals.col(0) = R_eigen_system.eigenvalues().col(0);
-	// A-orthonormalise X
-	R = R.llt().matrixL().adjoint();
-	for(int i=0; i<N; ++i) {
-		for(int j=0; j<i; ++j) {
-			X[i].add(-R(j,i), X[j]);
-		}
-		X[i] /= R(i,i);
-	}
-}
-
-// Bartels–Stewart: O(N^3) algorithm to solve Sylvester equation for X:
-// AX + XB = C
-// (NB there also exists the Hessenberg-Schur method that only requires one Schur decomposition)
-void dirac_op::bartels_stewart(Eigen::MatrixXcd& X, const Eigen::MatrixXcd& A, const Eigen::MatrixXcd& B, const Eigen::MatrixXcd& C) {
-	int N = X.rows();
-	// Compute Schur form U T U^dag of A and B
-	Eigen::ComplexSchur<Eigen::MatrixXcd> schurA(A);
-	Eigen::ComplexSchur<Eigen::MatrixXcd> schurB(B);
-
-	// Can now transform equation to the form
-	// TA X_tilde + X_tilde TB = C_tilde
-	// where TA, TB are upper triangular,
-	// X_tilde = UA^dag X UB
-	// C_tilde = UA^dag C UB
-	Eigen::MatrixXcd C_tilde = schurA.matrixU().adjoint() * C * schurB.matrixU();
-	Eigen::MatrixXcd X_tilde = Eigen::MatrixXcd::Zero(N, N);
-
-	// Solve triangular system by back substitution
-	// consider k-th vector of transformed equation
-	for(int k=0; k<N; ++k) {
-		// do subtractions from C_tilde
-		Eigen::MatrixXcd C_sub = C_tilde.col(k);
-		for(int l=0; l<k; ++l) {
-			C_sub -= schurB.matrixT()(l,k) * X_tilde.col(l);
-		}
-		// do back substitution to solve for X_tilde^(k)
-		for(int i=N-1; i>=0 ; --i) {
-			X_tilde(i,k) = C_sub(i);
-			for(int j=i+1; j<N; j++) {
-				X_tilde(i,k) -= schurA.matrixT()(i,j) * X_tilde(j,k);
-			}
-			X_tilde(i,k) /= (schurA.matrixT()(i,i) + schurB.matrixT()(k,k));
-		} 
-	}
-	// Transform solution X_tilde back to X
-	X = schurA.matrixU() * X_tilde * schurB.matrixU().adjoint();
-}
-
-int dirac_op::cg(field<fermion>& x, const field<fermion>& b, field<gauge>& U, double mass, double mu_I, double eps) {
-	field<fermion> a(b.grid), p(b.grid), r(b.grid);
-	double r2_old = 0;
-	double r2_new = 0;
-	std::complex<double> beta;
-	double alpha;
-	int iter = 0;
-
-	// initial guess zero since we'll need to do this for multi-shift CG anyway
-	// x = 0, a = Ax = 0
-	x.setZero();
-	a.setZero();
-	// r = b - a
-	r = b;
-	// p = r
-	p = r;
-	// b_norm = sqrt(<b|b>)
-	double b_norm = sqrt(b.squaredNorm());
-	// r2_new = <r|r>
-	r2_new = r.squaredNorm();
-	while (sqrt(r2_new)/b_norm > eps)
-	{
-		// a = A p
-		DDdagger(a, p, U, mass, mu_I);
-		++iter;
-		r2_old = r2_new;
-		// beta = -<r|r>/<p|a>
-		beta = -r2_old / p.dot(a);
-		// x -= beta * p
-		x.add(-beta, p);
-		// r += beta a
-		r.add(beta, a);
-		// r2_new = <r|r>
-		r2_new = r.squaredNorm();
-		alpha = r2_new / r2_old;
-		// p = alpha p + r
-		p.scale_add(alpha, 1.0, r);
-		//std::cout << iter << "\t" << sqrt(r2_new)/b_norm << std::endl;
-		if(iter>1e5)
-		{
-			std::cout << "CG not converging: iter= " << iter << " residual= " << sqrt(r2_new)/b_norm << std::endl; 
-			exit(1); 
-		}
-	}
-	return iter;
-}
-
-int dirac_op::cg_singleshift(field<fermion>& x, const field<fermion>& b, field<gauge>& U, double mass, double mu_I, double shift, double eps) {
-	field<fermion> a(b.grid), p(b.grid), r(b.grid);
-	double r2_old = 0;
-	double r2_new = 0;
-	std::complex<double> beta;
-	double alpha;
-	int iter = 0;
-
-	// initial guess zero since we'll need to do this for multi-shift CG anyway
-	// x = 0, a = Ax = 0
-	x.setZero();
-	a.setZero();
-	// r = b - a
-	r = b;
-	// p = r
-	p = r;
-	// b_norm = sqrt(<b|b>)
-	double b_norm = sqrt(b.squaredNorm());
-	// r2_new = <r|r>
-	r2_new = r.squaredNorm();
-	while (sqrt(r2_new)/b_norm > eps)
-	{
-		// a = (A + shift) p
-		DDdagger(a, p, U, mass, mu_I);
-		a.add(shift, p);
-		++iter;
-		r2_old = r2_new;
-		// beta = -<r|r>/<p|a>
-		beta = -r2_old / p.dot(a);
-		// x -= beta * p
-		x.add(-beta, p);
-		// r += beta a
-		r.add(beta, a);
-		// r2_new = <r|r>
-		r2_new = r.squaredNorm();
-		alpha = r2_new / r2_old;
-		// p = alpha p + r
-		p.scale_add(alpha, 1.0, r);
-		if(iter>1e5)
-		{
-			std::cout << "cg_singleshift not converging: iter= " << iter << " residual= " << sqrt(r2_new)/b_norm << std::endl; 
-			exit(1); 
-		}
-	}
-	return iter;
-} 
-
-int dirac_op::cg_multishift(std::vector<field<fermion>>& x, const field<fermion>& b, field<gauge>& U, double mass, double mu_I, std::vector<double>& sigma, double eps) {
-	int n_shifts = x.size();
-	std::vector<field<fermion>> p;
-	field<fermion> a(b.grid), r(b.grid);
-	double r2_old = 0;
-	double r2_new = 0;
-	std::vector<std::complex<double>> beta(n_shifts), beta_m1(n_shifts);
-	std::vector<std::complex<double>> zeta_m1(n_shifts), zeta(n_shifts), zeta_p1(n_shifts);
-	std::vector<std::complex<double>> alpha(n_shifts);
-	int iter = 0;
-
-	// initial guess zero required for multi-shift CG
-	// x_i = 0, a = Ax_0 = 0
-	a.setZero();
-	// r = b - a
-	r = b;
-	// p = r
-	for(int i_shift=0; i_shift<n_shifts; ++i_shift) {
-		p.push_back(r);
-		x[i_shift].setZero();
-		zeta[i_shift] = 1.0;
-		zeta_m1[i_shift] = 1.0;
-		alpha[i_shift] = 0.0;		
-	}
-	beta_m1[0] = 1.0;
-	// b_norm = sqrt(<b|b>)
-	double b_norm = sqrt(b.squaredNorm());
-	// r2_new = <r|r>
-	r2_new = r.squaredNorm();
-	while (sqrt(r2_new)/b_norm > eps)
-	{
-		// a = A p_0
-		DDdagger(a, p[0], U, mass, mu_I);
-		// add first shift to DDdagger explicitly here:
-		a.add(sigma[0], p[0]);
-		++iter;
-		r2_old = r2_new;
-		// beta = -<r|r>/<p|a>
-		beta[0] = -r2_old / p[0].dot(a);
-		// calculate zeta and beta coefficients for shifted vectors
-		// see arXiv:hep-lat/9612014 for derivation
-		for(int i_shift=1; i_shift<n_shifts; ++i_shift) {
-			zeta_p1[i_shift] = zeta[i_shift] * zeta_m1[i_shift] * beta_m1[0];
-			zeta_p1[i_shift] /= (beta[0]*alpha[0]*(zeta_m1[i_shift]-zeta[i_shift]) + zeta_m1[i_shift]*beta_m1[0]*(1.0 - (sigma[i_shift]-sigma[0])*beta[0]));
-			beta[i_shift] = beta[0] * zeta_p1[i_shift] / zeta[i_shift];
-			if(beta[i_shift] != beta[i_shift]) {
-				// beta is NaN, i.e. we have converged to machine precision for this shift,
-				// so stop updating it
-				if(i_shift+1 == n_shifts) {
-					// If shifts are in increasing order, we can just reduce n_shifts by one
-					// to stop updating this shift
-					--n_shifts;
-				}
-				else {
-					std::cout << "NaN in cg_multishift for i_shift: " << i_shift << std::endl;
-					std::cout << "But n_shifts = " << n_shifts << "; check that shifts are in increasing order!" << std::endl;
-					exit(1);
-				}
-			}
-//			std::cout << i_shift << "\t" << beta[i_shift] << std::endl;
-		}
-		// x_i -= beta_i * p_i
-		for(int i_shift=0; i_shift<n_shifts; ++i_shift) {
-			x[i_shift].add(-beta[i_shift], p[i_shift]);			
-		}
-		// r += beta_0 a
-		r.add(beta[0], a);
-		// r2_new = <r|r>
-		r2_new = r.squaredNorm();
-		// increment timestep:
-		// X_m1 <- X
-		// X <- X_p1
-		alpha[0] = r2_new / r2_old;
-		beta_m1[0] = beta[0];
-		for(int i_shift=1; i_shift<n_shifts; ++i_shift) {
-			beta_m1[i_shift] = beta[i_shift];
-			zeta_m1[i_shift] = zeta[i_shift];
-			zeta[i_shift] = zeta_p1[i_shift];
-		}
-		// calculate alpha coeffs for shifted vectors
-		for(int i_shift=1; i_shift<n_shifts; ++i_shift) {
-			alpha[i_shift] = alpha[0] * (zeta[i_shift] * beta_m1[i_shift]) / (zeta_m1[i_shift] * beta_m1[0]);
-		}
-		// p_i = alpha_i p_i + zeta_i r
-		for(int i_shift=0; i_shift<n_shifts; ++i_shift) {
-			p[i_shift].scale_add(alpha[i_shift], zeta[i_shift], r);
-		}
-		if(iter>1e5)
-		{
-			std::cout << "CG-multishift not converging: iter= " << iter << " residual= " << sqrt(r2_new)/b_norm << std::endl;
-			exit(1); 
-		}
-	}
-	return iter;	
-}
-
-int dirac_op::cg_block(std::vector<field<fermion>>& X, const std::vector<field<fermion>>& B, field<gauge>& U, double mass, double mu_I, double eps, bool BCGA, bool dQ, bool dQA, bool rQ, const field<fermion>& x0_star) {
-	int N = static_cast<int>(B.size());
-	// S = 1 [NxN]
-	Eigen::MatrixXcd S = Eigen::MatrixXcd::Identity(N, N);
-	// C = 1 [NxN]
-	Eigen::MatrixXcd C = Eigen::MatrixXcd::Identity(N, N);
-	// beta = 0 [NxN]
-	Eigen::MatrixXcd beta = Eigen::MatrixXcd::Zero(N, N);
-	// betaC = 0 [NxN]
-	Eigen::MatrixXcd betaC = Eigen::MatrixXcd::Zero(N, N);
-	// R = 1 [NxN]
-	Eigen::MatrixXcd R = Eigen::MatrixXcd::Identity(N, N);
-	// PQ, PAQ (for BCGA dot products) [NxN]
-	Eigen::MatrixXcd mPAPinv = Eigen::MatrixXcd::Identity(N, N);
-	Eigen::MatrixXcd mPQ = Eigen::MatrixXcd::Identity(N, N);
-	Eigen::MatrixXcd mPAQ = Eigen::MatrixXcd::Identity(N, N);
-	// AP, P, Q are [NxVOL]
-	std::vector<field<fermion>> AP, P, Q;
-	for(int i=0; i<N; ++i) {
- 		AP.push_back(field<fermion>(grid));
- 		P.push_back(field<fermion>(grid));
- 		Q.push_back(field<fermion>(grid));
-	}
-	// for debugging (error norms of first vector):
-	field<fermion> tmpE0(grid), tmpAE0(grid);
-	// get error norms for X=0 to normalise all to 1 intially
-	double norm0_x0_star = sqrt(x0_star.squaredNorm());
-	DDdagger(tmpAE0, x0_star, U, mass, mu_I);
-	double norm1_x0_star = sqrt(x0_star.dot(tmpAE0).real());
-	// note norm2 is just the residual so we already have the normalisation
-
-	// start from X=0 initial guess, so residual Q = B [NxVOL]
-	Q = B;
-	for(int i=0; i<N; ++i) {
-		X[i].setZero();
-	}
-	if(rQ) {
-		// in place thinQR decomposition of residual Q[N][VOL] into orthonormal Q[N][VOL] and triangular C[NxN]
-		thinQR(Q, C);
-	} else if(BCGA) {
-		// set diagonal values of C to residuals Q^dag Q, only needed for residual stopping criterion
-		for(int i=0; i<N; ++i) {
-			C(i, i) = Q[i].dot(Q[i]);
-		}
-	} else {
-		// set C to hermitian matrix Q^dag Q
-		for(int i=0; i<N; ++i) {
-			for(int j=0; j<=i; ++j) {
-				C(i, j) = Q[i].dot(Q[j]);
-				C(j, i) = conj(C(i, j));
-			}
-		}
-		// S = C_old^-1 C_new = C since C_old=1.
-		S = C;
-	}
-
-	// P = 0 [NxVOL]
-	for(int i=0; i<N; ++i) {
-		P[i].setZero(); 
-	}
-
-	// main loop
-	int iter = 0;
-	// get norm of each vector b in matrix B
-	// NB: v.norm() == sqrt(\sum_i v_i v_i^*) = l2 norm of vector v
-	Eigen::ArrayXd b_norm = Eigen::ArrayXd::Zero(N);
-	if(rQ) {
-		// residual_i = sqrt(\sum_j Q_i^dag Q_j) = sqrt(\sum_j C_ij)
-		b_norm = C.rowwise().norm().array();
-	} else {
-		// residual_i = sqrt(Q_i^dag Q_i) = sqrt(C_ii)
-		b_norm = C.diagonal().real().array().sqrt();		
-	}
-	double residual = 1.0;
-	while(residual > eps) {
-
-		// P <- Q + PS
-		for(int i=0; i<N; ++i) {
-			AP[i] = Q[i];
-			for(int j=0; j<N; ++j) {
-				AP[i].add((S(j,i)), P[j]);
-			}
-		}
-		P = AP;
-
-		if(dQ) {
-			// in-place thinQR decomposition of descent matrix P
-			// such that P^dag P = I
-			thinQR(P, R);
-		}
-
-		// Apply dirac op to P:
-		for(int i=0; i<N; ++i) {
-			DDdagger(AP[i], P[i], U, mass, mu_I);
-			++iter;
-		}
-
-		if(dQA) {
-			// in-place thinQRA decomposition of descent matrix P and AP
-			// such that P^dag AP = I
-			thinQRA(P, AP, R);			
-		}
-
-		// construct NxN beta matrix:
-		// beta^-1 = P^dag AP [NxN hermitian matrix]
-		if(dQA) {
-			// P^dag AP = I by construction
-			beta = Eigen::MatrixXcd::Identity(N, N);
-		} else {
-			// note beta is hermitian since A is hermitian so we
-			// only need to calculate lower triangular elements of matrix
-			for(int i=0; i<N; ++i) {
-				for(int j=0; j<=i; ++j) {
-					beta(i,j) = P[i].dot(AP[j]);
-				}
-			}
-			// Find inverse of beta via LDLT cholesky decomposition
-			// and solving beta beta^-1 = I
-			beta = beta.ldlt().solve(Eigen::MatrixXcd::Identity(N, N));
-		}
-
-		if((dQ || dQA) && !BCGA) {
-			// beta <- beta (R^dag)^-1
-			// Solve X (R^dag) = beta for X, then beta <- X
-			// Can be done in-place by back-substitution since R is upper-triangular
-			//std::cout << "beta\n" << beta << std::endl;
-			for(int i=0; i<N; ++i) {
-				for(int j=N-1; j>=0; --j) {
-					for(int k=N-1; k>j; --k) {
-						beta(i,j) -= beta(i,k) * conj(R(j,k));
-					}
-					beta(i,j) /= R(j,j);
-				}
-			}
-			//std::cout << "new beta\n" << beta << std::endl;
-			//std::cout << "beta R^dag\n" << beta*R.adjoint() << std::endl;
-		}
-
-		if(BCGA) {
-			mPAPinv = beta;
-			for(int i=0; i<N; ++i) {
-				for(int j=0; j<N; ++j) {
-					mPQ(i, j) = P[i].dot(Q[j]);
-				}
-			}
-			beta = beta * mPQ;
-			if(rQ) {
-				betaC = beta * C;
-			} else {
-				betaC = beta;
-			}			
-		} else {
-			betaC = beta * C;
-			if(!rQ) {
-				beta = betaC;
-			}
-		}
-		// X = X + P beta C
-		for(int i=0; i<N; ++i) {
-			for(int j=0; j<N; ++j) {
-				X[i].add(betaC(j,i), P[j]);
-			}
-		}
-
-		//Q -= AP beta
-		for(int i=0; i<N; ++i) {
-			for(int j=0; j<N; ++j) {
-				Q[i].add(-beta(j,i), AP[j]);
-			}
-		}
-
-		if(BCGA) {
-			if(rQ) {
-				// in-place thinQR decomposition of residuals matrix Q
-				thinQR(Q, S);
-				C = S * C;
-			} else {
-				// update diagonal values of C for residual
-				for(int i=0; i<N; ++i) {
-					C(i, i) = Q[i].dot(Q[i]);
-				}				
-			}
-			// S <- -[P^dag AP]^-1 [Q^dag AP] = - PQ [Q^dag AP]
-			for(int i=0; i<N; ++i) {
-				for(int j=0; j<N; ++j) {
-					mPAQ(i, j) = Q[i].dot(AP[j]);
-				}
-			}
-			S = -mPAPinv * mPAQ.adjoint();
-		} else {
-			if(rQ) {
-				// in-place thinQR decomposition of residuals matrix Q
-				thinQR(Q, S);
-				C = S * C;
-				// S <- S^dag:
-				S.adjointInPlace();
-			} else {
-				// find inverse of C = Q_old^dagQ_old by cholesky decomposition
-				S = C.ldlt().solve(Eigen::MatrixXcd::Identity(N, N));
-				// update C to hermitian matrix Q^dag Q
-				for(int i=0; i<N; ++i) {
-					for(int j=0; j<=i; ++j) {
-						C(i, j) = Q[i].dot(Q[j]);
-						C(j, i) = conj(C(i, j));
-					}
-				}
-				// S = [Q_old^dag Q_old]^-1 [Q_new^dag Q_new]
-				S = S * C;
-			}
-			if(dQ || dQA) {
-				// S <- RS:
-				S = R * S;
-			}
-		}
-
-		// use maximum over vectors of residual/b_norm as stopping crit
-		// worst vector should be equal to CG with same eps on that vector, others will be better
-		if(rQ) {
-			residual = (C.rowwise().norm().array()/b_norm).maxCoeff();
-		}
-		else {
-			// C_ii = Q_i^dag Q_i
-			residual = (C.diagonal().real().array().sqrt()/b_norm).maxCoeff();
-		}
-
-		// debugging: use known solution to get error norms for first block vector
-		tmpE0 = X[0];
-		tmpE0.add(-1.0, x0_star);
-		DDdagger(tmpAE0, tmpE0, U, mass, mu_I);
-		double norm0 = sqrt(tmpE0.squaredNorm())/norm0_x0_star;
-		double norm1 = sqrt(tmpE0.dot(tmpAE0).real())/norm1_x0_star;
-		double norm2 = sqrt(tmpAE0.squaredNorm())/b_norm[0];
-		std::cout << "#Error-norms <(x-x*)|(1,sqrt(A),A)|(x-x*)> " << iter << "\t" << norm0 << "\t" << norm1 << "\t" << norm2 << std::endl;
-
-		// [debugging] find eigenvalues of C
-		Eigen::SelfAdjointEigenSolver<Eigen::MatrixXcd> saes;
-		saes.compute(C);
-		Eigen::ArrayXd evals = saes.eigenvalues();
-		std::cout << "#BCG";
-		if(BCGA) {
-			std::cout << "A";
-		}
-		if(dQ) {
-			std::cout << "dQ";
-		}
-		if(dQA) {
-			std::cout << "dQA";
-		}
-		if(rQ) {
-			std::cout << "rQ";
-		}
-		std::cout << " " << iter << "\t" << residual << "\t" << evals.maxCoeff()/evals.minCoeff() << std::endl;
-		// "\t" << evals.matrix().transpose() << std::endl;
-	}
-	return iter;
-}
-
-int dirac_op::SBCGrQ(std::vector< std::vector< field<fermion> > >& X, const std::vector<field<fermion>>& B, std::vector<double>& input_shifts, field<gauge>& U, double mass, double mu_I, double eps) {
-	int N = static_cast<int>(B.size());
-	// count shifts (not including first one that is included in the dirac op)
-	int N_shifts = static_cast<int>(input_shifts.size()) - 1;
-	int N_unconverged_shifts = N_shifts;
-
-	// Check shift parameters are consistent with size of supplied solution vector X:
-	if (N_shifts+1 != static_cast<int>(X.size())) {
-		std::cout << "Error in SBCGrQ: N_shifts+1 (" << N_shifts+1 << ") not consistent with size of X (" << static_cast<int>(X.size()) << ")" << std::endl;
-		exit(1);
-	}
-
-	// subtract first shift from remaining set of shifts
-	std::vector<double> shifts(N_shifts);
-	for(int i_shift=0; i_shift<N_shifts; ++i_shift) {
-		shifts[i_shift] = input_shifts[i_shift+1] - input_shifts[0];
-	}
-
-	std::cout << "#Shifted BCGrQ:\t" << std::endl;
-	std::cout << "#mass:\t" << mass << std::endl;
-	std::cout << "#input_shifts:\t";
-	for(int i_shift=0; i_shift<N_shifts+1; ++i_shift) {
-			std::cout << "\t" << input_shifts[i_shift];
-	}
-	std::cout << std::endl;
-	std::cout << "#remaining_rescaled_shifts:\t";
-	for(int i_shift=0; i_shift<N_shifts; ++i_shift) {
-			std::cout << "\t" << shifts[i_shift];
-	}
-	std::cout << std::endl;
-
-	// Unshifted matrices:
-	Eigen::MatrixXcd S = Eigen::MatrixXcd::Identity(N, N);
-	Eigen::MatrixXcd C = Eigen::MatrixXcd::Identity(N, N);
-	Eigen::MatrixXcd beta = Eigen::MatrixXcd::Identity(N, N);
-	Eigen::MatrixXcd betaC = Eigen::MatrixXcd::Zero(N, N);
-	// AP, Q are [NxVOL]
-	std::vector< field<fermion> > AP, Q;
-	// start from X=0 initial guess, so residual Q = B [NxVOL]
-	// X = 0 for unshifted + all shifts
-	for(int i_shift=0; i_shift<N_shifts+1; ++i_shift) {
-		for(int i=0; i<N; ++i) {
-			X[i_shift][i].setZero();
-		}
-	}
-	Q = B;
-	// in place thinQR decomposition of residual Q[N][VOL] into orthonormal Q[N][VOL] and triangular C[NxN]
-	thinQR(Q, C);
-	S = C;
-	AP = Q;
-	// P has one NxVOL block per shift
-	std::vector< std::vector< field<fermion> > > P;
-	// P = Q for all shifts
-	for(int i_shift=0; i_shift<N_shifts+1; ++i_shift) {
-		P.push_back(Q);
-	}
-
-	// Shifted matrices:
-	// previous / inverted versions of beta
-	Eigen::MatrixXcd beta_inv = Eigen::MatrixXcd::Identity(N, N);
-	Eigen::MatrixXcd beta_inv_m1 = Eigen::MatrixXcd::Identity(N, N);
-	// Construct decomposition of S: can then do S^-1 M using S_inv.solve(M)
-	Eigen::ColPivHouseholderQR<Eigen::MatrixXcd> S_inv (S);
-	Eigen::MatrixXcd S_m1 = Eigen::MatrixXcd::Zero(N, N);
-	// These are temporary matrices used for each shift
-	Eigen::MatrixXcd tmp_betaC, tmp_Sdag; 
-	// ksi_s are the scale factors related shifted and unshifted residuals
-	// 3-term recurrence so need _k, _k-1, _k-2 for each shift
-	// initially ksi_s_m2 = I, ksi_s_m1 = S
-	std::vector<Eigen::MatrixXcd> ksi_s, ksi_s_m1, ksi_s_m2; 
-	std::vector< Eigen::ColPivHouseholderQR<Eigen::MatrixXcd> > ksi_s_inv_m1, ksi_s_inv_m2;
-	for(int i_shift=0; i_shift<N_shifts; ++i_shift) {
- 		ksi_s.push_back(Eigen::MatrixXcd::Identity(N, N));
- 		ksi_s_m1.push_back(S);
- 		ksi_s_inv_m1.push_back(S_inv);
- 		ksi_s_m2.push_back(Eigen::MatrixXcd::Identity(N, N));
- 		ksi_s_inv_m2.push_back(Eigen::MatrixXcd::Identity(N, N).colPivHouseholderQr());
-	}
-
-	// main loop
-	int iter = 0;
-	// get norm of each vector b in matrix B
-	// NB: v.norm() == sqrt(\sum_i v_i v_i^*) = l2 norm of vector v
-	// residual_i = sqrt(\sum_j Q_i^dag Q_j) = sqrt(\sum_j C_ij)
-	Eigen::ArrayXd b_norm = C.rowwise().norm().array();
-	double residual = 1.0;
-	while(residual > eps) {
-
-		// Apply dirac op (with lowest shift) to P[0]:
-		for(int i=0; i<N; ++i) {
-			DDdagger(AP[i], P[0][i], U, mass, mu_I);
-			// do lowest shift as part of dirac op
-			AP[i].add(input_shifts[0], P[0][i]);
-			++iter;
-		}
-
-		beta_inv_m1 = beta_inv;
-		for(int i=0; i<N; ++i) {
-			for(int j=0; j<=i; ++j) {
-				beta_inv(i,j) = P[0][i].dot(AP[j]);
-				beta_inv(j,i) = conj(beta_inv(i,j));
-			}
-		}
-		// Find inverse of beta_inv via LDLT cholesky decomposition
-		// and solving beta beta_inv = I
-		beta = beta_inv.ldlt().solve(Eigen::MatrixXcd::Identity(N, N));
-		betaC = beta * C;
-
-		// X[0] = X[0] + P[0] beta C
-		for(int i=0; i<N; ++i) {
-			for(int j=0; j<N; ++j) {
-				X[0][i].add(betaC(j,i), P[0][j]);
-			}
-		}
-
-		//Q -= AP beta
-		for(int i=0; i<N; ++i) {
-			for(int j=0; j<N; ++j) {
-				Q[i].add(-beta(j,i), AP[j]);
-			}
-		}
-
-		S_m1 = S;
-		// in-place thinQR decomposition of residuals matrix Q
-		thinQR(Q, S);
-		C = S * C;
-		if(N_unconverged_shifts>0) {
-			// update decomposition of S for S_inv operations
-			S_inv.compute(S);
-		}
-
-		// P <- Q + P S^dag for lower triangular S
-		for(int i=0; i<N; ++i) {
-			P[0][i] *= S(i,i);
-			for(int j=i+1; j<N; ++j) {
-				P[0][i].add(conj(S(i,j)), P[0][j]);
-			}
-			P[0][i] += Q[i];
-		}
-		// calculate shifted X and P
-		// note X[0] and P[0] are the unshifted ones, so first shift has index 1 in X and P
-		for(int i_shift=0; i_shift<N_unconverged_shifts; ++i_shift) {
-			// calculate shifted coefficients
-			// ksi_s:
-			tmp_betaC = S_m1 * beta_inv_m1 - ksi_s_m1[i_shift] * ksi_s_inv_m2[i_shift].solve(beta_inv_m1);
-			tmp_Sdag = Eigen::MatrixXcd::Identity(N, N) + shifts[i_shift] * beta + tmp_betaC * S_m1.adjoint() * beta;
-			ksi_s[i_shift] = S * tmp_Sdag.colPivHouseholderQr().solve(ksi_s_m1[i_shift]);
-			// tmp_betaC == "alpha^sigma" in paper:
-			tmp_betaC = beta * S_inv.solve(ksi_s[i_shift]);
-			// tmp_Sdag == "beta^sigma" in paper:
-			tmp_Sdag = tmp_betaC * ksi_s_inv_m1[i_shift].solve(beta_inv * S.adjoint());
-			// update shifted X and P
-			// X_s = X_s + P_s tmp_betaC
-			for(int i=0; i<N; ++i) {
-				for(int j=0; j<N; ++j) {
-					X[i_shift+1][i].add(tmp_betaC(j,i), P[i_shift+1][j]);
-				}
-			}
-			// P_s <- Q + P_s tmp_Sdag (using AP as temporary storage)
-			for(int i=0; i<N; ++i) {
-				AP[i] = Q[i];
-				for(int j=0; j<N; ++j) {
-					AP[i].add(tmp_Sdag(j,i), P[i_shift+1][j]);
-				}
-			}
-			P[i_shift+1] = AP;
-			// update inverse ksi's for next iteration
-			ksi_s_m2[i_shift] = ksi_s_m1[i_shift];
-			ksi_s_inv_m2[i_shift] = ksi_s_inv_m1[i_shift];
-			ksi_s_m1[i_shift] = ksi_s[i_shift];
-			ksi_s_inv_m1[i_shift].compute(ksi_s[i_shift]);
-			// check if largest unconverged shift has converged
-			if((ksi_s[N_unconverged_shifts-1].rowwise().norm().array()/b_norm).maxCoeff() < eps) {
-				--N_unconverged_shifts;
-			}
-		}
-
-		// use maximum over vectors of residuals/b_norm for unshifted solution as stopping crit
-		// assumes that all shifts are positive i.e. better conditioned and converge faster
-		// worst vector should be equal to CG with same eps on that vector, others will be better
-		residual = (C.rowwise().norm().array()/b_norm).maxCoeff();
-
-		// [debugging] find eigenvalues of C
-		/*
-		Eigen::SelfAdjointEigenSolver<Eigen::MatrixXcd> saes;
-		saes.compute(C);
-		Eigen::ArrayXd evals = saes.eigenvalues();
-		*/
-			// Output iteration number and worst residual for each shift
-		std::cout << "#SBCGrQ " << iter << "\t" << residual;
-		for(int i_shift=0; i_shift<N_shifts; ++i_shift) {
-			std::cout << "\t" << (ksi_s[i_shift].rowwise().norm().array()/b_norm).maxCoeff();
-		}
-		std::cout << std::endl;
-	}
-	return iter;
-}
-
-int dirac_op::SBCGAdQArQ(std::vector< std::vector< field<fermion> > >& X, const std::vector<field<fermion>>& B, std::vector<double>& input_shifts, field<gauge>& U, double input_mass, double mu_I, double eps) {
-	int N = static_cast<int>(B.size());
-	// count shifts (not including first one that is just a mass rescaling in the dirac op)
-	int N_shifts = static_cast<int>(input_shifts.size()) - 1;
-	int N_unconverged_shifts = N_shifts;
-
-	// Check shift parameters are consistent with size of supplied solution vector X:
-	if (N_shifts+1 != static_cast<int>(X.size())) {
-		std::cout << "Error in SBCGAdQArQ: N_shifts+1 (" << N_shifts+1 << ") not consistent with size of X (" << static_cast<int>(X.size()) << ")" << std::endl;
-		exit(1);
-	}
-
-	// absorb first shift as rescaling of mass
-	double mass = sqrt(input_mass*input_mass + input_shifts[0]);
-	// subtract first shift from remaining set of shifts
-	std::vector<double> shifts(N_shifts);
-	for(int i_shift=0; i_shift<N_shifts; ++i_shift) {
-		shifts[i_shift] = input_shifts[i_shift+1] - input_shifts[0];
-	}
-
-	std::cout << "#Shifted BCGAdQArQ:\t" << input_mass << std::endl;
-	std::cout << "#input_mass:\t" << input_mass << std::endl;
-	std::cout << "#input_shifts:\t";
-	for(int i_shift=0; i_shift<N_shifts+1; ++i_shift) {
-			std::cout << "\t" << input_shifts[i_shift];
-	}
-	std::cout << std::endl;
-	std::cout << "#rescaled_mass:\t" << mass << std::endl;
-	std::cout << "#remaining_rescaled_shifts:\t";
-	for(int i_shift=0; i_shift<N_shifts; ++i_shift) {
-			std::cout << "\t" << shifts[i_shift];
-	}
-	std::cout << std::endl;
-
-	// Unshifted matrices:
-	Eigen::MatrixXcd S = Eigen::MatrixXcd::Identity(N, N);
-	Eigen::MatrixXcd C = Eigen::MatrixXcd::Identity(N, N);
-	Eigen::MatrixXcd beta = Eigen::MatrixXcd::Identity(N, N);
-	Eigen::MatrixXcd betaC = Eigen::MatrixXcd::Zero(N, N);
-	Eigen::MatrixXcd R = Eigen::MatrixXcd::Identity(N, N);
-	// AP, Q are [NxVOL]
-	std::vector< field<fermion> > AP, Q;
-	// P has one NxVOL block per shift
-	std::vector< std::vector< field<fermion> > > P;
-	// start from X=0 initial guess, so residual Q = B [NxVOL]
-	Q = B;
-	// in place thinQR decomposition of residual Q[N][VOL] into orthonormal Q[N][VOL] and triangular C[NxN]
-	thinQR(Q, C);
-	S = C;
-	AP = Q;
-	P.push_back(Q);
-
-	// Shifted matrices:
-	// previous / inverted versions of beta
-	Eigen::MatrixXcd beta_inv = Eigen::MatrixXcd::Identity(N, N);
-	Eigen::MatrixXcd beta_inv_m1 = Eigen::MatrixXcd::Identity(N, N);
-	// Construct decomposition of S: can then do S^-1 A using S_inv.solve(A)
-	Eigen::ColPivHouseholderQR<Eigen::MatrixXcd> S_inv (S);
-	Eigen::MatrixXcd S_m1 = Eigen::MatrixXcd::Zero(N, N);
-	// These are temporary matrices used for each shift
-	Eigen::MatrixXcd tmp_betaC, tmp_Sdag; 
-	// add a block to P for each shift s
-	for(int i_shift=0; i_shift<N_shifts; ++i_shift) {
-		// P = Q initially for all shifts
- 		P.push_back(Q);
-	}
-	// ksi_s are the scale factors related shifted and unshifted residuals
-	// 3-term recurrence so need _k, _k-1, _k-2 for each shift
-	// initially ksi_s_m2 = I, ksi_s_m1 = S
-	std::vector<Eigen::MatrixXcd> ksi_s, ksi_s_m1, ksi_s_m2; 
-	std::vector< Eigen::ColPivHouseholderQR<Eigen::MatrixXcd> > ksi_s_inv_m1, ksi_s_inv_m2;
-	for(int i_shift=0; i_shift<N_shifts; ++i_shift) {
- 		ksi_s.push_back(Eigen::MatrixXcd::Identity(N, N));
- 		ksi_s_m1.push_back(S);
- 		ksi_s_inv_m1.push_back(S_inv);
- 		ksi_s_m2.push_back(Eigen::MatrixXcd::Identity(N, N));
- 		ksi_s_inv_m2.push_back(Eigen::MatrixXcd::Identity(N, N).colPivHouseholderQr());
-	}
-
-	// X = 0 for unshifted + all shifts
-	for(int i_shift=0; i_shift<N_shifts+1; ++i_shift) {
-		for(int i=0; i<N; ++i) {
-			X[i_shift][i].setZero();
-		}
-	}
-
-	// main loop
-	int iter = 0;
-	// get norm of each vector b in matrix B
-	// NB: v.norm() == sqrt(\sum_i v_i v_i^*) = l2 norm of vector v
-	// residual_i = sqrt(\sum_j Q_i^dag Q_j) = sqrt(\sum_j C_ij)
-	Eigen::ArrayXd b_norm = C.rowwise().norm().array();
-	double residual = 1.0;
-	while(residual > eps) {
-
-		// P[0] <- Q + P[0] S (using AP as temporary storage)
-		for(int i=0; i<N; ++i) {
-			AP[i] = Q[i];
-			for(int j=0; j<N; ++j) {
-				AP[i].add(S(j,i), P[0][j]);
-			}
-		}
-		P[0] = AP;
-
-		// Apply dirac op (with lowest shift absorbed into mass) to P[0]:
-		for(int i=0; i<N; ++i) {
-			DDdagger(AP[i], P[0][i], U, mass, mu_I);
-			++iter;
-		}
-
-		// in-place thinQRA decomposition of descent matrix P[0] and AP
-		// such that P[0]^dag AP = I
-		thinQRA(P[0], AP, R);			
-
-		beta_inv_m1 = beta_inv;
-		for(int i=0; i<N; ++i) {
-			for(int j=0; j<=i; ++j) {
-				beta_inv(i,j) = P[0][i].dot(Q[j]);
-				beta_inv(j,i) = conj(beta_inv(i,j));
-			}
-		}
-		// Find inverse of beta_inv via LDLT cholesky decomposition
-		// and solving beta beta_inv = I
-		beta = beta_inv.ldlt().solve(Eigen::MatrixXcd::Identity(N, N));
-		betaC = beta * C;
-
-		// X[0] = X[0] + P[0] beta C
-		for(int i=0; i<N; ++i) {
-			for(int j=0; j<N; ++j) {
-				X[0][i].add(betaC(j,i), P[0][j]);
-			}
-		}
-
-		//Q -= AP beta
-		for(int i=0; i<N; ++i) {
-			for(int j=0; j<N; ++j) {
-				Q[i].add(-beta(j,i), AP[j]);
-			}
-		}
-
-		S_m1 = S;
-		// in-place thinQR decomposition of residuals matrix Q
-		thinQR(Q, S);
-		C = S * C;
-		if(N_unconverged_shifts>0) {
-			// update decomposition of S for S_inv operations
-			S_inv.compute(S);
-		}
-
-		// P <- Q + P S^dag for lower triangular S
-		for(int i=0; i<N; ++i) {
-			P[0][i] *= S(i,i);
-			for(int j=i+1; j<N; ++j) {
-				P[0][i].add(conj(S(i,j)), P[0][j]);
-			}
-			P[0][i] += Q[i];
-		}
-
-		// calculate shifted X and P
-		// note X[0] and P[0] are the unshifted ones, so +1 to i_shift in X and P
-		for(int i_shift=0; i_shift<N_unconverged_shifts; ++i_shift) {
-			// calculate shifted coefficients
-			// ksi_s:
-			tmp_betaC = S_m1 * beta_inv_m1 - ksi_s_m1[i_shift] * ksi_s_inv_m2[i_shift].solve(beta_inv_m1);
-			tmp_Sdag = Eigen::MatrixXcd::Identity(N, N) + shifts[i_shift] * beta + tmp_betaC * S_m1.adjoint() * beta;
-			ksi_s[i_shift] = S * tmp_Sdag.colPivHouseholderQr().solve(ksi_s_m1[i_shift]);
-			// tmp_betaC == "alpha^sigma" in paper:
-			tmp_betaC = beta * S_inv.solve(ksi_s[i_shift]);
-			// tmp_Sdag == "beta^sigma" in paper:
-			tmp_Sdag = tmp_betaC * ksi_s_inv_m1[i_shift].solve(beta_inv * S.adjoint());
-			// update shifted X and P
-			// X_s = X_s + P_s tmp_betaC
-			for(int i=0; i<N; ++i) {
-				for(int j=0; j<N; ++j) {
-					X[i_shift+1][i].add(tmp_betaC(j,i), P[i_shift+1][j]);
-				}
-			}
-			// P_s <- Q + P_s tmp_Sdag (using AP as temporary storage)
-			for(int i=0; i<N; ++i) {
-				AP[i] = Q[i];
-				for(int j=0; j<N; ++j) {
-					AP[i].add(tmp_Sdag(j,i), P[i_shift+1][j]);
-				}
-			}
-			P[i_shift+1] = AP;
-			// update inverse ksi's for next iteration
-			ksi_s_m2[i_shift] = ksi_s_m1[i_shift];
-			ksi_s_inv_m2[i_shift] = ksi_s_inv_m1[i_shift];
-			ksi_s_m1[i_shift] = ksi_s[i_shift];
-			ksi_s_inv_m1[i_shift].compute(ksi_s[i_shift]);
-			// check if largest unconverged shift has converged
-			if((ksi_s[N_unconverged_shifts-1].rowwise().norm().array()/b_norm).maxCoeff() < eps) {
-				--N_unconverged_shifts;
-			}
-		}
-
-		// use maximum over vectors of residuals/b_norm for unshifted solution as stopping crit
-		// assumes that all shifts are positive i.e. better conditioned and converge faster
-		// worst vector should be equal to CG with same eps on that vector, others will be better
-		residual = (C.rowwise().norm().array()/b_norm).maxCoeff();
-
-		// [debugging] find eigenvalues of C
-		/*
-		Eigen::SelfAdjointEigenSolver<Eigen::MatrixXcd> saes;
-		saes.compute(C);
-		Eigen::ArrayXd evals = saes.eigenvalues();
-		*/
-			// Output iteration number and worst residual for each shift
-		std::cout << "#SBCGrQ " << iter << "\t" << residual;
-		for(int i_shift=0; i_shift<N_shifts; ++i_shift) {
-			std::cout << "\t" << (ksi_s[i_shift].rowwise().norm().array()/b_norm).maxCoeff();
-		}
-		std::cout << std::endl;
-	}
-	return iter;
 }

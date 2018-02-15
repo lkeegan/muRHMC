@@ -7,16 +7,29 @@ hmc::hmc (const hmc_params& params) : rng(params.seed), params(params) {
 }
 
 int hmc::trajectory (field<gauge>& U, dirac_op& D) {
+	// set Dirac op mass and isospin mu values
+	D.mass = params.mass;
+	D.mu_I = params.mu_I;
 	// make random gaussian momentum field P
 	field<gauge> P (U.grid);
 	gaussian_P (P);
 	// make gaussian fermion field
-	field<fermion> chi (U.grid);
+	field<fermion>::eo_storage_options eo_storage_e = field<fermion>::FULL;
+	field<fermion>::eo_storage_options eo_storage_o = field<fermion>::FULL;
+	if(params.EE) {
+		// only use even part of pseudofermions and even-even sub-block of dirac op
+		eo_storage_e = field<fermion>::EVEN_ONLY;
+		eo_storage_o = field<fermion>::ODD_ONLY;
+	}
+	field<fermion> chi (U.grid, eo_storage_o);
 	gaussian_fermion (chi);
-	// construct phi = D chi
-	field<fermion> phi (U.grid);
-	D.D (phi, chi, U, params.mass, params.mu_I);
-
+	// construct phi_(e) = D_(eo) chi_(o)
+	field<fermion> phi (U.grid, eo_storage_e);
+	if(params.EE) {
+		D.D_eo (phi, chi, U);
+	} else {
+		D.D (phi, chi, U);
+	}
 	// make copy of current gauge config in case update is rejected
 	field<gauge> U_old (U.grid);
 	U_old = U;
@@ -31,7 +44,7 @@ int hmc::trajectory (field<gauge>& U, dirac_op& D) {
 	if(params.constrained) {
 		// this value is stored from the last trajectory
 		//log("[HMC] old-sus", suscept);
-		double new_suscept = D.pion_susceptibility_exact(U, params.mass, params.mu_I);
+		double new_suscept = D.pion_susceptibility_exact(U);
 		suscept_proposed = new_suscept;
 		if (new_suscept > (params.suscept_central + params.suscept_delta)) {
 			// suscept too high: reject proposed update, restore old U
@@ -127,8 +140,8 @@ double hmc::action_P (const field<gauge>& P) {
 }
 
 double hmc::action_F (field<gauge>& U, const field<fermion>& phi, dirac_op& D) {
-	field<fermion> D2inv_phi (phi.grid);
-	int iter = D.cg(D2inv_phi, phi, U, params.mass, params.mu_I, 1.e-15);
+	field<fermion> D2inv_phi (phi.grid, phi.eo_storage);
+	int iter = cg(D2inv_phi, phi, U, D, 1.e-15);
 	//std::cout << "Action CG iterations: " << iter << std::endl;
 	return phi.dot(D2inv_phi).real();
 }
@@ -227,40 +240,75 @@ void hmc::stout_smear (double rho, field<gauge> &U) {
 }
 
 int hmc::force_fermion (field<gauge> &force, field<gauge> &U, const field<fermion>& phi, dirac_op& D) {
-	// anti-periodic boundary conditions:
-	// want to set F -> -F at end of this for [x0=T-1, mu=0]
-	// but we are incrementing existing F, so first set existing to -itself
-	// then minus the whole thing at the end
-	D.apbs_in_time(force);
-
 	// chi = (D(mu)D^dagger(mu))^-1 phi
-	field<fermion> chi (phi.grid);
-	int iter = D.cg (chi, phi, U, params.mass, params.mu_I, params.MD_eps);
+	field<fermion> chi (phi.grid, phi.eo_storage);
+	int iter = cg (chi, phi, U, D, params.MD_eps);
 	// psi = -D^dagger(mu,m) chi = D(-mu, -m) chi
-	field<fermion> psi (phi.grid);
-	D.D(psi, chi, U, -params.mass, -params.mu_I);
+	field<fermion>::eo_storage_options eo_storage = field<fermion>::FULL;
+	if(params.EE) {
+		eo_storage = field<fermion>::ODD_ONLY;
+	}
+	field<fermion> psi (phi.grid, eo_storage);
+	if(params.EE) {
+		D.apply_eta_bcs_to_U(U);
+		D.D_oe(psi, chi, U);
+		D.remove_eta_bcs_from_U(U);
+	} else {
+		// apply -Ddagger = D(-m, -mu)
+		// NB: should put this in a function
+		D.mass = -D.mass;
+		D.mu_I = -D.mu_I;
+		D.D(psi, chi, U);
+		D.mass = -D.mass;
+		D.mu_I = -D.mu_I;
+	}
 
-	// mu=0 terms have extra chemical potential isospin factors exp(+-\mu_I/2):
-	double mu_I_plus_factor = exp(0.5 * params.mu_I);
-	double mu_I_minus_factor = exp(-0.5 * params.mu_I);
+	D.apply_eta_bcs_to_U(U);
 	SU3_Generators T;
-	#pragma omp parallel for
-	for(int ix=0; ix<U.V; ++ix) {
-		for(int a=0; a<8; ++a) {
-			double Fa = chi[ix].dot(T[a] * mu_I_plus_factor * U[ix][0] * psi.up(ix,0)).imag();
-			Fa += chi.up(ix,0).dot(U[ix][0].adjoint() * mu_I_minus_factor * T[a] * psi[ix]).imag();
-			force[ix][0] -= Fa * T[a];
+	if(params.EE) {
+		// for even-even version half of the terms are zero:
+		// even ix: ix = ix_e
+		#pragma omp parallel for
+		for(int ix=0; ix<chi.V; ++ix) {
+			for(int mu=0; mu<4; ++mu) {
+				for(int a=0; a<8; ++a) {
+					double Fa = (chi[ix].dot(T[a] * U[ix][mu] * psi.up(ix,mu))).imag();
+					force[ix][mu] -= Fa * T[a];
+				}
+			}
 		}
-		for(int mu=1; mu<4; ++mu) {
+		// odd ix: ix = ix_o + chi.V
+		#pragma omp parallel for
+		for(int ix_o=0; ix_o<chi.V; ++ix_o) {
+			int ix = ix_o + chi.V;
+			for(int mu=0; mu<4; ++mu) {
+				for(int a=0; a<8; ++a) {
+					double Fa = (chi.up(ix,mu).dot(U[ix][mu].adjoint() * T[a] * psi[ix_o])).imag();
+					force[ix][mu] -= Fa * T[a];
+				}
+			}
+		}
+	} else {
+		// mu=0 terms have extra chemical potential isospin factors exp(+-\mu_I/2):
+		double mu_I_plus_factor = exp(0.5 * params.mu_I);
+		double mu_I_minus_factor = exp(-0.5 * params.mu_I);
+		#pragma omp parallel for
+		for(int ix=0; ix<U.V; ++ix) {
 			for(int a=0; a<8; ++a) {
-				double Fa = D.eta[ix][mu] * (chi[ix].dot(T[a] * U[ix][mu] * psi.up(ix,mu))).imag();
-				Fa += D.eta[ix][mu] * (chi.up(ix,mu).dot(U[ix][mu].adjoint() * T[a] * psi[ix])).imag();
-				force[ix][mu] -= Fa * T[a];
+				double Fa = chi[ix].dot(T[a] * mu_I_plus_factor * U[ix][0] * psi.up(ix,0)).imag();
+				Fa += chi.up(ix,0).dot(U[ix][0].adjoint() * mu_I_minus_factor * T[a] * psi[ix]).imag();
+				force[ix][0] -= Fa * T[a];
+			}
+			for(int mu=1; mu<4; ++mu) {
+				for(int a=0; a<8; ++a) {
+					double Fa = (chi[ix].dot(T[a] * U[ix][mu] * psi.up(ix,mu))).imag();
+					Fa += (chi.up(ix,mu).dot(U[ix][mu].adjoint() * T[a] * psi[ix])).imag();
+					force[ix][mu] -= Fa * T[a];
+				}
 			}
 		}
 	}
-
-	D.apbs_in_time(force);
+	D.remove_eta_bcs_from_U(U);
 
 	return iter;
 }
@@ -370,9 +418,13 @@ double hmc::chiral_condensate (field<gauge> &U, dirac_op& D) {
 	gaussian_fermion(phi);
 	// chi = [D(mu,m)D(mu,m)^dag]-1 phi
 	field<fermion> chi(U.grid);
-	D.cg(chi, phi, U, params.mass, params.mu_I, eps);
+	cg(chi, phi, U, D, eps);
 	// psi = D(mu,m)^dag chi = - D(-mu,-m) chi = D(mu)^-1 phi
 	field<fermion> psi(U.grid);
-	D.D(psi, chi, U, -params.mass, -params.mu_I);
+	D.mass = -D.mass;
+	D.mu_I = -D.mu_I;
+	D.D(psi, chi, U);
+	D.mass = -D.mass;
+	D.mu_I = -D.mu_I;
 	return -phi.dot(psi).real() / static_cast<double>(phi.V);
 }

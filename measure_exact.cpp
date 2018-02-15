@@ -32,7 +32,7 @@ int main(int argc, char *argv[]) {
 	// make U[mu] field on lattice
 	field<gauge> U (grid);
 	// initialise Dirac Op
-	dirac_op D (grid);
+	dirac_op D (grid, mass, mu_I);
 
 	// read philippe gauge config
 	// Initialise HMC
@@ -48,7 +48,7 @@ int main(int argc, char *argv[]) {
 		read_gauge_field(U, base_name, i);
 
 		// Calculate all eigenvalues lambda_i of Dirac op:
-		Eigen::MatrixXcd eigenvalues = D.D_eigenvalues (U, mass, mu_I);				
+		Eigen::MatrixXcd eigenvalues = D.D_eigenvalues(U);
 		// Det[D] = \prod_i \lambda_i
 		// phase{D} = \sum_i phase{lambda_i}
 		double sum = 0;
@@ -65,7 +65,7 @@ int main(int argc, char *argv[]) {
 		log("[evals] psibar-psi", eigenvalues.cwiseInverse().sum()/static_cast<double>(3*U.V));
 
 		// Calculate all eigenvalues of DDdagger op:
-		Eigen::MatrixXcd eigenvaluesDDdag = D.DDdagger_eigenvalues (U, mass, mu_I);				
+		Eigen::MatrixXcd eigenvaluesDDdag = D.DDdagger_eigenvalues(U);
 		log("[evals] pion-suscept", eigenvaluesDDdag.cwiseInverse().sum().real()/static_cast<double>(3*U.V));
 		log("[evals] mineval-DDdag", eigenvaluesDDdag.real().minCoeff());
 		log("[evals] maxeval-DDdag", eigenvaluesDDdag.real().maxCoeff());

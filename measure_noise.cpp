@@ -1,5 +1,6 @@
 #include "hmc.hpp"
 #include "dirac_op.hpp"
+#include "inverters.hpp"
 #include "io.hpp"
 #include "stats.hpp"
 #include <iostream>
@@ -44,7 +45,7 @@ int main(int argc, char *argv[]) {
 	// make U[mu] field on lattice
 	field<gauge> U (grid);
 	// initialise Dirac Op
-	dirac_op D (grid);
+	dirac_op D (grid, hmc_pars.mass, hmc_pars.mu_I);
 
 	// read philippe gauge config
 	/*
@@ -66,16 +67,20 @@ int main(int argc, char *argv[]) {
 			// phi = gaussian noise vector
 			// unit norm: <phi|phi> = 1
 			hmc.gaussian_fermion(phi);
-			phi /= sqrt(phi.squaredNorm());
+			phi /= phi.norm();
 
 			// chi = [D(mu,m)D(mu,m)^dag]-1 phi	
-			D.cg(chi, phi, U, hmc_pars.mass, hmc_pars.mu_I, eps);
+			cg(chi, phi, U, D, eps);
 			// pion_susceptibility = Tr[{D(mu,m)D(mu,m)^dag}^-1] = <phi|chi>
 			pion_susceptibility.push_back(phi.dot(chi).real());
 			
 			// psi = -D(mu,m)^dag chi = D(-mu,-m) chi = -D(mu)^-1 phi
 			// psibar_psi = Tr[D(mu,nu)^-1] = -<phi|psi>
-			D.D(psi, chi, U, -hmc_pars.mass, -hmc_pars.mu_I);
+			D.mass = -D.mass;
+			D.mu_I = -D.mu_I;
+			D.D(psi, chi, U);
+			D.mass = -D.mass;
+			D.mu_I = -D.mu_I;
 			psibar_psi.push_back(-phi.dot(psi).real());
 
 			// NOTE: changed definition!!

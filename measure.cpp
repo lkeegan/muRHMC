@@ -1,5 +1,6 @@
 #include "hmc.hpp"
 #include "dirac_op.hpp"
+#include "inverters.hpp"
 #include "io.hpp"
 #include "stats.hpp"
 #include <iostream>
@@ -44,7 +45,7 @@ int main(int argc, char *argv[]) {
 	// make U[mu] field on lattice
 	field<gauge> U (grid);
 	// initialise Dirac Op
-	dirac_op D (grid);
+	dirac_op D (grid, hmc_pars.mass, hmc_pars.mu_I);
 
 	// Gaussian noise observables:
 	field<fermion> phi(U.grid);
@@ -60,7 +61,7 @@ int main(int argc, char *argv[]) {
 		double phase, pbp, sus, mineval, maxeval, density_real, density_imag;
 
 		// Calculate all eigenvalues lambda_i of Dirac op:
-		Eigen::MatrixXcd eigenvalues = D.D_eigenvalues (U, mass, mu_I);				
+		Eigen::MatrixXcd eigenvalues = D.D_eigenvalues(U);				
 		// Det[D] = \prod_i \lambda_i
 		// phase{D} = \sum_i phase{lambda_i}
 		phase = 0;
@@ -75,7 +76,7 @@ int main(int argc, char *argv[]) {
 		log("[evals] psibar-psi", pbp);
 
 		// Calculate all eigenvalues of DDdagger op:
-		Eigen::MatrixXcd eigenvaluesDDdag = D.DDdagger_eigenvalues (U, mass, mu_I);
+		Eigen::MatrixXcd eigenvaluesDDdag = D.DDdagger_eigenvalues(U);
 		sus = eigenvaluesDDdag.cwiseInverse().sum().real()/static_cast<double>(3*U.V);
 		mineval = eigenvaluesDDdag.real().minCoeff();
 		maxeval = eigenvaluesDDdag.real().maxCoeff();
@@ -90,7 +91,7 @@ int main(int argc, char *argv[]) {
 
 		Eigen::GeneralizedEigenSolver<Eigen::MatrixXcd> ges;
 		Eigen::MatrixXcd A = D.dD_dmu_dense_matrix(U, mu_I);
-		Eigen::MatrixXcd B = D.D_dense_matrix(U, mass, mu_I);
+		Eigen::MATRICESatrixXcd B = D.D_dense_matrix(U, mass, mu_I);
 		ges.compute(A, B, false);
 		std::cout << "The (complex) numerators of the generalzied eigenvalues are: " << ges.alphas().transpose() << std::endl;
 		std::cout << "The (real) denominatore of the generalzied eigenvalues are: " << ges.betas().transpose() << std::endl;
@@ -109,13 +110,17 @@ int main(int argc, char *argv[]) {
 			phi /= sqrt(phi.squaredNorm());
 
 			// chi = [D(mu,m)D(mu,m)^dag]-1 phi	
-			D.cg(chi, phi, U, hmc_pars.mass, hmc_pars.mu_I, eps);
+			cg(chi, phi, U, D, eps);
 			// pion_susceptibility = Tr[{D(mu,m)D(mu,m)^dag}^-1] = <phi|chi>
 			pion_susceptibility.push_back(phi.dot(chi).real());
 			
 			// psi = -D(mu,m)^dag chi = D(-mu,-m) chi = -D(mu)^-1 phi
 			// psibar_psi = Tr[D(mu,nu)^-1] = -<phi|psi>
-			D.D(psi, chi, U, -hmc_pars.mass, -hmc_pars.mu_I);
+			D.mass = -D.mass;
+			D.mu_I = -D.mu_I;
+			D.D(psi, chi, U);
+			D.mass = -D.mass;
+			D.mu_I = -D.mu_I;
 			psibar_psi.push_back(-phi.dot(psi).real());
 
 			// isospin_density = (d/dmu)Tr[{D(mu,m)D(mu,m)^dag}^-1]

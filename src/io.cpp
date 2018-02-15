@@ -218,12 +218,30 @@ void read_gauge_field (field<gauge>& U, const std::string& base_name, int config
 		// check that plaquette matches checksum
 		double plaq = checksum_plaquette(U);
 		if(fabs(plaq - plaq_check) > 1.e-13) {
-			log("ERROR: read_gauge_field CHECKSUM fail!");
-			log("filename: " + filename);
-			log("checksum plaquette in file", plaq_check);
-			log("measured plaquette", plaq);
-			log("deviation", plaq - plaq_check);
-			exit(1);
+			// if it doesn't match try the other
+			// possible index ordering EO <-> LEXI
+			lattice grid_tmp (U.L0, U.L1, U.L2, U.L3, !U.grid.isEO);
+			field<gauge> U_tmp (grid_tmp);
+			U_tmp = U;
+			for(int ix=0; ix<U.V; ++ix) {
+				int ix_U;
+				if(U.grid.isEO) {
+					ix_U = U.grid.EO_from_LEXI(ix);
+				} else {
+					ix_U = U.grid.LEXI_from_EO(ix);
+				}
+				U[ix_U] = U_tmp[ix];
+			}
+			// check that plaquette matches checksum
+			plaq = checksum_plaquette(U);
+			if(fabs(plaq - plaq_check) > 1.e-13) {
+				log("ERROR: read_gauge_field CHECKSUM fail!");
+				log("filename: " + filename);
+				log("checksum plaquette in file", plaq_check);
+				log("measured plaquette", plaq);
+				log("deviation", plaq - plaq_check);
+				exit(1);
+			}
 		}
 		log("Gauge field [" + filename + "] read with plaquette: ", plaq);
 	}

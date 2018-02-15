@@ -1,5 +1,6 @@
 #include "hmc.hpp"
 #include "dirac_op.hpp"
+#include "inverters.hpp"
 #include "io.hpp"
 #include "stats.hpp"
 #include <iostream>
@@ -65,7 +66,7 @@ int main(int argc, char *argv[]) {
 	field<gauge> U (grid);
 
 	// initialise Dirac Op
-	dirac_op D (grid);
+	dirac_op D (grid, hmc_pars.mass, hmc_pars.mu_I);
 
 	if(run_pars.initial_config < 0) {
 		log("initial config negative i.e. RANDOM");
@@ -117,7 +118,7 @@ int main(int argc, char *argv[]) {
 		// obviously this is only efficient if we are moving towards the value
 		// that minimises the action, i.e. the susceptibility is initially too low
 	if (hmc_pars.constrained) {
-		hmc.suscept = D.pion_susceptibility_exact(U, hmc_pars.mass, hmc_pars.mu_I);
+		hmc.suscept = D.pion_susceptibility_exact(U);
 		if (run_pars.n_therm > 0) {
 			log("");
 			log("Pre-thermalisation (until we get a pion suscept in the desired range):");

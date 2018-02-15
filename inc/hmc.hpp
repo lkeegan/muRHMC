@@ -3,6 +3,7 @@
 #include "su3.hpp"
 #include "4d.hpp"
 #include "dirac_op.hpp"
+#include "inverters.hpp"
 #include <random>
 #include <unsupported/Eigen/MatrixFunctions>
 #include <string>
@@ -15,6 +16,7 @@ struct hmc_params {
 	int n_steps;
 	double MD_eps;
 	int seed;
+	bool EE;
 	bool constrained;
 	double suscept_central;
 	double suscept_delta;

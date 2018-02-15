@@ -64,11 +64,19 @@ public:
 	const SU3mat& operator[](int i) const { return U_[i]; }
 
 	// equality operator returns true if U[mu] are equal for all mu
-	bool operator==(const gauge& other) {
+	bool operator==(const gauge& other) const {
 		return (U_[0]==other[0]) &&
 			   (U_[1]==other[1]) &&
 			   (U_[2]==other[2]) &&
 			   (U_[3]==other[3]);
+	}
+
+	gauge& operator-=(const gauge& rhs)
+	{
+		for(int i=0; i<4; ++i) {
+			U_[i] -= rhs[i];
+		}
+	    return *this;
 	}
 
 	gauge& operator*=(double scalar)
@@ -77,6 +85,20 @@ public:
 			U_[i] *= scalar;
 		}
 	    return *this;
+	}
+
+	void setZero() {
+		for(int i=0; i<4; ++i) {
+			U_[i].setZero();
+		}		
+	}
+
+	double squaredNorm() const {
+		double norm = 0.0;
+		for(int i=0; i<4; ++i) {
+			norm += U_[i].squaredNorm();
+		}
+		return norm;		
 	}
 
 };
