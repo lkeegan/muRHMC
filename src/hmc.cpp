@@ -27,6 +27,7 @@ int hmc::trajectory (field<gauge>& U, dirac_op& D) {
 	field<fermion> phi (U.grid, eo_storage_e);
 	if(params.EE) {
 		D.D_eo (phi, chi, U);
+		phi.add(-params.mass, chi); //WRONG hmmm CHECK THIS!
 	} else {
 		D.D (phi, chi, U);
 	}
@@ -34,7 +35,14 @@ int hmc::trajectory (field<gauge>& U, dirac_op& D) {
 	field<gauge> U_old (U.grid);
 	U_old = U;
 
-	double action_old = action(U, phi, P, D);
+	double action_old = chi.squaredNorm() + action_U(U) + action_P(P);
+
+	// DEBUGGING: these should be the same:
+	std::cout << "chidag.chi " << chi.squaredNorm() << std::endl;
+	std::cout << "fermion_ac " << action_F(U, phi, D) << std::endl;
+	std::cout << "full_ac " << action(U, phi, P, D) << std::endl;
+	std::cout << "full_ac " << action_old << std::endl;
+
 	// do integration
 	OMF2 (U, phi, P, D);
 	// calculate change in action

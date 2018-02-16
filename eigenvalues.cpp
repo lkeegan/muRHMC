@@ -39,7 +39,7 @@ int main(int argc, char *argv[]) {
 	int N_eigenvalues = static_cast<int>(atof(argv[5]));
 	double eps = atof(argv[6]);
 
-	lattice grid (12, true);
+	lattice grid (40, 20, 20, 20, true);
 	//field<fermion>::eo_storage_options eo_storage = field<fermion>::FULL;
 	field<fermion>::eo_storage_options eo_storage = field<fermion>::EVEN_ONLY;
 

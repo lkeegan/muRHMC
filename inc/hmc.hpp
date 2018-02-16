@@ -22,16 +22,6 @@ struct hmc_params {
 	double suscept_delta;
 };
 
-struct run_params {
-	std::string base_name;
-	int T;
-	int L;
-	int initial_config;
-	int n_therm;
-	int n_traj;
-	int n_save;	
-};
-
 class hmc {
 
 private:

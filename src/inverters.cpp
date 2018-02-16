@@ -188,6 +188,7 @@ int cg_singleshift(field<fermion>& x, const field<fermion>& b, field<gauge>& U, 
 
 int cg_multishift(std::vector<field<fermion>>& x, const field<fermion>& b, field<gauge>& U, std::vector<double>& sigma, dirac_op& D, double eps) {
 	int n_shifts = x.size();
+	int n_unconverged_shifts = n_shifts;
 	std::vector<field<fermion>> p;
 	field<fermion> a(b.grid, b.eo_storage), r(b.grid, b.eo_storage);
 	double r2_old = 0;
@@ -227,27 +228,17 @@ int cg_multishift(std::vector<field<fermion>>& x, const field<fermion>& b, field
 		beta[0] = -r2_old / p[0].dot(a);
 		// calculate zeta and beta coefficients for shifted vectors
 		// see arXiv:hep-lat/9612014 for derivation
-		for(int i_shift=1; i_shift<n_shifts; ++i_shift) {
+		for(int i_shift=1; i_shift<n_unconverged_shifts; ++i_shift) {
 			zeta_p1[i_shift] = zeta[i_shift] * zeta_m1[i_shift] * beta_m1[0];
 			zeta_p1[i_shift] /= (beta[0]*alpha[0]*(zeta_m1[i_shift]-zeta[i_shift]) + zeta_m1[i_shift]*beta_m1[0]*(1.0 - (sigma[i_shift]-sigma[0])*beta[0]));
 			beta[i_shift] = beta[0] * zeta_p1[i_shift] / zeta[i_shift];
-			if(sqrt((zeta[i_shift]*conj(zeta[i_shift])).real()*r2_old)/b_norm < eps) {
-				// if shift has converged, i.e. normalised residual < eps, stop updating it
-				if(i_shift+1 == n_shifts) {
-					// If shifts are in increasing order, we can just reduce n_shifts by one
-					// to stop updating this shift
-					--n_shifts;
-				}
-				else {
-					std::cout << "Convergence in cg_multishift for i_shift: " << i_shift << std::endl;
-					std::cout << "But n_shifts = " << n_shifts << "; check that shifts are in increasing order!" << std::endl;
-					exit(1);
-				}
-			}
-//			std::cout << i_shift << "\t" << beta[i_shift] << std::endl;
+		}
+		// if largest shift has converged (to machine precision), i.e. normalised residual < ulp, stop updating it
+		if(sqrt((zeta[n_unconverged_shifts-1]*conj(zeta[n_unconverged_shifts-1])).real()*r2_old)/b_norm < 1e-20) {
+			--n_unconverged_shifts;
 		}
 		// x_i -= beta_i * p_i
-		for(int i_shift=0; i_shift<n_shifts; ++i_shift) {
+		for(int i_shift=0; i_shift<n_unconverged_shifts; ++i_shift) {
 			x[i_shift].add(-beta[i_shift], p[i_shift]);			
 		}
 		// r += beta_0 a
@@ -259,17 +250,111 @@ int cg_multishift(std::vector<field<fermion>>& x, const field<fermion>& b, field
 		// X <- X_p1
 		alpha[0] = r2_new / r2_old;
 		beta_m1[0] = beta[0];
-		for(int i_shift=1; i_shift<n_shifts; ++i_shift) {
+		for(int i_shift=1; i_shift<n_unconverged_shifts; ++i_shift) {
 			beta_m1[i_shift] = beta[i_shift];
 			zeta_m1[i_shift] = zeta[i_shift];
 			zeta[i_shift] = zeta_p1[i_shift];
 		}
 		// calculate alpha coeffs for shifted vectors
-		for(int i_shift=1; i_shift<n_shifts; ++i_shift) {
+		for(int i_shift=1; i_shift<n_unconverged_shifts; ++i_shift) {
 			alpha[i_shift] = alpha[0] * (zeta[i_shift] * beta_m1[i_shift]) / (zeta_m1[i_shift] * beta_m1[0]);
 		}
 		// p_i = alpha_i p_i + zeta_i r
-		for(int i_shift=0; i_shift<n_shifts; ++i_shift) {
+		for(int i_shift=0; i_shift<n_unconverged_shifts; ++i_shift) {
+			p[i_shift].scale_add(alpha[i_shift], zeta[i_shift], r);
+		}
+		if(iter>1e5)
+		{
+			std::cout << "CG-multishift not converging: iter= " << iter << " residual= " << sqrt(r2_new)/b_norm << std::endl;
+			exit(1); 
+		}
+	}
+	return iter;	
+}
+
+// return rational approx x = \alpha_0 + \sum_i \alpha_{i+1} [A + \beta_i]^{-1} b using cg_multishift for inversions
+// avoids storing shifted solution vectors, instead does above sum for every CG iteration and only stores result
+// still need the shifted search vectors p of course 
+int rational_approx_cg_multishift(field<fermion>& x, const field<fermion>& b, field<gauge>& U, std::vector<double>& rational_alpha, std::vector<double>& rational_beta, dirac_op& D, double eps) {
+	int n_shifts = rational_beta.size();
+	int n_unconverged_shifts = n_shifts;
+	std::vector<field<fermion>> p;
+	field<fermion> a(b.grid, b.eo_storage), r(b.grid, b.eo_storage);
+	double r2_old = 0;
+	double r2_new = 0;
+	std::vector<std::complex<double>> beta(n_shifts), beta_m1(n_shifts);
+	std::vector<std::complex<double>> zeta_m1(n_shifts), zeta(n_shifts), zeta_p1(n_shifts);
+	std::vector<std::complex<double>> alpha(n_shifts);
+	int iter = 0;
+
+	// initial guess zero required for multi-shift CG
+	// x_i = 0, a = Ax_0 = 0
+	a.setZero();
+	// r = b - a
+	r = b;
+	// p = r
+	for(int i_shift=0; i_shift<n_shifts; ++i_shift) {
+		p.push_back(r);
+		zeta[i_shift] = 1.0;
+		zeta_m1[i_shift] = 1.0;
+		alpha[i_shift] = 0.0;		
+	}
+	beta_m1[0] = 1.0;
+
+	// Initial value for our x is \rational_alpha_0 b:
+	x = b;
+	x *= rational_alpha[0];
+
+	// b_norm = sqrt(<b|b>)
+	double b_norm = b.norm();
+	// r2_new = <r|r>
+	r2_new = r.squaredNorm();
+	while (sqrt(r2_new)/b_norm > eps)
+	{
+		// a = A p_0
+		D.DDdagger(a, p[0], U);
+		// add first shift to DDdagger explicitly here:
+		a.add(rational_beta[0], p[0]);
+		++iter;
+		r2_old = r2_new;
+		// beta = -<r|r>/<p|a>
+		beta[0] = -r2_old / p[0].dot(a);
+		// calculate zeta and beta coefficients for shifted vectors
+		// see arXiv:hep-lat/9612014 for derivation
+		for(int i_shift=1; i_shift<n_unconverged_shifts; ++i_shift) {
+			zeta_p1[i_shift] = zeta[i_shift] * zeta_m1[i_shift] * beta_m1[0];
+			zeta_p1[i_shift] /= (beta[0]*alpha[0]*(zeta_m1[i_shift]-zeta[i_shift]) + zeta_m1[i_shift]*beta_m1[0]*(1.0 - (rational_beta[i_shift]-rational_beta[0])*beta[0]));
+			beta[i_shift] = beta[0] * zeta_p1[i_shift] / zeta[i_shift];
+		}
+		// if largest shift has converged, i.e. normalised residual < eps, stop updating it
+		if(sqrt((zeta[n_unconverged_shifts-1]*conj(zeta[n_unconverged_shifts-1])).real()*r2_old)/b_norm < eps) {
+			--n_unconverged_shifts;
+		}
+		// usual CG solver would do: x_i -= beta_i * p_i
+		// instead we do: x -= \sum_i \rational_alpha_i beta_i * p_i
+		for(int i_shift=0; i_shift<n_unconverged_shifts; ++i_shift) {
+			x.add(-rational_alpha[i_shift+1] * beta[i_shift], p[i_shift]);			
+		}
+		// r += beta_0 a
+		r.add(beta[0], a);
+		// r2_new = <r|r>
+		r2_new = r.squaredNorm();
+		// increment timestep:
+		// X_m1 <- X
+		// X <- X_p1
+		alpha[0] = r2_new / r2_old;
+		beta_m1[0] = beta[0];
+		for(int i_shift=1; i_shift<n_unconverged_shifts; ++i_shift) {
+			beta_m1[i_shift] = beta[i_shift];
+			zeta_m1[i_shift] = zeta[i_shift];
+			zeta[i_shift] = zeta_p1[i_shift];
+		}
+		// calculate alpha coeffs for shifted vectors
+		for(int i_shift=1; i_shift<n_unconverged_shifts; ++i_shift) {
+			alpha[i_shift] = alpha[0] * (zeta[i_shift] * beta_m1[i_shift]) / (zeta_m1[i_shift] * beta_m1[0]);
+		}
+		// p_i = alpha_i p_i + zeta_i r
+		for(int i_shift=0; i_shift<n_unconverged_shifts; ++i_shift) {
 			p[i_shift].scale_add(alpha[i_shift], zeta[i_shift], r);
 		}
 		if(iter>1e5)

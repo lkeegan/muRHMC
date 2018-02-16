@@ -45,9 +45,39 @@ void read_input_file(const std::string& filename, hmc_params& hmc_params, run_pa
 		input >> var_name >> hmc_params.n_steps;
 		input >> var_name >> hmc_params.MD_eps;
 		input >> var_name >> hmc_params.seed;
+		input >> var_name >> hmc_params.EE;
 		input >> var_name >> hmc_params.constrained;
 		input >> var_name >> hmc_params.suscept_central;
 		input >> var_name >> hmc_params.suscept_delta;
+		input >> var_name >> run_params.initial_config;
+		input >> var_name >> run_params.n_therm;
+		input >> var_name >> run_params.n_traj;
+		input >> var_name >> run_params.n_save;		
+	}
+	else {
+		log("Failed to open input file: " + filename);
+		exit(1);
+	}
+}
+
+void read_input_file(const std::string& filename, rhmc_params& rhmc_params, run_params& run_params) {
+	std::ifstream input(filename.c_str());
+	std::string var_name;
+
+	if(input.good()) {
+		input >> var_name >> run_params.base_name;
+		input >> var_name >> run_params.T;
+		input >> var_name >> run_params.L;
+		input >> var_name >> rhmc_params.beta;
+		input >> var_name >> rhmc_params.mass;
+		input >> var_name >> rhmc_params.mu_I;
+		input >> var_name >> rhmc_params.n_f;
+		input >> var_name >> rhmc_params.n_pf;
+		input >> var_name >> rhmc_params.tau;
+		input >> var_name >> rhmc_params.n_steps;
+		input >> var_name >> rhmc_params.MD_eps;
+		input >> var_name >> rhmc_params.seed;
+		input >> var_name >> rhmc_params.EE;
 		input >> var_name >> run_params.initial_config;
 		input >> var_name >> run_params.n_therm;
 		input >> var_name >> run_params.n_traj;

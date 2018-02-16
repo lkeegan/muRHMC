@@ -6,7 +6,7 @@
 #include "io.hpp"
 #include <iostream>
 
-constexpr double EPS = 5.e-14;
+constexpr double EPS = 9.e-14;
 
 TEST_CASE( "Gauge action self consistency", "[hmc]" ) {
 	// create 4^4 lattice with random U[mu] at each site
@@ -144,7 +144,6 @@ TEST_CASE( "Reversibility of HMC", "[hmc]" ) {
 
 	// create 4^4 lattice with random U[mu] at each site, random gaussian P
 	// integrate by tau, P -> -P, integrate by tau, compare to original U
-	// NB: what is the reversibility requirement on the HMC? exact/machine prec/inverter prec/..?
 	for(bool isEO : {false, true}) {
 		lattice grid (4, isEO);
 		field<gauge> U (grid);
@@ -168,7 +167,7 @@ TEST_CASE( "Reversibility of HMC", "[hmc]" ) {
 			U_old -= U;
 			double dev = U_old.norm();
 			INFO("HMC reversibility violation: " << dev << "\t MD_eps: " << hmc_pars.MD_eps << "\t CG iter: " << iter);
-			REQUIRE( dev == Approx(0).margin(100.0*hmc_pars.MD_eps) );
+			REQUIRE( dev < 1e2 * EPS );
 			REQUIRE( is_field_hermitian(P) < EPS );
 			REQUIRE( is_field_SU3(U) < EPS );	
 		}
@@ -182,7 +181,7 @@ TEST_CASE( "Reversibility of HMC", "[hmc]" ) {
 			U_old -= U;
 			double dev = U_old.norm();
 			INFO("HMC reversibility violation: " << dev << "\t MD_eps: " << hmc_pars.MD_eps << "\t CG iter: " << iter);
-			REQUIRE( dev == Approx(0).margin(100.0*hmc_pars.MD_eps) );
+			REQUIRE( dev < 1e2 * EPS );
 			REQUIRE( is_field_hermitian(P) < EPS );
 			REQUIRE( is_field_SU3(U) < EPS );		
 		}
@@ -230,7 +229,7 @@ TEST_CASE( "Reversibility of EE HMC", "[hmc_EE]" ) {
 		U_old -= U;
 		double dev = U_old.norm();
 		INFO("HMC reversibility violation: " << dev << "\t MD_eps: " << hmc_pars.MD_eps << "\t CG iter: " << iter);
-		REQUIRE( dev == Approx(0).margin(100.0*hmc_pars.MD_eps) );
+		REQUIRE( dev < 1e2 * EPS );
 		REQUIRE( is_field_hermitian(P) < EPS );
 		REQUIRE( is_field_SU3(U) < EPS );		
 	}
@@ -244,7 +243,7 @@ TEST_CASE( "Reversibility of EE HMC", "[hmc_EE]" ) {
 		U_old -= U;
 		double dev = U_old.norm();
 		INFO("HMC reversibility violation: " << dev << "\t MD_eps: " << hmc_pars.MD_eps << "\t CG iter: " << iter);
-		REQUIRE( dev == Approx(0).margin(100.0*hmc_pars.MD_eps) );
+		REQUIRE( dev < 1e2 * EPS );
 		REQUIRE( is_field_hermitian(P) < EPS );
 		REQUIRE( is_field_SU3(U) < EPS );		
 	}
@@ -257,7 +256,7 @@ TEST_CASE( "HMC EE force term matches full HMC term with even phi sites -> 0", "
 		0.00,   // mu_I
 		0.05, 	// tau
 		20, 	// n_steps
-		1.e-10,	// MD_eps
+		1.e-12,	// MD_eps
 		1234,	// seed
 		false, 	// EE: only simulate even-even sub-block (requires mu_I=0)
 		false,	// constrained HMC (fixed allowed range for pion susceptibility)
@@ -326,7 +325,7 @@ TEST_CASE( "HMC conserves action for small tau", "[hmc]" ) {
 		CAPTURE(hmc_pars.tau);
 		CAPTURE(hmc_pars.n_steps);
 		CAPTURE(hmc_pars.MD_eps);
-		REQUIRE( hmc.deltaE < 1.e-6 * U.V );		
+		REQUIRE( fabs(hmc.deltaE) < 1.e-6 * U.V );		
 	}
 }
 
@@ -357,5 +356,5 @@ TEST_CASE( "EE HMC conserves action for small tau", "[hmc_EE]" ) {
 	CAPTURE(hmc_pars.tau);
 	CAPTURE(hmc_pars.n_steps);
 	CAPTURE(hmc_pars.MD_eps);
-	REQUIRE( hmc.deltaE < 1.e-6 * U.V );		
+	REQUIRE( fabs(hmc.deltaE) < 1.e-6 * U.V );		
 }
