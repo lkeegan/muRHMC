@@ -216,6 +216,7 @@ int cg_multishift(std::vector<field<fermion>>& x, const field<fermion>& b, field
 	double b_norm = b.norm();
 	// r2_new = <r|r>
 	r2_new = r.squaredNorm();
+	//std::cout << "INIT res " << sqrt(r2_new)/b_norm << " x00: " << x[0][0](0) << std::endl;	
 	while (sqrt(r2_new)/b_norm > eps)
 	{
 		// a = A p_0
@@ -236,11 +237,13 @@ int cg_multishift(std::vector<field<fermion>>& x, const field<fermion>& b, field
 		// if largest shift has converged (to machine precision), i.e. normalised residual < ulp, stop updating it
 		if(sqrt((zeta[n_unconverged_shifts-1]*conj(zeta[n_unconverged_shifts-1])).real()*r2_old)/b_norm < 1e-20) {
 			--n_unconverged_shifts;
+			//std::cout << "iter " << iter << "converged " << n_unconverged_shifts+1 << std::endl;
 		}
 		// x_i -= beta_i * p_i
 		for(int i_shift=0; i_shift<n_unconverged_shifts; ++i_shift) {
 			x[i_shift].add(-beta[i_shift], p[i_shift]);			
 		}
+		//std::cout << "iter " << iter << "res " << sqrt(r2_new)/b_norm << " x00: " << x[0][0](0) << std::endl;
 		// r += beta_0 a
 		r.add(beta[0], a);
 		// r2_new = <r|r>
@@ -269,6 +272,7 @@ int cg_multishift(std::vector<field<fermion>>& x, const field<fermion>& b, field
 			exit(1); 
 		}
 	}
+	//std::cout << "CONV iter " << iter << "res " << sqrt(r2_new)/b_norm << " x00: " << x[0][0](0) << std::endl;
 	return iter;	
 }
 

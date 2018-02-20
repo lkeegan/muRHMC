@@ -79,6 +79,14 @@ public:
 	    return *this;
 	}
 
+	gauge& operator+=(const gauge& rhs)
+	{
+		for(int i=0; i<4; ++i) {
+			U_[i] += rhs[i];
+		}
+	    return *this;
+	}
+
 	gauge& operator*=(double scalar)
 	{
 		for(int i=0; i<4; ++i) {

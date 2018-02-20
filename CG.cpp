@@ -174,10 +174,10 @@ int main(int argc, char *argv[]) {
 	hmc hmc (hmc_params);
 	std::cout.precision(12);
 
-	lattice grid (12);
+	lattice grid (40, 20);
 	field<gauge> U (grid);
-//	read_massimo_gauge_field(U, config_name);
-//	write_gauge_field(U, config_name, 1);
+	read_massimo_gauge_field(U, config_name);
+	write_gauge_field(U, config_name, 1);
 	read_gauge_field(U, config_name, 1);
 	log("Average plaquette", hmc.plaq(U));
 	log("Spatial plaquette", hmc.plaq_spatial(U));

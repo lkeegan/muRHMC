@@ -68,49 +68,61 @@ TEST_CASE( "Rational Approximations", "[rational_approx]") {
 
 		int iter = 0;
 		for(int n : n_values) {
-			SECTION( std::string("A^{1/(2n)}_") + lt + " n=" + std::to_string(n) ) {
-			int N_shifts = RA.beta_hi[n].size();
-			std::vector< field<fermion> > X;
-			for(int i=0; i<N_shifts; ++i) {
-				X.push_back(B);
+			SECTION( std::string("[A^{1/(2n)}]^{2n}_") + lt + " n=" + std::to_string(n) ) {
+				y = B;
+				// y = [A^{1/2n}]^{2n} B = A B:
+				for(int i=0; i<n; ++i) {
+					// x = A^{1/2n} B:
+					iter += rational_approx_cg_multishift(x, y, U, RA.alpha_hi[n], RA.beta_hi[n], D, eps);
+					// y = A^{1/2n} x = A^{1/n} B:
+					iter += rational_approx_cg_multishift(y, x, U, RA.alpha_hi[n], RA.beta_hi[n], D, eps);
+				}
+				// x = A^-1 y = B
+				int iter = cg(x, y, U, D, eps);
+				x -= B;
+				double res = x.norm()/B.norm();
+				INFO("Lattice-type: " << lattice_type << "\t|| b - A^-1 [A^{1/2m} A^{1/2m}]^n b ||_{n=" << n << "} = " << res);
+				REQUIRE( res < EPS );				
 			}
-			y = B;
-			// y = [A^{1/2n}]^{2n} B = A B:
-			for(int i=0; i<n; ++i) {
-				// x = A^{1/2n} B:
-				iter += rational_approx_cg_multishift(x, y, U, RA.alpha_hi[n], RA.beta_hi[n], D, eps);
-				// y = A^{1/2n} x = A^{1/n} B:
+
+			SECTION( std::string("[A^{-1/(2n)}]^{2n}_") + lt + " n=" + std::to_string(n) ) {
+				y = B;
+				// y = [A^{-1/2n}]^{2n} B = A^{-1} B:
+				for(int i=0; i<n; ++i) {
+					// x = A^{-1/2n} B:
+					iter += rational_approx_cg_multishift(x, y, U, RA.alpha_inv_hi[n], RA.beta_inv_hi[n], D, eps);
+					// y = A^{-1/2n} x = A^{-1/n} B:
+					iter += rational_approx_cg_multishift(y, x, U, RA.alpha_inv_hi[n], RA.beta_inv_hi[n], D, eps);
+				}
+				// x = A y = B
+				D.DDdagger(x, y, U);
+
+				x -= B;
+				double res = x.norm()/B.norm();
+				INFO("Lattice-type: " << lattice_type << "\t|| b - A [A^{-1/2n} A^{-1/2n}]^n b ||_{n=" << n << "} = " << res);
+				REQUIRE( res < EPS );				
+			}
+
+			SECTION( std::string("A^{+1/(2n)}A^{-1/(2n)}_") + lt + " n=" + std::to_string(n) ) {
+				// y = [A^{+1/2n}] [A^{-1/2n}] B = B:
+				iter += rational_approx_cg_multishift(x, B, U, RA.alpha_inv_hi[n], RA.beta_inv_hi[n], D, eps);
 				iter += rational_approx_cg_multishift(y, x, U, RA.alpha_hi[n], RA.beta_hi[n], D, eps);
-			}
-			// x = A^-1 y = B
-			int iter = cg(x, y, U, D, eps);
-			x -= B;
-			double res = x.norm()/B.norm();
-			INFO("Lattice-type: " << lattice_type << "\t|| b - A^-1 [A^{1/2m} A^{1/2m}]^n b ||_{n=" << n << "} = " << res);
-			REQUIRE( res < EPS );				
+
+				y -= B;
+				double res = y.norm()/B.norm();
+				INFO("Lattice-type: " << lattice_type << "\t|| b - [A^{+1/2n} A^{-1/2n}] b ||_{n=" << n << "} = " << res);
+				REQUIRE( res < EPS );				
 			}
 
-			SECTION( std::string("A^{-1/(2n)}_") + lt + " n=" + std::to_string(n) ) {
-			int N_shifts = RA.beta_inv_hi[n].size();
-			std::vector< field<fermion> > X;
-			for(int i=0; i<N_shifts; ++i) {
-				X.push_back(B);
-			}
-			y = B;
-			// y = [A^{-1/2n}]^{2n} B = A^{-1} B:
-			for(int i=0; i<n; ++i) {
-				// x = A^{-1/2n} B:
-				iter += rational_approx_cg_multishift(x, y, U, RA.alpha_inv_hi[n], RA.beta_inv_hi[n], D, eps);
-				// y = A^{-1/2n} x = A^{-1/n} B:
+			SECTION( std::string("A^{-1/(2n)}A^{+1/(2n)}_") + lt + " n=" + std::to_string(n) ) {
+				// y = [A^{-1/2n}] [A^{+1/2n}] B = B:
+				iter += rational_approx_cg_multishift(x, B, U, RA.alpha_hi[n], RA.beta_hi[n], D, eps);
 				iter += rational_approx_cg_multishift(y, x, U, RA.alpha_inv_hi[n], RA.beta_inv_hi[n], D, eps);
-			}
-			// x = A y = B
-			D.DDdagger(x, y, U);
 
-			x -= B;
-			double res = x.norm()/B.norm();
-			INFO("Lattice-type: " << lattice_type << "\t|| b - A [A^{-1/2n} A^{-1/2n}]^n b ||_{n=" << n << "} = " << res);
-			REQUIRE( res < EPS );				
+				y -= B;
+				double res = y.norm()/B.norm();
+				INFO("Lattice-type: " << lattice_type << "\t|| b - [A^{-1/2n} A^{+1/2n}] b ||_{n=" << n << "} = " << res);
+				REQUIRE( res < EPS );				
 			}
 		}
 	}

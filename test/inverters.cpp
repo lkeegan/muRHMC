@@ -71,7 +71,7 @@ TEST_CASE( "CG inversions of isospin (D+m)(D+m)^dagger", "[inverters]") {
 			Ax -= B[0];
 			double res = Ax.norm()/B[0].norm();
 			INFO("Lattice-type: " << lattice_type << "CG: eps = " << eps << "\t iterations = " << iter << "\t residual = " << res);
-			REQUIRE( res == Approx(0).margin(5e-13 + 50.0*eps) );
+			REQUIRE( res < 1e2 * eps );
 		}
 
 		SECTION( std::string("CG-singleshift_") + lt ) {
@@ -81,7 +81,7 @@ TEST_CASE( "CG inversions of isospin (D+m)(D+m)^dagger", "[inverters]") {
 			Ax -= B[0];
 			double res = Ax.norm()/B[0].norm();
 			INFO("Lattice-type: " << lattice_type << "\tCG-singleshift: eps = " << eps << "\t iterations = " << iter << "\t residual = " << res);
-			REQUIRE( res == Approx(0).margin(5e-13 + 50.0*eps) );
+			REQUIRE( res < 1e2 * eps );
 		}
 
 		SECTION( std::string("CG-multishift_") + lt ) {
@@ -92,7 +92,7 @@ TEST_CASE( "CG inversions of isospin (D+m)(D+m)^dagger", "[inverters]") {
 				Ax -= B[0];
 				double res = Ax.norm()/B[0].norm();
 				INFO("Lattice-type: " << lattice_type << "\tCG-multishift: eps = " << eps << "\t iterations = " << iter << "\tshift = " << shifts[i] << "\t residual = " << res);
-				REQUIRE( res == Approx(0).margin(5e-13 + 50.0*eps) );				
+				REQUIRE( res < 1e2 * eps );				
 			}
 		}
 
@@ -113,7 +113,7 @@ TEST_CASE( "CG inversions of isospin (D+m)(D+m)^dagger", "[inverters]") {
 									CAPTURE(dQA);
 									CAPTURE(rQ);
 									INFO("Lattice-type: " << lattice_type << "\tBCG[" << i << "]: eps = " << eps << "\t iterations = " << iter << "\t residual = " << residual);
-									REQUIRE( residual == Approx(0).margin(5e-13 + 50.0*eps) );
+									REQUIRE( residual < 1e2 * eps );
 								}
 							}
 						}
@@ -131,7 +131,7 @@ TEST_CASE( "CG inversions of isospin (D+m)(D+m)^dagger", "[inverters]") {
 					Ax -= B[i_rhs];
 					double residual = Ax.norm();
 					INFO("Lattice-type: " << lattice_type << "\tSBCGrQ[" << i_s << "][" << i_rhs << "]: eps = " << eps << "\t iterations = " << iter << "\t residual = " << residual);
-					REQUIRE( residual == Approx(0).margin(5e-13 + 50.0*eps) );
+					REQUIRE( residual < 1e2 * eps );
 				}
 			}
 		}
@@ -173,5 +173,118 @@ TEST_CASE( "CG inversions of isospin (D+m)(D+m)^dagger", "[inverters]") {
 				REQUIRE( Ax.norm() < EPS );
 			}
 		}
+	}
+}
+
+
+TEST_CASE( "U perturbations: CG inversions of isospin (D+m)(D+m)^dagger", "[inverters]") {
+
+	double eps = 1.e-5;
+	int N_shifts = 3;
+	std::vector<double> shifts = {0.005, 0.010, 0.015};
+
+	hmc_params hmc_pars = {
+		5.4, 	// beta
+		0.0292, 	// mass
+		0.00, // mu_I
+		1.0, 	// tau
+		3, 		// n_steps
+		1.e-6,	// MD_eps
+		1234,	// seed
+		false, 	// EE: only simulate even-even sub-block (requires mu_I=0)
+		false,	// constrained HMC (fixed allowed range for pion susceptibility)
+		3.0, 	// suscept_central
+		0.05	// suscept_eps
+	};
+
+	// Loop over 3 setups: LEXI (default), EO, EO w/EO preconditioning
+	field<fermion>::eo_storage_options eo_storage_e = field<fermion>::FULL;
+	field<fermion>::eo_storage_options eo_storage_o = field<fermion>::FULL;
+	std::string lt ("LEXI_FULL");
+	bool isEO = false;
+	for (int lattice_type : {0, 1, 2}) {
+		if(lattice_type==1) {
+			isEO = true;
+			lt = "EO_FULL";
+		} else if(lattice_type==2) {
+			isEO = true;
+			eo_storage_e = field<fermion>::EVEN_ONLY;			
+			eo_storage_o = field<fermion>::ODD_ONLY;			
+			lt = "EO_EVEN_ONLY";
+		}
+
+		lattice grid (4, isEO);
+		field<gauge> U (grid);
+		field<gauge> Uprime (grid);
+		field<gauge> P (grid);
+		field<gauge> dP (grid);
+		hmc rhmc (hmc_pars);
+
+		rhmc.gaussian_P(P);
+		rhmc.gaussian_P(dP);
+		for(int ix=0; ix<Uprime.V; ++ix) {
+			for(int mu=0; mu<4; ++mu) {
+				U[ix][mu] = ((std::complex<double> (0.0, 10) * P[ix][mu]).exp()).eval();
+				Uprime[ix][mu] = ((std::complex<double> (0.0, 10) * P[ix][mu] + (std::complex<double> (0.0, 1e-14) * dP[ix][mu])).exp()).eval();
+			}
+		}
+
+		dirac_op D (grid, hmc_pars.mass, hmc_pars.mu_I);
+
+		field<fermion> Ax (grid, eo_storage_e);
+		field<fermion> Aprimex (grid, eo_storage_e);
+
+		field<fermion> B (grid, eo_storage_e);
+		rhmc.gaussian_fermion(B);
+
+		std::vector< field<fermion> > X;
+		std::vector< field<fermion> > Xprime;
+		for(int i=0; i<N_shifts; ++i) {
+			X.push_back(B);
+			Xprime.push_back(B);
+		}
+
+		SECTION( std::string("U: CG_") + lt ) {
+			int iter = cg(X[0], B, U, D, eps);
+			D.DDdagger(Ax, X[0], U);
+			Ax -= B;
+			iter = cg(Xprime[0], B, Uprime, D, eps);
+			D.DDdagger(Aprimex, Xprime[0], Uprime);
+			Aprimex -= B;
+			double res = Ax.norm()/B.norm();
+			double resprime = Aprimex.norm()/B.norm();
+			Xprime[0] -= X[0];
+			double deltaX = Xprime[0].norm()/X[0].norm();
+			Uprime -= U;
+			double deltaU = Uprime.norm()/U.norm();			
+			CAPTURE( deltaU );
+			CAPTURE( deltaX );
+			CAPTURE( eps );
+			INFO("Lattice-type: " << lattice_type << "CG: eps = " << eps << "\t iterations = " << iter << "\t residual = " << res);
+			REQUIRE( res < 1e2 * eps );
+		}
+/*
+		SECTION( std::string("CG-singleshift_") + lt ) {
+			int iter = cg_singleshift(X[0][0], B[0], U, shifts[0], D, eps);
+			D.DDdagger(Ax, X[0][0], U);
+			Ax.add(shifts[0], X[0][0]);
+			Ax -= B[0];
+			double res = Ax.norm()/B[0].norm();
+			INFO("Lattice-type: " << lattice_type << "\tCG-singleshift: eps = " << eps << "\t iterations = " << iter << "\t residual = " << res);
+			REQUIRE( res < 1e2 * eps );
+		}
+
+		SECTION( std::string("CG-multishift_") + lt ) {
+			int iter = cg_multishift(X[0], B[0], U, shifts, D, eps);
+			for(int i=0; i<N_shifts; ++i) {
+				D.DDdagger(Ax, X[0][i], U);
+				Ax.add(shifts[i], X[0][i]);
+				Ax -= B[0];
+				double res = Ax.norm()/B[0].norm();
+				INFO("Lattice-type: " << lattice_type << "\tCG-multishift: eps = " << eps << "\t iterations = " << iter << "\tshift = " << shifts[i] << "\t residual = " << res);
+				REQUIRE( res < 1e2 * eps );				
+			}
+		}
+		*/
 	}
 }

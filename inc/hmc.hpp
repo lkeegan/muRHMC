@@ -25,6 +25,7 @@ struct hmc_params {
 class hmc {
 
 private:
+	int fermion_force_count; // number of times fermion forces calculated 
 
 public:
 
@@ -33,13 +34,21 @@ public:
 	double deltaE; // dE of proposed change at end of last trajectory
 	double suscept_proposed; // proposed pion susceptibility from last trajectory
 	double suscept; // pion susceptibility after last trajectory
+	double fermion_force_norm; // average L2 norm of fermion force term 
+
 	explicit hmc (const hmc_params& params);
 
 	// Does a full HMC trajectory using parameters in params, returns 1 if update was accepted
 	int trajectory (field<gauge>& U, dirac_op& D);
 
+	// Does a full (pure gauge) HMC trajectory using parameters in params, returns 1 if update was accepted
+	int trajectory_pure_gauge (field<gauge>& U);
+
 	// HMC accept/reject step on gauge field U, returns 1 if proposed change accepted, 0 if rejected
 	int accept_reject (field<gauge>& U, const field<gauge>& U_old, double dE);
+
+	// do leapfrog integration of fields (returns # calls of dirac op)
+	void leapfrog_pure_gauge (field<gauge>& U, field<gauge>& P);
 
 	// do leapfrog integration of fields (returns # calls of dirac op)
 	int leapfrog (field<gauge>& U, field<fermion>& phi, field<gauge>& P, dirac_op& D);
@@ -58,6 +67,9 @@ public:
 
 	// action of pseudofermion field 
 	double action_F (field<gauge>& U, const field<fermion>& phi, dirac_op& D);
+
+	// do a single HMC integration step of length eps for the momenta
+	void step_P_pure_gauge (field<gauge>& P, field<gauge> &U, double eps);
 
 	// do a single HMC integration step of length eps for the momenta (returns # calls of dirac op)
 	int step_P (field<gauge>& P, field<gauge> &U, const field<fermion>& phi, dirac_op& D, double eps);

@@ -159,8 +159,9 @@ int main(int argc, char *argv[]) {
 				  << "\tplaq: " << hmc.plaq(U) 
 				  << "\t acc: " << acc/static_cast<double>(i)
 				  << "\t dE: " << hmc.deltaE
-				  << "\t suscept: " << hmc.suscept
-				  << "\t proposed_sus: " << hmc.suscept_proposed
+				  << "\t Ff: " << hmc.fermion_force_norm
+//				  << "\t suscept: " << hmc.suscept
+//				  << "\t proposed_sus: " << hmc.suscept_proposed
  				  << std::endl;
  	}
 	log("Thermalisation acceptance", static_cast<double>(acc)/static_cast<double>(run_pars.n_therm));
@@ -182,8 +183,9 @@ int main(int argc, char *argv[]) {
 				  << "\tplaq: " << hmc.plaq(U) 
 				  << "\t acc: " << static_cast<double>(acc)/static_cast<double>(i)
 				  << "\t dE: " << hmc.deltaE
-				  << "\t suscept: " << hmc.suscept
-				  << "\t proposed_sus: " << hmc.suscept_proposed
+				  << "\t Ff: " << hmc.fermion_force_norm
+//				  << "\t suscept: " << hmc.suscept
+//				  << "\t proposed_sus: " << hmc.suscept_proposed
 				  << std::endl;
 		if(i%run_pars.n_save==0) {
 			// save gauge config

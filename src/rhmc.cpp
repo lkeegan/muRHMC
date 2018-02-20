@@ -29,9 +29,11 @@ int rhmc::trajectory (field<gauge>& U, dirac_op& D, bool do_reversibility_test) 
 	//std::cout << "#RHMC: n_f=" << params.n_f << ", n_pf=" << params.n_pf << ", n_rational=" << n_rational << ", n_shifts hi/lo=" << params.RA.beta_hi[n_rational].size() << "/" << params.RA.beta_lo[n_rational].size() << std::endl;
 	field<fermion> chi_e (U.grid, eo_storage_e);
 	phi.clear();
+	double chi_norm = 0;
 	for(int i_pf=0; i_pf<params.n_pf; ++i_pf) {
 		phi.push_back(chi_e); //TODO: don't do this everytime, just intialise once
 		gaussian_fermion (chi_e);
+		chi_norm += chi_e.squaredNorm();
 		// construct phi[i] = M^{1/(2*n_rational) chi_e
 		int iter = rational_approx_cg_multishift(phi[i_pf], chi_e, U, params.RA.alpha_hi[n_rational], params.RA.beta_hi[n_rational], D, 1.e-15);
 	}
@@ -39,7 +41,21 @@ int rhmc::trajectory (field<gauge>& U, dirac_op& D, bool do_reversibility_test) 
 	field<gauge> U_old (U.grid);
 	U_old = U;
 
-	double action_old = action(U, P, D); //NB check that action_F given by chi.dot(chi), and avoid recalculating here...
+	// debugging
+	field<gauge> P_old (U.grid);
+	if(do_reversibility_test) {
+		P_old = P;
+	}
+
+	double action_old = chi_norm + action_U (U) + action_P (P);
+
+	// DEBUGGING
+	/*
+	std::cout << "chidag.chi " << chi_norm << std::endl;
+	std::cout << "fermion_ac " << action_F(U, D) << std::endl;
+	std::cout << "full_ac " << action(U, P, D) << std::endl;
+	std::cout << "full_ac " << action_old << std::endl;
+	*/
 	// do integration
 	OMF2 (U, P, D);
 
@@ -48,6 +64,10 @@ int rhmc::trajectory (field<gauge>& U, dirac_op& D, bool do_reversibility_test) 
 	if(do_reversibility_test) {
 		P *= -1;
 		OMF2 (U, P, D);
+		P_old += P;
+		std::cout << "P reserve dev: " << P_old.norm() << std::endl;
+		U_old -= U;
+		std::cout << "U reserve dev: " << U_old.norm() << std::endl;
 		return 1;
 	}
 
@@ -136,8 +156,11 @@ double rhmc::action_F (field<gauge>& U, dirac_op& D) {
 
 int rhmc::step_P (field<gauge>& P, field<gauge> &U, dirac_op& D, double eps) {
 	field<gauge> force (U.grid);
+	//std::cout.precision(17);
 	force_gauge (force, U);
+	//std::cout << "F_g: " << force.norm() << std::endl;
 	int iter = force_fermion (force, U, D);	
+	//std::cout << "F_g + F_pf: " << force.norm() << std::endl;
 	#pragma omp parallel for
 	for(int ix=0; ix<U.V; ++ix) {
 		for(int mu=0; mu<4; ++mu) {
@@ -223,10 +246,12 @@ int rhmc::force_fermion (field<gauge> &force, field<gauge> &U, dirac_op& D) {
 	}
 	field<fermion> psi (phi[0].grid, eo_storage);
 
+	std::vector<double> fermion_force_norms(n_shifts, 0.0);
 	int iter=0;
 	for(int i_pf=0; i_pf<params.n_pf; ++i_pf) {
 		// chi_{i_s} = [(DD^dagger + beta_{i_s}]^-1 phi[i_pf]
 		iter += cg_multishift (chi, phi[i_pf], U, params.RA.beta_inv_lo[n_rational/2], D, params.MD_eps);
+		//std::cout << "ipf " << i_pf << "cum iter " << iter << " inv0 norm " << chi[0].norm() << " Unorm " << U.norm() << " phinorm " << phi[i_pf].norm() << std::endl;
 		for(int i_s=0; i_s<n_shifts; ++i_s) {
 			// psi_i = -D^dagger(mu,m) chi or Doe chi
 			// psi = -D^dagger(mu,m) chi = D(-mu, -m) chi
@@ -257,6 +282,7 @@ int rhmc::force_fermion (field<gauge> &force, field<gauge> &U, dirac_op& D) {
 					for(int mu=0; mu<4; ++mu) {
 						for(int a=0; a<8; ++a) {
 							double Fa = a_rational * (chi[i_s][ix].dot(T[a] * U[ix][mu] * psi.up(ix,mu))).imag();
+							fermion_force_norms[i_s] += 0.5 * Fa * Fa;
 							force[ix][mu] -= Fa * T[a];
 						}
 					}
@@ -268,6 +294,7 @@ int rhmc::force_fermion (field<gauge> &force, field<gauge> &U, dirac_op& D) {
 					for(int mu=0; mu<4; ++mu) {
 						for(int a=0; a<8; ++a) {
 							double Fa = a_rational * (chi[i_s].up(ix,mu).dot(U[ix][mu].adjoint() * T[a] * psi[ix_o])).imag();
+							fermion_force_norms[i_s] += 0.5 * Fa * Fa;
 							force[ix][mu] -= Fa * T[a];
 						}
 					}
@@ -281,20 +308,30 @@ int rhmc::force_fermion (field<gauge> &force, field<gauge> &U, dirac_op& D) {
 					for(int a=0; a<8; ++a) {
 						double Fa = a_rational * chi[i_s][ix].dot(T[a] * mu_I_plus_factor * U[ix][0] * psi.up(ix,0)).imag();
 						Fa += a_rational * chi[i_s].up(ix,0).dot(U[ix][0].adjoint() * mu_I_minus_factor * T[a] * psi[ix]).imag();
+						fermion_force_norms[i_s] += 0.5 * Fa * Fa;
 						force[ix][0] -= Fa * T[a];
 					}
 					for(int mu=1; mu<4; ++mu) {
 						for(int a=0; a<8; ++a) {
 							double Fa = a_rational * (chi[i_s][ix].dot(T[a] * U[ix][mu] * psi.up(ix,mu))).imag();
 							Fa += a_rational * (chi[i_s].up(ix,mu).dot(U[ix][mu].adjoint() * T[a] * psi[ix])).imag();
+							fermion_force_norms[i_s] += 0.5 * Fa * Fa;
 							force[ix][mu] -= Fa * T[a];
 						}
 					}
 				}
 			}
 			D.remove_eta_bcs_from_U(U);
-		} // loop over shifts
-	} // loop over pseudo fermion flavours
+		} // end of loop over shifts
+	} // end of loop over pseudo fermion flavours
+	// output fermion force norms
+	
+	std::cout << "#FFnorms ";
+	for(int i_s=0; i_s<n_shifts; ++i_s) {
+		std::cout << sqrt(fermion_force_norms[i_s]/static_cast<double>(4*U.V)) << " ";
+	}
+	std::cout << std::endl;
+
 	return iter;
 }
 

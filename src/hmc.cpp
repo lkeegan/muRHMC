@@ -7,6 +7,8 @@ hmc::hmc (const hmc_params& params) : rng(params.seed), params(params) {
 }
 
 int hmc::trajectory (field<gauge>& U, dirac_op& D) {
+	fermion_force_norm = 0.0;
+	fermion_force_count = 0;
 	// set Dirac op mass and isospin mu values
 	D.mass = params.mass;
 	D.mu_I = params.mu_I;
@@ -38,16 +40,22 @@ int hmc::trajectory (field<gauge>& U, dirac_op& D) {
 	double action_old = chi.squaredNorm() + action_U(U) + action_P(P);
 
 	// DEBUGGING: these should be the same:
+	/*
 	std::cout << "chidag.chi " << chi.squaredNorm() << std::endl;
 	std::cout << "fermion_ac " << action_F(U, phi, D) << std::endl;
 	std::cout << "full_ac " << action(U, phi, P, D) << std::endl;
 	std::cout << "full_ac " << action_old << std::endl;
+	*/
 
 	// do integration
 	OMF2 (U, phi, P, D);
 	// calculate change in action
 	double action_new = action(U, phi, P, D);
 	deltaE = action_new - action_old;
+
+	// average over force term calculations, then square root for final norm
+	fermion_force_norm /= static_cast<double>(fermion_force_count);
+	fermion_force_norm = sqrt(fermion_force_norm);
 
 	if(params.constrained) {
 		// this value is stored from the last trajectory
@@ -83,6 +91,22 @@ int hmc::trajectory (field<gauge>& U, dirac_op& D) {
 	}
 }
 
+int hmc::trajectory_pure_gauge (field<gauge>& U) {
+	// make random gaussian momentum field P
+	field<gauge> P (U.grid);
+	gaussian_P (P);
+	// make copy of current gauge config in case update is rejected
+	field<gauge> U_old (U.grid);
+	U_old = U;
+	double action_old = action_U(U) + action_P(P);
+	// do integration
+	leapfrog_pure_gauge (U, P);
+	// calculate change in action
+	double action_new = action_U(U) + action_P(P);
+	deltaE = action_new - action_old;
+	return accept_reject (U, U_old, action_new - action_old);
+}
+
 int hmc::accept_reject (field<gauge>& U, const field<gauge>& U_old, double dE) {
 	std::uniform_real_distribution<double> randdist_double_0_1 (0,1);
 	double r = randdist_double_0_1 (rng);
@@ -93,6 +117,18 @@ int hmc::accept_reject (field<gauge>& U, const field<gauge>& U_old, double dE) {
 	}
 	// otherwise accept proposed update, i.e. do nothing
 	return 1;
+}
+
+void hmc::leapfrog_pure_gauge (field<gauge>& U, field<gauge>& P) {
+	double eps = params.tau / static_cast<double>(params.n_steps);
+	// leapfrog integration:
+	step_P_pure_gauge(P, U, 0.5*eps);
+	for(int i=0; i<params.n_steps-1; ++i) {
+		step_U(P, U, eps);
+		step_P_pure_gauge(P, U, eps);
+	}
+	step_U(P, U, eps);
+	step_P_pure_gauge(P, U, 0.5*eps);
 }
 
 int hmc::leapfrog (field<gauge>& U, field<fermion>& phi, field<gauge>& P, dirac_op& D) {
@@ -152,6 +188,17 @@ double hmc::action_F (field<gauge>& U, const field<fermion>& phi, dirac_op& D) {
 	int iter = cg(D2inv_phi, phi, U, D, 1.e-15);
 	//std::cout << "Action CG iterations: " << iter << std::endl;
 	return phi.dot(D2inv_phi).real();
+}
+
+void hmc::step_P_pure_gauge (field<gauge>& P, field<gauge> &U, double eps) {
+	field<gauge> force (U.grid);
+	force_gauge (force, U);
+	#pragma omp parallel for
+	for(int ix=0; ix<U.V; ++ix) {
+		for(int mu=0; mu<4; ++mu) {
+			P[ix][mu] -= eps * force[ix][mu];
+		}
+	}
 }
 
 int hmc::step_P (field<gauge>& P, field<gauge> &U, const field<fermion>& phi, dirac_op& D, double eps) {
@@ -250,6 +297,7 @@ void hmc::stout_smear (double rho, field<gauge> &U) {
 int hmc::force_fermion (field<gauge> &force, field<gauge> &U, const field<fermion>& phi, dirac_op& D) {
 	// chi = (D(mu)D^dagger(mu))^-1 phi
 	field<fermion> chi (phi.grid, phi.eo_storage);
+	++fermion_force_count;
 	int iter = cg (chi, phi, U, D, params.MD_eps);
 	// psi = -D^dagger(mu,m) chi = D(-mu, -m) chi
 	field<fermion>::eo_storage_options eo_storage = field<fermion>::FULL;
@@ -281,6 +329,7 @@ int hmc::force_fermion (field<gauge> &force, field<gauge> &U, const field<fermio
 			for(int mu=0; mu<4; ++mu) {
 				for(int a=0; a<8; ++a) {
 					double Fa = (chi[ix].dot(T[a] * U[ix][mu] * psi.up(ix,mu))).imag();
+					fermion_force_norm += 0.5 * Fa * Fa;
 					force[ix][mu] -= Fa * T[a];
 				}
 			}
@@ -292,6 +341,7 @@ int hmc::force_fermion (field<gauge> &force, field<gauge> &U, const field<fermio
 			for(int mu=0; mu<4; ++mu) {
 				for(int a=0; a<8; ++a) {
 					double Fa = (chi.up(ix,mu).dot(U[ix][mu].adjoint() * T[a] * psi[ix_o])).imag();
+					fermion_force_norm += 0.5 * Fa * Fa;
 					force[ix][mu] -= Fa * T[a];
 				}
 			}
@@ -305,12 +355,14 @@ int hmc::force_fermion (field<gauge> &force, field<gauge> &U, const field<fermio
 			for(int a=0; a<8; ++a) {
 				double Fa = chi[ix].dot(T[a] * mu_I_plus_factor * U[ix][0] * psi.up(ix,0)).imag();
 				Fa += chi.up(ix,0).dot(U[ix][0].adjoint() * mu_I_minus_factor * T[a] * psi[ix]).imag();
+				fermion_force_norm += 0.5 * Fa * Fa;
 				force[ix][0] -= Fa * T[a];
 			}
 			for(int mu=1; mu<4; ++mu) {
 				for(int a=0; a<8; ++a) {
 					double Fa = (chi[ix].dot(T[a] * U[ix][mu] * psi.up(ix,mu))).imag();
 					Fa += (chi.up(ix,mu).dot(U[ix][mu].adjoint() * T[a] * psi[ix])).imag();
+					fermion_force_norm += 0.5 * Fa * Fa;
 					force[ix][mu] -= Fa * T[a];
 				}
 			}

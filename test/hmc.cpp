@@ -6,7 +6,7 @@
 #include "io.hpp"
 #include <iostream>
 
-constexpr double EPS = 9.e-14;
+constexpr double EPS = 5.e-13;
 
 TEST_CASE( "Gauge action self consistency", "[hmc]" ) {
 	// create 4^4 lattice with random U[mu] at each site
@@ -126,15 +126,15 @@ double is_field_SU3 (const field<gauge>& U) {
 	return norm / static_cast<double>(U.V*4*2);
 }
 
-TEST_CASE( "Reversibility of HMC", "[hmc]" ) {
+TEST_CASE( "Reversibility of pure gauge HMC", "[hmc]" ) {
 
 	hmc_params hmc_pars = {
 		5.4, 	// beta
-		0.292, 	// mass
-		0.0157, // mu_I
+		0.100, 	// mass
+		0.005, // mu_I
 		1.0, 	// tau
 		3, 		// n_steps
-		1.e-6,	// MD_eps
+		1.e-7,	// MD_eps
 		1234,	// seed
 		false, 	// EE: only simulate even-even sub-block (requires mu_I=0)
 		false,	// constrained HMC (fixed allowed range for pion susceptibility)
@@ -149,16 +149,70 @@ TEST_CASE( "Reversibility of HMC", "[hmc]" ) {
 		field<gauge> U (grid);
 		field<gauge> P (grid);
 		field<gauge> U_old (grid);
+		field<gauge> P_old (grid);
 		hmc hmc (hmc_pars);
-		dirac_op D (grid, hmc_pars.mass, hmc_pars.mu_I);
-		hmc.random_U(U, 10.0);
+		hmc.random_U(U, 0.2);
 		U_old = U;
 		hmc.gaussian_P(P);
+		P_old = P;
 		// make gaussian fermion field
 		field<fermion> phi (grid);
 		hmc.gaussian_fermion (phi);
 
-		SECTION( "Leapfrog integrator") {
+		SECTION( "Leapfrog integrator isEO" + std::to_string(isEO)) {
+			hmc.leapfrog_pure_gauge (U, P);
+			// P <- -P
+			P *= -1;
+			hmc.leapfrog_pure_gauge (U, P);
+
+			U_old -= U;
+			double dev = U_old.norm();
+			P_old += P;
+			double devP = P_old.norm();
+			INFO("HMC reversibility violation: " << dev << "\t P_dev: " << devP);
+			REQUIRE( dev < EPS );
+			REQUIRE( devP < EPS );
+			REQUIRE( is_field_hermitian(P) < EPS );
+			REQUIRE( is_field_SU3(U) < EPS );	
+		}
+	}
+}
+
+TEST_CASE( "Reversibility of HMC", "[hmc]" ) {
+
+	hmc_params hmc_pars = {
+		5.4, 	// beta
+		0.100, 	// mass
+		0.005, // mu_I
+		1.0, 	// tau
+		3, 		// n_steps
+		1.e-7,	// MD_eps
+		1234,	// seed
+		false, 	// EE: only simulate even-even sub-block (requires mu_I=0)
+		false,	// constrained HMC (fixed allowed range for pion susceptibility)
+		3.0, 	// suscept_central
+		0.05	// suscept_eps
+	};
+
+	// create 4^4 lattice with random U[mu] at each site, random gaussian P
+	// integrate by tau, P -> -P, integrate by tau, compare to original U
+	for(bool isEO : {false, true}) {
+		lattice grid (4, isEO);
+		field<gauge> U (grid);
+		field<gauge> P (grid);
+		field<gauge> U_old (grid);
+		field<gauge> P_old (grid);
+		hmc hmc (hmc_pars);
+		dirac_op D (grid, hmc_pars.mass, hmc_pars.mu_I);
+		hmc.random_U(U, 0.2);
+		U_old = U;
+		hmc.gaussian_P(P);
+		P_old = P;
+		// make gaussian fermion field
+		field<fermion> phi (grid);
+		hmc.gaussian_fermion (phi);
+
+		SECTION( "Leapfrog integrator isEO" + std::to_string(isEO)) {
 			int iter = hmc.leapfrog (U, phi, P, D);
 			// P <- -P
 			P *= -1;
@@ -166,13 +220,16 @@ TEST_CASE( "Reversibility of HMC", "[hmc]" ) {
 
 			U_old -= U;
 			double dev = U_old.norm();
-			INFO("HMC reversibility violation: " << dev << "\t MD_eps: " << hmc_pars.MD_eps << "\t CG iter: " << iter);
-			REQUIRE( dev < 1e2 * EPS );
+			P_old += P;
+			double devP = P_old.norm();
+			INFO("HMC reversibility violation: " << dev << "\t P_dev: " << devP << "\t MD_eps: " << hmc_pars.MD_eps << "\t CG iter: " << iter);
+			REQUIRE( dev < EPS );
+			REQUIRE( devP < EPS );
 			REQUIRE( is_field_hermitian(P) < EPS );
 			REQUIRE( is_field_SU3(U) < EPS );	
 		}
 
-		SECTION( "OMF2 integrator") {
+		SECTION( "OMF2 integrator isEO" + std::to_string(isEO)) {
 			int iter = hmc.OMF2 (U, phi, P, D);
 			// P <- -P
 			P *= -1;
@@ -180,8 +237,11 @@ TEST_CASE( "Reversibility of HMC", "[hmc]" ) {
 
 			U_old -= U;
 			double dev = U_old.norm();
-			INFO("HMC reversibility violation: " << dev << "\t MD_eps: " << hmc_pars.MD_eps << "\t CG iter: " << iter);
-			REQUIRE( dev < 1e2 * EPS );
+			P_old += P;
+			double devP = P_old.norm();
+			INFO("HMC reversibility violation: " << dev << "\t P_dev: " << devP << "\t MD_eps: " << hmc_pars.MD_eps << "\t CG iter: " << iter);
+			REQUIRE( dev < EPS );
+			REQUIRE( devP < EPS );
 			REQUIRE( is_field_hermitian(P) < EPS );
 			REQUIRE( is_field_SU3(U) < EPS );		
 		}
@@ -192,11 +252,11 @@ TEST_CASE( "Reversibility of EE HMC", "[hmc_EE]" ) {
 
 	hmc_params hmc_pars = {
 		5.4, 	// beta
-		0.292, 	// mass
+		0.05, 	// mass
 		0.0157, // mu_I
 		1.0, 	// tau
 		3, 		// n_steps
-		1.e-6,	// MD_eps
+		1.e-3,	// MD_eps
 		1234,	// seed
 		true, 	// EE: only simulate even-even sub-block (requires mu_I=0)
 		false,	// constrained HMC (fixed allowed range for pion susceptibility)
@@ -206,21 +266,22 @@ TEST_CASE( "Reversibility of EE HMC", "[hmc_EE]" ) {
 
 	// create 4^4 lattice with random U[mu] at each site, random gaussian P
 	// integrate by tau, P -> -P, integrate by tau, compare to original U
-	// NB: what is the reversibility requirement on the HMC? exact/machine prec/inverter prec/..?
 	lattice grid (4, true);
 	field<gauge> U (grid);
 	field<gauge> P (grid);
 	field<gauge> U_old (grid);
+	field<gauge> P_old (grid);
 	hmc hmc (hmc_pars);
 	dirac_op D (grid, hmc_pars.mass, hmc_pars.mu_I);
-	hmc.random_U(U, 10.0);
+	hmc.random_U(U, 0.2);
 	U_old = U;
 	hmc.gaussian_P(P);
+	P_old = P;
 	// make gaussian fermion field
 	field<fermion> phi (grid, field<fermion>::EVEN_ONLY);
 	hmc.gaussian_fermion (phi);
 
-	SECTION( "Leapfrog integrator") {
+	SECTION( "EE Leapfrog integrator") {
 		int iter = hmc.leapfrog (U, phi, P, D);
 		// P <- -P
 		P *= -1;
@@ -228,13 +289,16 @@ TEST_CASE( "Reversibility of EE HMC", "[hmc_EE]" ) {
 
 		U_old -= U;
 		double dev = U_old.norm();
-		INFO("HMC reversibility violation: " << dev << "\t MD_eps: " << hmc_pars.MD_eps << "\t CG iter: " << iter);
-		REQUIRE( dev < 1e2 * EPS );
+		P_old += P;
+		double devP = P_old.norm();
+		INFO("HMC reversibility violation: " << dev << "\t P_dev: " << devP << "\t MD_eps: " << hmc_pars.MD_eps << "\t CG iter: " << iter);
+		REQUIRE( dev < EPS );
+		REQUIRE( devP < EPS );
 		REQUIRE( is_field_hermitian(P) < EPS );
 		REQUIRE( is_field_SU3(U) < EPS );		
 	}
 
-	SECTION( "OMF2 integrator") {
+	SECTION( "EE OMF2 integrator") {
 		int iter = hmc.OMF2 (U, phi, P, D);
 		// P <- -P
 		P *= -1;
@@ -242,8 +306,11 @@ TEST_CASE( "Reversibility of EE HMC", "[hmc_EE]" ) {
 
 		U_old -= U;
 		double dev = U_old.norm();
-		INFO("HMC reversibility violation: " << dev << "\t MD_eps: " << hmc_pars.MD_eps << "\t CG iter: " << iter);
-		REQUIRE( dev < 1e2 * EPS );
+		P_old += P;
+		double devP = P_old.norm();
+		INFO("HMC reversibility violation: " << dev << "\t P_dev: " << devP << "\t MD_eps: " << hmc_pars.MD_eps << "\t CG iter: " << iter);
+		REQUIRE( dev < EPS );
+		REQUIRE( devP < EPS );
 		REQUIRE( is_field_hermitian(P) < EPS );
 		REQUIRE( is_field_SU3(U) < EPS );		
 	}
@@ -297,7 +364,7 @@ TEST_CASE( "HMC EE force term matches full HMC term with even phi sites -> 0", "
 	F_EE -= F;
 	REQUIRE( F_EE.norm() < EPS );		
 }
-
+/*
 TEST_CASE( "HMC conserves action for small tau", "[hmc]" ) {
 	hmc_params hmc_pars = {
 		5.4, 	// beta
@@ -358,3 +425,4 @@ TEST_CASE( "EE HMC conserves action for small tau", "[hmc_EE]" ) {
 	CAPTURE(hmc_pars.MD_eps);
 	REQUIRE( fabs(hmc.deltaE) < 1.e-6 * U.V );		
 }
+*/
