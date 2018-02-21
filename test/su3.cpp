@@ -1,5 +1,10 @@
 #include "catch.hpp"
 #include "su3.hpp"
+#include <unsupported/Eigen/MatrixFunctions> //for matrix exponential
+#include <iostream>
+#include <limits>
+
+constexpr double EPS = 5.e-14;
 
 TEST_CASE( "SU3 Generators T_a", "[su3]" ) {
 	// T_a are hermitian & traceless
@@ -21,4 +26,51 @@ TEST_CASE( "SU3 Generators T_a", "[su3]" ) {
 			
 		}
 	}
+}
+
+TEST_CASE( "Cayley-Hamilton form of exp(X)", "[su3]" ) {
+	// Make random traceless hermitian complex 3x3 matrix X
+	SU3mat tmpX = Eigen::Matrix3cd::Random();
+	SU3mat X = tmpX - tmpX.adjoint();
+	X -= (X.trace()/3.0)*SU3mat::Identity();
+	INFO( "eigen exp(X)" << X.exp() );
+
+	// Choose N = max value of n such that 1/(N-1)! <= ULP
+	// c_n = 1/n!
+	std::vector<double> c_n(2, 1.0);
+	int N = 1;
+	double c_N = 1;
+	while(c_n[N-1] > 1e-4*std::numeric_limits<double>::epsilon()) {
+		c_N /= static_cast<double>(++N);
+		c_n.push_back(c_N);
+	}
+	CAPTURE (std::numeric_limits<double>::epsilon());
+	CAPTURE (N);
+
+	SU3mat XX = X*X;
+	double t = -0.5 * XX.trace().real();
+	std::complex<double> d = X.determinant();
+	CAPTURE (t);
+	CAPTURE (d);
+
+	std::complex<double> q0 = c_n[N];
+	std::complex<double> q1 = 0.0;
+	std::complex<double> q2 = 0.0;
+	std::complex<double> q0_old, q1_old;
+	while(N > 0) {
+		q0_old = q0;
+		q1_old = q1;
+		q0 = c_n[--N] + d * q2;
+		q1 = q0_old - t * q2;
+		q2 = q1_old;
+	}
+	SU3mat expX_ch = q0*SU3mat::Identity() + q1*X + q2*XX;
+
+	INFO( "eigen exp(X)" << expX_ch );
+
+	INFO( "|| exp_ch(X) - X.exp()[eigen] || = " << (expX_ch - X.exp()).norm() );
+
+	REQUIRE( (X.exp() - exp_ch(X)).norm() < EPS );
+
+	REQUIRE( (expX_ch - X.exp()).norm() < EPS );
 }

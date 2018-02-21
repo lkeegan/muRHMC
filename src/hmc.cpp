@@ -7,8 +7,6 @@ hmc::hmc (const hmc_params& params) : rng(params.seed), params(params) {
 }
 
 int hmc::trajectory (field<gauge>& U, dirac_op& D) {
-	fermion_force_norm = 0.0;
-	fermion_force_count = 0;
 	// set Dirac op mass and isospin mu values
 	D.mass = params.mass;
 	D.mu_I = params.mu_I;
@@ -52,10 +50,6 @@ int hmc::trajectory (field<gauge>& U, dirac_op& D) {
 	// calculate change in action
 	double action_new = action(U, phi, P, D);
 	deltaE = action_new - action_old;
-
-	// average over force term calculations, then square root for final norm
-	fermion_force_norm /= static_cast<double>(fermion_force_count);
-	fermion_force_norm = sqrt(fermion_force_norm);
 
 	if(params.constrained) {
 		// this value is stored from the last trajectory
@@ -218,7 +212,8 @@ void hmc::step_U (const field<gauge>& P, field<gauge> &U, double eps) {
 	#pragma omp parallel for
 	for(int ix=0; ix<U.V; ++ix) {
 		for(int mu=0; mu<4; ++mu) {
-			U[ix][mu] = ((std::complex<double> (0.0, eps) * P[ix][mu]).exp()) * U[ix][mu];
+			//U[ix][mu] = ((std::complex<double> (0.0, eps) * P[ix][mu]).exp()) * U[ix][mu];
+			U[ix][mu] = exp_ch((std::complex<double> (0.0, eps) * P[ix][mu])) * U[ix][mu];
 		}
 	}
 }
@@ -297,7 +292,7 @@ void hmc::stout_smear (double rho, field<gauge> &U) {
 int hmc::force_fermion (field<gauge> &force, field<gauge> &U, const field<fermion>& phi, dirac_op& D) {
 	// chi = (D(mu)D^dagger(mu))^-1 phi
 	field<fermion> chi (phi.grid, phi.eo_storage);
-	++fermion_force_count;
+	double fermion_force_norm = 0.0;
 	int iter = cg (chi, phi, U, D, params.MD_eps);
 	// psi = -D^dagger(mu,m) chi = D(-mu, -m) chi
 	field<fermion>::eo_storage_options eo_storage = field<fermion>::FULL;
@@ -369,6 +364,7 @@ int hmc::force_fermion (field<gauge> &force, field<gauge> &U, const field<fermio
 		}
 	}
 	D.remove_eta_bcs_from_U(U);
+	std::cout << "#FFnorms " << sqrt(fermion_force_norm/static_cast<double>(4*U.V)) << std::endl;
 
 	return iter;
 }

@@ -24,6 +24,7 @@ void log(const std::string& message, const std::string& value);
 void log(const std::string& message, double value);
 void log(const std::string& message, std::complex<double> value);
 void log(const std::string& message, double value1, double value2);
+void log(const std::string& message, const std::vector<double>& value);
 
 // read hmc and run parameters from input file
 void read_input_file(const std::string& filename, hmc_params& hmc_params, run_params& run_params);

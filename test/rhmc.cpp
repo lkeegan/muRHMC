@@ -7,7 +7,7 @@
 #include "io.hpp"
 #include <iostream>
 
-constexpr double EPS = 9.e-10;
+constexpr double EPS = 5.e-13;
 
 TEST_CASE( "RHMC Gauge action self consistency", "[rhmc]" ) {
 	// create 4^4 lattice with random U[mu] at each site
@@ -220,7 +220,7 @@ TEST_CASE( "Reversibility of RHMC", "[rhmc]" ) {
 				field<gauge> U_old (grid);
 				rhmc rhmc (rhmc_pars);
 				dirac_op D (grid);
-				rhmc.random_U(U, 0.4);
+				rhmc.random_U(U, 0.2);
 				U_old = U;
 				rhmc.trajectory(U, D, true);
 				U_old -= U;

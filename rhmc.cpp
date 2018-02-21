@@ -18,7 +18,16 @@ int main(int argc, char *argv[]) {
 	std::cout.precision(14);
 
 	// RHMC parameters
-	rational_approx RA(0.06, 15.2);
+	rational_approx RA(0.0006, 3.2);
+
+	for(int i : {1, 2, 3, 4, 6, 8, 12, 16}) {
+		std::cout << "# " << i << std::endl;
+		for(int j=1; j<RA.alpha_inv_lo[i].size(); ++j) {
+			std::cout << j << "\t" << RA.alpha_inv_lo[i][j] << std::endl;
+		}
+		std::cout << std::endl;
+	}
+
 	rhmc_params rhmc_pars = {
 		5.4, 	// beta
 		0.05, 	// mass

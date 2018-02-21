@@ -26,8 +26,10 @@ struct rhmc_params {
 class rhmc {
 
 private:
-	int n_shifts; //number of shifts from rational approx
-	int n_rational; //rational approx type A^(1/(2*n_rational))
+//	int n_shifts; //number of shifts from rational approx
+	int n_rational; //rational approx A^(1/(2*n_rational))
+	field<fermion>::eo_storage_options eo_storage_e = field<fermion>::FULL;
+	field<fermion>::eo_storage_options eo_storage_o = field<fermion>::FULL;
 
 public:
 

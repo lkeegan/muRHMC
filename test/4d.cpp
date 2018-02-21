@@ -3,6 +3,8 @@
 #include "4d.hpp"
 #include "hmc.hpp"
 
+constexpr double EPS = 5.e-14;
+
 TEST_CASE( "moving forwards then backwards does nothing: 4^4 lattice of U[mu]", "[lattice]" ) {
 	for(bool isEO : {false, true}) {
 		lattice grid (4, isEO);
@@ -153,9 +155,7 @@ TEST_CASE( "x.squaredNorm() and x.dot(x) equivalent", "[4d]" ) {
 		hmc_pars.seed = 123;
 		hmc rhmc (hmc_pars);
 		rhmc.gaussian_fermion(chi);
-		double dev = chi.dot(chi).real() - chi.squaredNorm();
-		INFO("squaredNorm - dot = " << dev);
-		REQUIRE( dev == Approx(0) );
+		REQUIRE( chi.dot(chi).real() == Approx(chi.squaredNorm()) );
 		}
 }
 
@@ -167,8 +167,6 @@ TEST_CASE( "sqrt(x.squaredNorm()) and x.norm equivalent", "[4d]" ) {
 		hmc_pars.seed = 123;
 		hmc rhmc (hmc_pars);
 		rhmc.gaussian_fermion(chi);
-		double dev = chi.norm() - sqrt(chi.squaredNorm());
-		INFO("sqrt(squaredNorm) - norm = " << dev);
-		REQUIRE( dev == Approx(0) );
+		REQUIRE( chi.norm() == Approx(sqrt(chi.squaredNorm())) );
 	}
 }

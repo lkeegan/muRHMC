@@ -159,7 +159,6 @@ int main(int argc, char *argv[]) {
 				  << "\tplaq: " << hmc.plaq(U) 
 				  << "\t acc: " << acc/static_cast<double>(i)
 				  << "\t dE: " << hmc.deltaE
-				  << "\t Ff: " << hmc.fermion_force_norm
 //				  << "\t suscept: " << hmc.suscept
 //				  << "\t proposed_sus: " << hmc.suscept_proposed
  				  << std::endl;
@@ -183,7 +182,6 @@ int main(int argc, char *argv[]) {
 				  << "\tplaq: " << hmc.plaq(U) 
 				  << "\t acc: " << static_cast<double>(acc)/static_cast<double>(i)
 				  << "\t dE: " << hmc.deltaE
-				  << "\t Ff: " << hmc.fermion_force_norm
 //				  << "\t suscept: " << hmc.suscept
 //				  << "\t proposed_sus: " << hmc.suscept_proposed
 				  << std::endl;

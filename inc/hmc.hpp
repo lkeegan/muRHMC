@@ -25,7 +25,6 @@ struct hmc_params {
 class hmc {
 
 private:
-	int fermion_force_count; // number of times fermion forces calculated 
 
 public:
 
@@ -34,7 +33,6 @@ public:
 	double deltaE; // dE of proposed change at end of last trajectory
 	double suscept_proposed; // proposed pion susceptibility from last trajectory
 	double suscept; // pion susceptibility after last trajectory
-	double fermion_force_norm; // average L2 norm of fermion force term 
 
 	explicit hmc (const hmc_params& params);
 

@@ -5,18 +5,6 @@
 #include "io.hpp" //DEBUGGING
 
 rhmc::rhmc (const rhmc_params& params) : rng(params.seed), params(params) {
-}
-
-int rhmc::trajectory (field<gauge>& U, dirac_op& D, bool do_reversibility_test) {
-	// set Dirac op mass and isospin mu values
-	D.mass = params.mass;
-	D.mu_I = params.mu_I;
-	// make random gaussian momentum field P
-	field<gauge> P (U.grid);
-	gaussian_P (P);
-	// make gaussian fermion field
-	field<fermion>::eo_storage_options eo_storage_e = field<fermion>::FULL;
-	field<fermion>::eo_storage_options eo_storage_o = field<fermion>::FULL;
 	// rational approx for initial phi: M^{n_f/(16 params.n_pf)} = M^{1/(2*n_rational)}
 	n_rational = 8 * params.n_pf / params.n_f;
 	if(params.EE) {
@@ -26,12 +14,38 @@ int rhmc::trajectory (field<gauge>& U, dirac_op& D, bool do_reversibility_test) 
 		// rational approx for initial phi: M^{n_f/(8 params.n_pf)} = M^{1/(2*n_rational)}
 		n_rational = 4 * params.n_pf / params.n_f;
 	}
+	if(n_rational<2) {
+		std::cout << "Invalid combination of n_f, n_pf: need n_pf/n_f >= 1/2" << std::endl;
+		exit(1);
+	}
+	log("RHMC: RA lower_bound", params.RA.lower_bound);
+	log("RHMC: RA upper_bound", params.RA.upper_bound);
+
+	log("RHMC: init n_rational", n_rational);
+	log("RHMC: init alpha_hi", params.RA.alpha_hi[n_rational]);
+	log("RHMC: init beta_hi", params.RA.beta_hi[n_rational]);
+
+	log("RHMC: action n_rational/2", n_rational/2);
+	log("RHMC: action alpha_inv_hi", params.RA.alpha_inv_hi[n_rational/2]);
+	log("RHMC: action beta_inv_hi", params.RA.beta_inv_hi[n_rational/2]);
+
+	log("RHMC: force n_rational/2", n_rational/2);
+	log("RHMC: force alpha_inv_lo", params.RA.alpha_inv_lo[n_rational/2]);
+	log("RHMC: force beta_inv_lo", params.RA.beta_inv_lo[n_rational/2]);
+}
+
+int rhmc::trajectory (field<gauge>& U, dirac_op& D, bool do_reversibility_test) {
+	// set Dirac op mass and isospin mu values
+	D.mass = params.mass;
+	D.mu_I = params.mu_I;
+	// make random gaussian momentum field P
+	field<gauge> P (U.grid);
+	gaussian_P (P);
 	//std::cout << "#RHMC: n_f=" << params.n_f << ", n_pf=" << params.n_pf << ", n_rational=" << n_rational << ", n_shifts hi/lo=" << params.RA.beta_hi[n_rational].size() << "/" << params.RA.beta_lo[n_rational].size() << std::endl;
 	field<fermion> chi_e (U.grid, eo_storage_e);
-	phi.clear();
+	phi.resize(params.n_pf, chi_e);
 	double chi_norm = 0;
 	for(int i_pf=0; i_pf<params.n_pf; ++i_pf) {
-		phi.push_back(chi_e); //TODO: don't do this everytime, just intialise once
 		gaussian_fermion (chi_e);
 		chi_norm += chi_e.squaredNorm();
 		// construct phi[i] = M^{1/(2*n_rational) chi_e
@@ -174,7 +188,8 @@ void rhmc::step_U (const field<gauge>& P, field<gauge> &U, double eps) {
 	#pragma omp parallel for
 	for(int ix=0; ix<U.V; ++ix) {
 		for(int mu=0; mu<4; ++mu) {
-			U[ix][mu] = ((std::complex<double> (0.0, eps) * P[ix][mu]).exp()) * U[ix][mu];
+			U[ix][mu] = exp_ch((std::complex<double> (0.0, eps) * P[ix][mu])) * U[ix][mu];
+			//U[ix][mu] = ((std::complex<double> (0.0, eps) * P[ix][mu]).exp()) * U[ix][mu];
 		}
 	}
 }
@@ -235,16 +250,9 @@ void rhmc::force_gauge (field<gauge> &force, const field<gauge> &U) {
 int rhmc::force_fermion (field<gauge> &force, field<gauge> &U, dirac_op& D) {
 	//std::cout << "#RHMC force: n_f=" << params.n_f << ", n_pf=" << params.n_pf << ", n_rational/2=" << n_rational/2 << ", n_shifts lo=" << params.RA.beta_inv_lo[n_rational/2].size() << std::endl;
 	int n_shifts = params.RA.beta_inv_lo[n_rational/2].size();
-	std::vector< field<fermion> > chi;
-	for(int i_s=0; i_s<n_shifts; ++i_s) {
-		chi.push_back(phi[0]);
-	}
+	std::vector< field<fermion> > chi(n_shifts, phi[0]);
 
-	field<fermion>::eo_storage_options eo_storage = field<fermion>::FULL;
-	if(params.EE) {
-		eo_storage = field<fermion>::ODD_ONLY;
-	}
-	field<fermion> psi (phi[0].grid, eo_storage);
+	field<fermion> psi (phi[0].grid, eo_storage_o);
 
 	std::vector<double> fermion_force_norms(n_shifts, 0.0);
 	int iter=0;

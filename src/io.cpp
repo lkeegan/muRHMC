@@ -3,7 +3,7 @@
 #include <iomanip>
 #include <fstream>
 
-constexpr int STRING_WIDTH = 22;
+constexpr int STRING_WIDTH = 28;
 
 void log(const std::string& message) {
 	std::cout << "# " << std::left << std::setw(STRING_WIDTH) << message << std::endl;
@@ -28,6 +28,14 @@ void log(const std::string& message, double value1, double value2) {
 	std::cout << "# " << std::left << std::setw(STRING_WIDTH) << message
 			  		  << std::left << std::setw(STRING_WIDTH) << value1
 			  		  << std::left << std::setw(STRING_WIDTH) << value2 << std::endl;
+}
+
+void log(const std::string& message, const std::vector<double>& value) {
+	std::cout << "# " << std::left << std::setw(STRING_WIDTH) << message;
+	for(int i=0; i<static_cast<int>(value.size()); ++i) {
+		std::cout << " " << value[i];
+	}
+	std::cout << std::endl;
 }
 
 void read_input_file(const std::string& filename, hmc_params& hmc_params, run_params& run_params) {
