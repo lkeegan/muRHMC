@@ -364,7 +364,7 @@ TEST_CASE( "HMC EE force term matches full HMC term with even phi sites -> 0", "
 	F_EE -= F;
 	REQUIRE( F_EE.norm() < EPS );		
 }
-/*
+
 TEST_CASE( "HMC conserves action for small tau", "[hmc]" ) {
 	hmc_params hmc_pars = {
 		5.4, 	// beta
@@ -395,7 +395,7 @@ TEST_CASE( "HMC conserves action for small tau", "[hmc]" ) {
 		REQUIRE( fabs(hmc.deltaE) < 1.e-6 * U.V );		
 	}
 }
-
+/*
 TEST_CASE( "EE HMC conserves action for small tau", "[hmc_EE]" ) {
 	hmc_params hmc_pars = {
 		5.4, 	// beta

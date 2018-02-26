@@ -1,8 +1,8 @@
 #ifndef LATTICE_4D_H
 #define LATTICE_4D_H
 
-#include<vector>
-#include<complex>
+#include <vector>
+#include <complex>
 #include "omp.h"
 
 // 4d lattice with pbcs
@@ -70,16 +70,26 @@ public:
 			// store entire field
 			data_.resize(V);
 		} else if (eo_storage == EVEN_ONLY) {
-			// only store even part of field
-			V /= 2;
-			data_.resize(V);			
+			if(grid.isEO) {
+				// only store even part of field
+				V /= 2;
+				data_.resize(V);
+			} else {
+				//must be EO grid to only store even part!
+				exit(1);
+			}
 		} else {
-			// only store odd part of field
-			V /= 2;
-			data_.resize(V);
-			// need to subtract V from array indices that come from grid.iup etc
-			// since we don't store the even part which is the first V elements
-			eo_offset = V;
+			if(grid.isEO) {
+				// only store odd part of field
+				V /= 2;
+				data_.resize(V);
+				// need to subtract V from array indices that come from grid.iup etc
+				// since we don't store the even part which is the first V elements
+				eo_offset = V;
+			} else {
+				//must be EO grid to only store odd part!
+				exit(1);
+			}
 		} 
 	}
 

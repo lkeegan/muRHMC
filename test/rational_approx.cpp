@@ -54,6 +54,7 @@ TEST_CASE( "Rational Approximations", "[rational_approx]") {
 			lt = "EO_EVEN_ONLY";
 		}
 
+		int n_rhs = 3;
 		lattice grid (4, isEO);
 		field<gauge> U (grid);
 		hmc rhmc (hmc_pars);
@@ -63,13 +64,18 @@ TEST_CASE( "Rational Approximations", "[rational_approx]") {
 		field<fermion> x (grid, eo_storage_e);
 		field<fermion> y (grid, eo_storage_e);
 
-		field<fermion> B (grid, eo_storage_e);
-		rhmc.gaussian_fermion(B);
+		std::vector< field<fermion> > X, Y, B;
+		for(int i=0; i<n_rhs; ++i) {
+			rhmc.gaussian_fermion(x);
+			X.push_back(y);
+			Y.push_back(y);
+			B.push_back(x);
+		}
 
 		int iter = 0;
 		for(int n : n_values) {
 			SECTION( std::string("[A^{1/(2n)}]^{2n}_") + lt + " n=" + std::to_string(n) ) {
-				y = B;
+				y = B[0];
 				// y = [A^{1/2n}]^{2n} B = A B:
 				for(int i=0; i<n; ++i) {
 					// x = A^{1/2n} B:
@@ -79,14 +85,14 @@ TEST_CASE( "Rational Approximations", "[rational_approx]") {
 				}
 				// x = A^-1 y = B
 				int iter = cg(x, y, U, D, eps);
-				x -= B;
-				double res = x.norm()/B.norm();
+				x -= B[0];
+				double res = x.norm()/B[0].norm();
 				INFO("Lattice-type: " << lattice_type << "\t|| b - A^-1 [A^{1/2m} A^{1/2m}]^n b ||_{n=" << n << "} = " << res);
 				REQUIRE( res < EPS );				
 			}
 
 			SECTION( std::string("[A^{-1/(2n)}]^{2n}_") + lt + " n=" + std::to_string(n) ) {
-				y = B;
+				y = B[0];
 				// y = [A^{-1/2n}]^{2n} B = A^{-1} B:
 				for(int i=0; i<n; ++i) {
 					// x = A^{-1/2n} B:
@@ -97,32 +103,45 @@ TEST_CASE( "Rational Approximations", "[rational_approx]") {
 				// x = A y = B
 				D.DDdagger(x, y, U);
 
-				x -= B;
-				double res = x.norm()/B.norm();
+				x -= B[0];
+				double res = x.norm()/B[0].norm();
 				INFO("Lattice-type: " << lattice_type << "\t|| b - A [A^{-1/2n} A^{-1/2n}]^n b ||_{n=" << n << "} = " << res);
 				REQUIRE( res < EPS );				
 			}
 
 			SECTION( std::string("A^{+1/(2n)}A^{-1/(2n)}_") + lt + " n=" + std::to_string(n) ) {
 				// y = [A^{+1/2n}] [A^{-1/2n}] B = B:
-				iter += rational_approx_cg_multishift(x, B, U, RA.alpha_inv_hi[n], RA.beta_inv_hi[n], D, eps);
+				iter += rational_approx_cg_multishift(x, B[0], U, RA.alpha_inv_hi[n], RA.beta_inv_hi[n], D, eps);
 				iter += rational_approx_cg_multishift(y, x, U, RA.alpha_hi[n], RA.beta_hi[n], D, eps);
 
-				y -= B;
-				double res = y.norm()/B.norm();
+				y -= B[0];
+				double res = y.norm()/B[0].norm();
 				INFO("Lattice-type: " << lattice_type << "\t|| b - [A^{+1/2n} A^{-1/2n}] b ||_{n=" << n << "} = " << res);
 				REQUIRE( res < EPS );				
 			}
 
 			SECTION( std::string("A^{-1/(2n)}A^{+1/(2n)}_") + lt + " n=" + std::to_string(n) ) {
 				// y = [A^{-1/2n}] [A^{+1/2n}] B = B:
-				iter += rational_approx_cg_multishift(x, B, U, RA.alpha_hi[n], RA.beta_hi[n], D, eps);
+				iter += rational_approx_cg_multishift(x, B[0], U, RA.alpha_hi[n], RA.beta_hi[n], D, eps);
 				iter += rational_approx_cg_multishift(y, x, U, RA.alpha_inv_hi[n], RA.beta_inv_hi[n], D, eps);
 
-				y -= B;
-				double res = y.norm()/B.norm();
+				y -= B[0];
+				double res = y.norm()/B[0].norm();
 				INFO("Lattice-type: " << lattice_type << "\t|| b - [A^{-1/2n} A^{+1/2n}] b ||_{n=" << n << "} = " << res);
 				REQUIRE( res < EPS );				
+			}
+
+			SECTION( std::string("Block A^{-1/(2n)}A^{+1/(2n)}_") + lt + " n=" + std::to_string(n) ) {
+				// Y = [A^{-1/2n}] [A^{+1/2n}] B = B:
+				iter += rational_approx_SBCGrQ(X, B, U, RA.alpha_hi[n], RA.beta_hi[n], D, eps);
+				iter += rational_approx_SBCGrQ(Y, X, U, RA.alpha_inv_hi[n], RA.beta_inv_hi[n], D, eps);
+
+				for(int i=0; i<n_rhs; ++i) {
+					Y[i] -= B[i];
+					double res = Y[i].norm()/B[i].norm();
+					INFO("Lattice-type: " << lattice_type << "\t|| B[" << i << "] - [A^{-1/2n} A^{+1/2n}] B ||_{n=" << n << "} = " << res);
+					REQUIRE( res < EPS );				
+				}
 			}
 		}
 	}

@@ -26,8 +26,12 @@ int hmc::trajectory (field<gauge>& U, dirac_op& D) {
 	// construct phi_(e) = D_(eo) chi_(o)
 	field<fermion> phi (U.grid, eo_storage_e);
 	if(params.EE) {
+		D.apply_eta_bcs_to_U(U);
+		//field<fermion> chi_e (U.grid, eo_storage_e);
+		//chi_e = chi;
 		D.D_eo (phi, chi, U);
-		phi.add(-params.mass, chi); //WRONG hmmm CHECK THIS!
+		phi.scale_add(1.0, -params.mass, chi); //WRONG hmmm CHECK THIS!
+		D.remove_eta_bcs_from_U(U);
 	} else {
 		D.D (phi, chi, U);
 	}
@@ -38,12 +42,12 @@ int hmc::trajectory (field<gauge>& U, dirac_op& D) {
 	double action_old = chi.squaredNorm() + action_U(U) + action_P(P);
 
 	// DEBUGGING: these should be the same:
-	/*
+	
 	std::cout << "chidag.chi " << chi.squaredNorm() << std::endl;
 	std::cout << "fermion_ac " << action_F(U, phi, D) << std::endl;
 	std::cout << "full_ac " << action(U, phi, P, D) << std::endl;
 	std::cout << "full_ac " << action_old << std::endl;
-	*/
+	
 
 	// do integration
 	OMF2 (U, phi, P, D);

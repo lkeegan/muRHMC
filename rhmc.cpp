@@ -19,7 +19,7 @@ int main(int argc, char *argv[]) {
 
 	// RHMC parameters
 	rational_approx RA(0.0006, 3.2);
-
+/*
 	for(int i : {1, 2, 3, 4, 6, 8, 12, 16}) {
 		std::cout << "# " << i << std::endl;
 		for(int j=1; j<RA.alpha_inv_lo[i].size(); ++j) {
@@ -27,7 +27,7 @@ int main(int argc, char *argv[]) {
 		}
 		std::cout << std::endl;
 	}
-
+*/
 	rhmc_params rhmc_pars = {
 		5.4, 	// beta
 		0.05, 	// mass
@@ -95,6 +95,10 @@ int main(int argc, char *argv[]) {
 		// load specified gauge config
 		read_gauge_field (U, run_pars.base_name, run_pars.initial_config);
 	}
+
+	// just do force measurements:
+	rhmc.trajectory (U, D, false, true);
+	exit(0);
 
 	// observables to measure
 	std::vector<double> dE;

@@ -6,7 +6,7 @@
 #include "inverters.hpp"
 #include "rational_approx.hpp"
 #include <random>
-#include <unsupported/Eigen/MatrixFunctions>
+//#include <unsupported/Eigen/MatrixFunctions>
 #include <string>
 
 struct rhmc_params {
@@ -41,7 +41,7 @@ public:
 	explicit rhmc (const rhmc_params& params);
 
 	// Does a full RHMC trajectory using parameters in params, returns 1 if update was accepted
-	int trajectory (field<gauge>& U, dirac_op& D,  bool do_reversibility_test = false);
+	int trajectory (field<gauge>& U, dirac_op& D, bool do_reversibility_test = false, bool MEASURE_FORCE_ERROR_NORMS = false);
 
 	// HMC accept/reject step on gauge field U, returns 1 if proposed change accepted, 0 if rejected
 	int accept_reject (field<gauge>& U, const field<gauge>& U_old, double dE);
@@ -85,6 +85,9 @@ public:
 
 	// HMC fermionic force: adds to existing force (returns # calls of dirac op)
 	int force_fermion (field<gauge> &force, field<gauge> &U, dirac_op& D);
+
+	// debugging
+	int force_fermion_norms (field<gauge> &force, field<gauge> &U, dirac_op& D);
 
 	// staple for link U_{\mu}(ix)
 	SU3mat staple (int ix, int mu, const field<gauge>& U);

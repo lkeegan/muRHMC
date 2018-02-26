@@ -39,6 +39,8 @@ int cg_block (std::vector<field<fermion>>& X, const std::vector<field<fermion>>&
 // NB assumes vector of shifts are positive and in ascending order
 int SBCGrQ(std::vector< std::vector< field<fermion> > >& X, const std::vector<field<fermion>>& B, field<gauge>& U, std::vector<double>& input_shifts, dirac_op& D, double eps);
 
+int rational_approx_SBCGrQ(std::vector< field<fermion> >& X, const std::vector<field<fermion>>& B, field<gauge>& U, std::vector<double>& rational_alpha, std::vector<double>& rational_beta, dirac_op& D, double eps);
+
 int SBCGAdQArQ(std::vector< std::vector< field<fermion> > >& X, const std::vector<field<fermion>>& B, field<gauge>& U, std::vector<double>& input_shifts, dirac_op& D, double eps);
 
 // Bartels–Stewart - O(N^3) algorithm to solve Sylvester equation for X:
