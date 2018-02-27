@@ -277,7 +277,7 @@ int rhmc::force_fermion_norms (field<gauge> &force, field<gauge> &U, dirac_op& D
 	field<fermion> chi (phi[0].grid, eo_storage_e);
 	field<fermion> psi (phi[0].grid, eo_storage_o);
 
-	std::vector<double> residuals = {1.e-4, 1.e-5};
+	std::vector<double> residuals = {1.e-2, 1.e-3, 1.e-4, 1.e-5, 1.e-6, 1.e-7};
 	std::vector<double> ff_norms(n_shifts, 0.0);
 	std::vector< std::vector<double> > ff_error_norms(residuals.size(), ff_norms);
 	std::vector< std::vector<double> > ff_error_cgiter(residuals.size(), ff_norms);
@@ -340,21 +340,36 @@ int rhmc::force_fermion_norms (field<gauge> &force, field<gauge> &U, dirac_op& D
 	} // end of loop over pseudo fermion flavours
 	// output fermion force norms
 
-	std::cout << "#FFerr #i_shift #shift, force_norm, " << std::endl;	
+	std::cout.precision(12);
+
+	std::cout << "#i_shift, shift, force_norm, error, iter, epsilon" << std::endl;	
 	for(int i_eps=0; i_eps<static_cast<int>(residuals.size()); ++i_eps) {
-		std::cout << "res: " << residuals[i_eps] << ",\t cgiter,\t";
+		for(int i_s=0; i_s<n_shifts; ++i_s) {
+			std::cout 	<< std::scientific << i_s << "\t"
+						<< params.RA.beta_inv_lo[n_rational/2][i_s] << "\t"
+						<< sqrt(ff_norms[i_s]/static_cast<double>(4*residuals.size()*U.V)) << "\t"
+						<< sqrt(ff_error_norms[i_eps][i_s]/static_cast<double>(4*U.V)) << "\t"
+						<< ff_error_cgiter[i_eps][i_s] << "\t"
+						<< residuals[i_eps] << std::endl;
+		}
+		std::cout << std::endl;
+	}
+/*
+	std::cout << "#i_shift #shift, force_norm, ";	
+	for(int i_eps=0; i_eps<static_cast<int>(residuals.size()); ++i_eps) {
+		std::cout << std::scientific << "res: " << residuals[i_eps] << ",\t cgiter,\t";
 	}
 	std::cout << std::endl;
 	for(int i_s=0; i_s<n_shifts; ++i_s) {
-		std::cout << "#FFerr " << i_s << "\t" << params.RA.beta_inv_lo[n_rational/2][i_s] << "\t"
+		std::cout << "" << i_s << "\t" << params.RA.beta_inv_lo[n_rational/2][i_s] << "\t"
 		<< sqrt(ff_norms[i_s]/static_cast<double>(4*residuals.size()*U.V)) << "\t";
 		for(int i_eps=0; i_eps<static_cast<int>(residuals.size()); ++i_eps) {
-			std::cout << sqrt(ff_error_norms[i_eps][i_s]/static_cast<double>(4*U.V)) << "\t"
+			std::cout << std::scientific << sqrt(ff_error_norms[i_eps][i_s]/static_cast<double>(4*U.V)) << "\t"
 			<< ff_error_cgiter[i_eps][i_s] << "\t";
 		}
 		std::cout << std::endl;
 	}
-
+*/
     auto timer_stop = std::chrono::high_resolution_clock::now();
     auto timer_count = std::chrono::duration_cast<std::chrono::seconds>(timer_stop-timer_start).count();
 	std::cout << "#RHMC_InitCGRuntime " << timer_count << std::endl;

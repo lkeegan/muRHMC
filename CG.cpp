@@ -67,7 +67,7 @@ int main(int argc, char *argv[]) {
 	hmc hmc (hmc_params);
 	std::cout.precision(12);
 
-	lattice grid (8, 24, true);
+	lattice grid (24, 24, true);
 	field<gauge> U (grid);
 //	read_massimo_gauge_field(U, config_name);
 //	write_gauge_field(U, config_name, 1);
