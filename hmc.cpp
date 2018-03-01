@@ -81,6 +81,10 @@ int main(int argc, char *argv[]) {
 		read_gauge_field (U, run_pars.base_name, run_pars.initial_config);
 	}
 
+	// just do force measurements:
+	hmc.trajectory (U, D, true);
+	exit(0);
+
 	// observables to measure
 	std::vector<double> dE;
 	std::vector<double> expdE;

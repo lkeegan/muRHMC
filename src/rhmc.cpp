@@ -110,6 +110,7 @@ int rhmc::trajectory (field<gauge>& U, dirac_op& D, bool do_reversibility_test, 
 			std::cout << std::scientific << residuals[i_eps] << "\t" << CGiter << "\t" << CGerr << "\t" << CGtimer << "\t"
 					  << BLOCKiter << "\t" << BLOCKerr << "\t" << BLOCKtimer << "\t" << f_star_norm << std::endl;
 		}
+		exit(0);
 	}
 
 	// DEBUGGING

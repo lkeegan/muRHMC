@@ -841,18 +841,18 @@ int rational_approx_SBCGrQ(std::vector< field<fermion> >& X, const std::vector<f
 		shifts[i_shift] = rational_beta[i_shift+1] - rational_beta[0];
 	}
 
-	std::cout << "#Shifted BCGrQ:\t" << std::endl;
-	std::cout << "#mass:\t" << D.mass << std::endl;
-	std::cout << "#input_shifts:\t";
-	for(int i_shift=0; i_shift<N_shifts+1; ++i_shift) {
-			std::cout << "\t" << rational_beta[i_shift];
-	}
-	std::cout << std::endl;
-	std::cout << "#remaining_rescaled_shifts:\t";
-	for(int i_shift=0; i_shift<N_shifts; ++i_shift) {
-			std::cout << "\t" << shifts[i_shift];
-	}
-	std::cout << std::endl;
+//	std::cout << "#Shifted BCGrQ:\t" << std::endl;
+//	std::cout << "#mass:\t" << D.mass << std::endl;
+//	std::cout << "#input_shifts:\t";
+//	for(int i_shift=0; i_shift<N_shifts+1; ++i_shift) {
+//			std::cout << "\t" << rational_beta[i_shift];
+//	}
+//	std::cout << std::endl;
+//	std::cout << "#remaining_rescaled_shifts:\t";
+//	for(int i_shift=0; i_shift<N_shifts; ++i_shift) {
+//			std::cout << "\t" << shifts[i_shift];
+//	}
+//	std::cout << std::endl;
 
 	// Unshifted matrices:
 	Eigen::MatrixXcd S = Eigen::MatrixXcd::Identity(N, N);

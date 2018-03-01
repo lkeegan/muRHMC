@@ -3,11 +3,12 @@
 #include <complex>
 #include <iostream> //FOR DEBUGGING
 #include "io.hpp" //DEBUGGING
+#include <chrono>
 
 hmc::hmc (const hmc_params& params) : rng(params.seed), params(params) {
 }
 
-int hmc::trajectory (field<gauge>& U, dirac_op& D) {
+int hmc::trajectory (field<gauge>& U, dirac_op& D, bool MEASURE_FORCE_ERROR_NORMS) {
 	// set Dirac op mass and isospin mu values
 	D.mass = params.mass;
 	D.mu_I = params.mu_I;
@@ -37,6 +38,38 @@ int hmc::trajectory (field<gauge>& U, dirac_op& D) {
 
 	double action_old = chi.squaredNorm() + action_U(U) + action_P(P);
 
+	// FORCE MEASUREMENT: measure force norms once and exit:
+	if(MEASURE_FORCE_ERROR_NORMS) {
+		std::cout.precision(12);
+		// get "exact" high precision solve force vector
+	    auto timer_start = std::chrono::high_resolution_clock::now();
+		field<gauge> force_star (U.grid);
+		force_star.setZero();
+		params.MD_eps = 1.e-12;
+		int iter = force_fermion (force_star, U, phi, D);
+		force_star *= -1.0;
+		double f_star_norm = force_star.norm();
+	    auto timer_stop = std::chrono::high_resolution_clock::now();
+		auto timer_count = std::chrono::duration_cast<std::chrono::seconds>(timer_stop-timer_start).count();
+		std::cout << std::scientific << "# correct force iter " << iter << "\t norm" << f_star_norm << "\t runtime: " << timer_count << std::endl;
+
+		// get approx force vector, output norm of difference
+		field<gauge> force_eps (U.grid);
+		std::vector<double> residuals = {1.e-2, 1.e-3, 1.e-4, 1.e-5, 1.e-6, 1.e-7};
+		std::cout << "# eps, CGiter, CGerror-norm, CGruntime, true-force-norm" << std::endl;
+		for(int i_eps=0; i_eps<static_cast<int>(residuals.size()); ++i_eps) {
+			params.MD_eps = residuals[i_eps];
+		    auto timer_start = std::chrono::high_resolution_clock::now();
+			force_eps = force_star;
+			int CGiter = force_fermion (force_eps, U, phi, D);
+		    auto timer_stop = std::chrono::high_resolution_clock::now();
+			auto CGtimer = std::chrono::duration_cast<std::chrono::seconds>(timer_stop-timer_start).count();
+			double CGerr = force_eps.norm();
+			std::cout << std::scientific << residuals[i_eps] << "\t" << CGiter << "\t" << CGerr << "\t" << CGtimer << "\t"
+					  << f_star_norm << std::endl;
+		}
+		exit(0);
+	}
 	// DEBUGGING: these should be the same:
 	/*
 	std::cout.precision(17);

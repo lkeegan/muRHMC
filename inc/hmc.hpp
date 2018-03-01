@@ -37,7 +37,7 @@ public:
 	explicit hmc (const hmc_params& params);
 
 	// Does a full HMC trajectory using parameters in params, returns 1 if update was accepted
-	int trajectory (field<gauge>& U, dirac_op& D);
+	int trajectory (field<gauge>& U, dirac_op& D, bool MEASURE_FORCE_ERROR_NORMS = false);
 
 	// Does a full (pure gauge) HMC trajectory using parameters in params, returns 1 if update was accepted
 	int trajectory_pure_gauge (field<gauge>& U);
