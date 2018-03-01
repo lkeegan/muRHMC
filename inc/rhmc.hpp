@@ -85,6 +85,7 @@ public:
 
 	// HMC fermionic force: adds to existing force (returns # calls of dirac op)
 	int force_fermion (field<gauge> &force, field<gauge> &U, dirac_op& D);
+	int force_fermion_block (field<gauge> &force, field<gauge> &U, dirac_op& D);
 
 	// debugging
 	int force_fermion_norms (field<gauge> &force, field<gauge> &U, dirac_op& D);

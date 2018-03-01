@@ -28,7 +28,7 @@ int cg_singleshift (field<fermion>& x, const field<fermion>& b, field<gauge>& U,
 // returns number of times Dirac operator was called
 // note larger shifts converge faster: currently only stop iterating a given shift if residual is zero to avoid NaN issues
 // could add vector of eps values for each shift in the future
-int cg_multishift (std::vector<field<fermion>>& x, const field<fermion>& b, field<gauge>& U, std::vector<double>& sigma, dirac_op& D, double eps);
+int cg_multishift (std::vector<field<fermion>>& x, const field<fermion>& b, field<gauge>& U, std::vector<double>& sigma, dirac_op& D, double eps, double eps_shifts = 1.e-15);
 
 int rational_approx_cg_multishift(field<fermion>& x, const field<fermion>& b, field<gauge>& U, std::vector<double>& rational_alpha, std::vector<double>& rational_beta, dirac_op& D, double eps);
 
@@ -37,7 +37,7 @@ int cg_block (std::vector<field<fermion>>& X, const std::vector<field<fermion>>&
 
 // Shifted Block CG rQ:
 // NB assumes vector of shifts are positive and in ascending order
-int SBCGrQ(std::vector< std::vector< field<fermion> > >& X, const std::vector<field<fermion>>& B, field<gauge>& U, std::vector<double>& input_shifts, dirac_op& D, double eps);
+int SBCGrQ(std::vector< std::vector< field<fermion> > >& X, const std::vector<field<fermion>>& B, field<gauge>& U, std::vector<double>& input_shifts, dirac_op& D, double eps, double eps_shifts = 1.e-15);
 
 int rational_approx_SBCGrQ(std::vector< field<fermion> >& X, const std::vector<field<fermion>>& B, field<gauge>& U, std::vector<double>& rational_alpha, std::vector<double>& rational_beta, dirac_op& D, double eps);
 

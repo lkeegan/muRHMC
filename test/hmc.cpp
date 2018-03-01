@@ -395,7 +395,7 @@ TEST_CASE( "HMC conserves action for small tau", "[hmc]" ) {
 		REQUIRE( fabs(hmc.deltaE) < 1.e-6 * U.V );		
 	}
 }
-/*
+
 TEST_CASE( "EE HMC conserves action for small tau", "[hmc_EE]" ) {
 	hmc_params hmc_pars = {
 		5.4, 	// beta
@@ -425,4 +425,3 @@ TEST_CASE( "EE HMC conserves action for small tau", "[hmc_EE]" ) {
 	CAPTURE(hmc_pars.MD_eps);
 	REQUIRE( fabs(hmc.deltaE) < 1.e-6 * U.V );		
 }
-*/

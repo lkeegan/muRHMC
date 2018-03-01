@@ -143,6 +143,20 @@ TEST_CASE( "Rational Approximations", "[rational_approx]") {
 					REQUIRE( res < EPS );				
 				}
 			}
+
+			SECTION( std::string("Block A^{+1/(2n)}A^{-1/(2n)}_") + lt + " n=" + std::to_string(n) ) {
+				// Y = [A^{+1/2n}] [A^{-1/2n}] B = B:
+				iter += rational_approx_SBCGrQ(X, B, U, RA.alpha_inv_hi[n], RA.beta_inv_hi[n], D, eps);
+				iter += rational_approx_SBCGrQ(Y, X, U, RA.alpha_hi[n], RA.beta_hi[n], D, eps);
+
+				for(int i=0; i<n_rhs; ++i) {
+					Y[i] -= B[i];
+					double res = Y[i].norm()/B[i].norm();
+					INFO("Lattice-type: " << lattice_type << "\t|| B[" << i << "] - [A^{+1/2n} A^{-1/2n}] B ||_{n=" << n << "} = " << res);
+					REQUIRE( res < EPS );				
+				}
+			}
+
 		}
 	}
 }

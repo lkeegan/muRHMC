@@ -1,4 +1,5 @@
 #include "hmc.hpp"
+#include "rational_approx.hpp" //FOR square root in EE PSEUDOFERMION HEATBATH
 #include <complex>
 #include <iostream> //FOR DEBUGGING
 #include "io.hpp" //DEBUGGING
@@ -15,23 +16,18 @@ int hmc::trajectory (field<gauge>& U, dirac_op& D) {
 	gaussian_P (P);
 	// make gaussian fermion field
 	field<fermion>::eo_storage_options eo_storage_e = field<fermion>::FULL;
-	field<fermion>::eo_storage_options eo_storage_o = field<fermion>::FULL;
 	if(params.EE) {
 		// only use even part of pseudofermions and even-even sub-block of dirac op
 		eo_storage_e = field<fermion>::EVEN_ONLY;
-		eo_storage_o = field<fermion>::ODD_ONLY;
 	}
-	field<fermion> chi (U.grid, eo_storage_o);
+	field<fermion> chi (U.grid, eo_storage_e);
 	gaussian_fermion (chi);
 	// construct phi_(e) = D_(eo) chi_(o)
 	field<fermion> phi (U.grid, eo_storage_e);
 	if(params.EE) {
-		D.apply_eta_bcs_to_U(U);
-		//field<fermion> chi_e (U.grid, eo_storage_e);
-		//chi_e = chi;
-		D.D_eo (phi, chi, U);
-		phi.scale_add(1.0, -params.mass, chi); //WRONG hmmm CHECK THIS!
-		D.remove_eta_bcs_from_U(U);
+		// Use rational approx for (m^2 - D_eo D_oe)^{1/2}
+		rational_approx RA(D.mass*D.mass, 16.0);
+		rational_approx_cg_multishift(phi, chi, U, RA.alpha_hi[1], RA.beta_hi[1], D, 1.e-15);
 	} else {
 		D.D (phi, chi, U);
 	}
@@ -42,12 +38,13 @@ int hmc::trajectory (field<gauge>& U, dirac_op& D) {
 	double action_old = chi.squaredNorm() + action_U(U) + action_P(P);
 
 	// DEBUGGING: these should be the same:
-	
+	/*
+	std::cout.precision(17);
 	std::cout << "chidag.chi " << chi.squaredNorm() << std::endl;
 	std::cout << "fermion_ac " << action_F(U, phi, D) << std::endl;
 	std::cout << "full_ac " << action(U, phi, P, D) << std::endl;
 	std::cout << "full_ac " << action_old << std::endl;
-	
+	*/
 
 	// do integration
 	OMF2 (U, phi, P, D);

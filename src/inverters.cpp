@@ -186,7 +186,7 @@ int cg_singleshift(field<fermion>& x, const field<fermion>& b, field<gauge>& U, 
 	return iter;
 } 
 
-int cg_multishift(std::vector<field<fermion>>& x, const field<fermion>& b, field<gauge>& U, std::vector<double>& sigma, dirac_op& D, double eps) {
+int cg_multishift(std::vector<field<fermion>>& x, const field<fermion>& b, field<gauge>& U, std::vector<double>& sigma, dirac_op& D, double eps, double eps_shifts) {
 	int n_shifts = x.size();
 	int n_unconverged_shifts = n_shifts;
 	std::vector<field<fermion>> p;
@@ -235,7 +235,7 @@ int cg_multishift(std::vector<field<fermion>>& x, const field<fermion>& b, field
 			beta[i_shift] = beta[0] * zeta_p1[i_shift] / zeta[i_shift];
 		}
 		// if largest shift has converged (to machine precision), i.e. normalised residual < ulp, stop updating it
-		if(sqrt((zeta[n_unconverged_shifts-1]*conj(zeta[n_unconverged_shifts-1])).real()*r2_old)/b_norm < 1e-20) {
+		if(sqrt((zeta[n_unconverged_shifts-1]*conj(zeta[n_unconverged_shifts-1])).real()*r2_old)/b_norm < eps_shifts) {
 			--n_unconverged_shifts;
 			//std::cout << "iter " << iter << "converged " << n_unconverged_shifts+1 << std::endl;
 		}
@@ -628,7 +628,7 @@ int cg_block(std::vector<field<fermion>>& X, const std::vector<field<fermion>>& 
 	return iter;
 }
 
-int SBCGrQ(std::vector< std::vector< field<fermion> > >& X, const std::vector<field<fermion>>& B, field<gauge>& U, std::vector<double>& input_shifts, dirac_op& D, double eps) {
+int SBCGrQ(std::vector< std::vector< field<fermion> > >& X, const std::vector<field<fermion>>& B, field<gauge>& U, std::vector<double>& input_shifts, dirac_op& D, double eps, double eps_shifts) {
 	int N = static_cast<int>(B.size());
 	// count shifts (not including first one that is included in the dirac op)
 	int N_shifts = static_cast<int>(input_shifts.size()) - 1;
@@ -646,18 +646,19 @@ int SBCGrQ(std::vector< std::vector< field<fermion> > >& X, const std::vector<fi
 		shifts[i_shift] = input_shifts[i_shift+1] - input_shifts[0];
 	}
 
-	std::cout << "#Shifted BCGrQ:\t" << std::endl;
-	std::cout << "#mass:\t" << D.mass << std::endl;
-	std::cout << "#input_shifts:\t";
-	for(int i_shift=0; i_shift<N_shifts+1; ++i_shift) {
-			std::cout << "\t" << input_shifts[i_shift];
-	}
-	std::cout << std::endl;
-	std::cout << "#remaining_rescaled_shifts:\t";
-	for(int i_shift=0; i_shift<N_shifts; ++i_shift) {
-			std::cout << "\t" << shifts[i_shift];
-	}
-	std::cout << std::endl;
+
+	// std::cout << "#Shifted BCGrQ:\t" << std::endl;
+	// std::cout << "#mass:\t" << D.mass << std::endl;
+	// std::cout << "#input_shifts:\t";
+	// for(int i_shift=0; i_shift<N_shifts+1; ++i_shift) {
+	//		std::cout << "\t" << input_shifts[i_shift];
+	// }
+	// std::cout << std::endl;
+	// std::cout << "#remaining_rescaled_shifts:\t";
+	// for(int i_shift=0; i_shift<N_shifts; ++i_shift) {
+	// 		std::cout << "\t" << shifts[i_shift];
+	// }
+	// std::cout << std::endl;
 
 	// Unshifted matrices:
 	Eigen::MatrixXcd S = Eigen::MatrixXcd::Identity(N, N);
@@ -800,7 +801,7 @@ int SBCGrQ(std::vector< std::vector< field<fermion> > >& X, const std::vector<fi
 			ksi_s_m1[i_shift] = ksi_s[i_shift];
 			ksi_s_inv_m1[i_shift].compute(ksi_s[i_shift]);
 			// check if largest unconverged shift has converged
-			if((ksi_s[N_unconverged_shifts-1].rowwise().norm().array()/b_norm).maxCoeff() < eps) {
+			if((ksi_s[N_unconverged_shifts-1].rowwise().norm().array()/b_norm).maxCoeff() < eps_shifts) {
 				--N_unconverged_shifts;
 			}
 		}
