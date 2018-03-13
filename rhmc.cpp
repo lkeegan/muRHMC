@@ -97,8 +97,8 @@ int main(int argc, char *argv[]) {
 	}
 
 	// just do force measurements:
-	rhmc.trajectory (U, D, false, true);
-	exit(0);
+//	rhmc.trajectory (U, D, false, true);
+//	exit(0);
 
 	// observables to measure
 	std::vector<double> dE;

@@ -259,3 +259,28 @@ void dirac_op::chebyshev (int k, double u, double v, std::vector<field<fermion>>
 		X[i_b] = c_minus0;
 	}
 }
+
+double dirac_op::largest_eigenvalue_bound (field<gauge>& U, double rel_err, field<fermion>::eo_storage_options EO_STORAGE) {
+	field<fermion> x (U.grid, EO_STORAGE), x2 (U.grid, EO_STORAGE);
+	for(int i=0; i<x.V; ++i) {
+		x[i] = fermion::Random();
+	}
+	double x_norm = x.norm();
+	double lambda_max = 1;
+	double lambda_max_err = 100;
+	int iter = 0;
+	while((lambda_max_err/lambda_max) > rel_err) {
+		for(int i=0; i<8; ++i) {
+			x /= x_norm;
+			DDdagger(x2, x, U);
+			x2 /= x2.norm();
+			DDdagger(x, x2, U);				
+			x_norm = x.norm();
+			iter += 2;
+		}
+		lambda_max = x2.dot(x).real();
+		lambda_max_err = sqrt(x_norm * x_norm - lambda_max * lambda_max);
+		std::cout << "lambda_max" << lambda_max << ", " << lambda_max_err << std::endl;
+	}
+	return lambda_max + lambda_max_err;
+}

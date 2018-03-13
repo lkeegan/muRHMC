@@ -76,6 +76,10 @@ public:
 	// in-place chebyshev polynomial of DDdag acting on vector of fermion fields
 	// See appendix A of hep-lat/0512021 for details of implementation
 	void chebyshev (int k, double u, double v, std::vector<field<fermion>>& X, field<gauge>& U);
+
+	// returns lower bound on largest eigenvalue of DDdagger operator
+	// for use in constructing rational approximations
+	double largest_eigenvalue_bound (field<gauge>& U, double rel_err = 0.01, field<fermion>::eo_storage_options EO_STORAGE = field<fermion>::EVEN_ONLY);
 };
  
 #endif //LATTICE_DIRAC_OP_H
