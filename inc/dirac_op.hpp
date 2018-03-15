@@ -79,7 +79,7 @@ public:
 
 	// returns lower bound on largest eigenvalue of DDdagger operator
 	// for use in constructing rational approximations
-	double largest_eigenvalue_bound (field<gauge>& U, double rel_err = 0.01, field<fermion>::eo_storage_options EO_STORAGE = field<fermion>::EVEN_ONLY);
+	double largest_eigenvalue_bound (field<gauge>& U, field<fermion>::eo_storage_options EO_STORAGE = field<fermion>::EVEN_ONLY, double rel_err = 0.01);
 };
  
 #endif //LATTICE_DIRAC_OP_H

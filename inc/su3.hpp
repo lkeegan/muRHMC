@@ -8,12 +8,14 @@ EIGEN_DEFINE_STL_VECTOR_SPECIALIZATION(Eigen::Matrix3cd)
 typedef Eigen::Matrix3cd SU3mat;
 typedef Eigen::Vector3cd fermion;
 
-// return exp(eps X)
-// where X is 3x3 complex hermitian traceless matrix
+// return exp(X)
+// where X is 3x3 complex anti-hermitian traceless matrix
+// so exp(X) is an element of SU(3)
 // Cayley-Hamilton form of matrix exponential
 // https://luscher.web.cern.ch/luscher/notes/su3fcts.pdf
 constexpr int exp_ch_N = 21;
 // factorial 1/n! up to n = 21:
+// NOTE! requires || X || <~ 1, if this norm is too large the expansion fails
 constexpr double exp_ch_c_n[exp_ch_N+1] = {1.0, 1.0, 0.5, 0.16666666666666666,
  0.041666666666666664, 0.0083333333333333332, 0.0013888888888888889,
  0.00019841269841269841, 2.4801587301587302e-05, 2.7557319223985893e-06, 
@@ -23,7 +25,7 @@ constexpr double exp_ch_c_n[exp_ch_N+1] = {1.0, 1.0, 0.5, 0.16666666666666666,
  8.220635246624331e-18, 4.1103176233121653e-19, 1.9572941063391263e-20};
 SU3mat exp_ch (const SU3mat& X);
 
-// SU3 generators
+// SU3 generators: complex 3x3 traceless hermitian matrices T_a
 class SU3_Generators {
 private:
 	SU3mat T_[8];

@@ -154,10 +154,10 @@ int hmc::accept_reject (field<gauge>& U, const field<gauge>& U_old, double dE) {
 }
 
 void hmc::leapfrog_pure_gauge (field<gauge>& U, field<gauge>& P) {
-	double eps = params.tau / static_cast<double>(params.n_steps);
+	double eps = params.tau / static_cast<double>(params.n_steps_fermion * params.n_steps_gauge);
 	// leapfrog integration:
 	step_P_pure_gauge(P, U, 0.5*eps);
-	for(int i=0; i<params.n_steps-1; ++i) {
+	for(int i=0; i<params.n_steps_gauge-1; ++i) {
 		step_U(P, U, eps);
 		step_P_pure_gauge(P, U, eps);
 	}
@@ -166,35 +166,58 @@ void hmc::leapfrog_pure_gauge (field<gauge>& U, field<gauge>& P) {
 }
 
 int hmc::leapfrog (field<gauge>& U, field<fermion>& phi, field<gauge>& P, dirac_op& D) {
-	double eps = params.tau / static_cast<double>(params.n_steps);
+	double eps = params.tau / static_cast<double>(params.n_steps_fermion);
 	int iter = 0;
 	// leapfrog integration:
-	iter += step_P(P, U, phi, D, 0.5*eps);
-	for(int i=0; i<params.n_steps-1; ++i) {
-		step_U(P, U, eps);
-		iter += step_P(P, U, phi, D, eps);
+	iter += step_P_fermion(P, U, phi, D, 0.5*eps);
+	for(int i=0; i<params.n_steps_fermion-1; ++i) {
+		//step_U(P, U, eps);
+		leapfrog_pure_gauge(U, P);
+		iter += step_P_fermion(P, U, phi, D, eps);
 	}
-	step_U(P, U, eps);
-	iter += step_P(P, U, phi, D, 0.5*eps);
+	//step_U(P, U, eps);
+	leapfrog_pure_gauge(U, P);
+	iter += step_P_fermion(P, U, phi, D, 0.5*eps);
 	return iter;
+}
+
+void hmc::OMF2_pure_gauge (field<gauge>& U, field<gauge>& P) {
+	double constexpr lambda = 0.19318; //tunable parameter
+	double eps = 0.5 * params.tau / static_cast<double>(params.n_steps_fermion * params.n_steps_gauge);
+	// OMF2 integration:
+	step_P_pure_gauge(P, U, (lambda)*eps);
+	for(int i=0; i<params.n_steps_gauge-1; ++i) {
+		step_U(P, U, 0.5*eps);
+		step_P_pure_gauge(P, U, (1.0 - 2.0*lambda)*eps);
+		step_U(P, U, 0.5*eps);
+		step_P_pure_gauge(P, U, (2.0*lambda)*eps);
+	}
+	step_U(P, U, 0.5*eps);
+	step_P_pure_gauge(P, U, (1.0 - 2.0*lambda)*eps);
+	step_U(P, U, 0.5*eps);
+	step_P_pure_gauge(P, U, (lambda)*eps);
 }
 
 int hmc::OMF2 (field<gauge>& U, field<fermion>& phi, field<gauge>& P, dirac_op& D) {
 	double constexpr lambda = 0.19318; //tunable parameter
-	double eps = params.tau / static_cast<double>(params.n_steps);
+	double eps = params.tau / static_cast<double>(params.n_steps_fermion);
 	int iter = 0;
 	// OMF2 integration:
-	iter += step_P(P, U, phi, D, (lambda)*eps);
-	for(int i=0; i<params.n_steps-1; ++i) {
-		step_U(P, U, 0.5*eps);
-		iter += step_P(P, U, phi, D, (1.0 - 2.0*lambda)*eps);
-		step_U(P, U, 0.5*eps);
-		iter += step_P(P, U, phi, D, (2.0*lambda)*eps);
+	iter += step_P_fermion(P, U, phi, D, (lambda)*eps);
+	for(int i=0; i<params.n_steps_fermion-1; ++i) {
+		//step_U(P, U, 0.5*eps);
+		OMF2_pure_gauge(U, P);
+		iter += step_P_fermion(P, U, phi, D, (1.0 - 2.0*lambda)*eps);
+		//step_U(P, U, 0.5*eps);
+		OMF2_pure_gauge(U, P);
+		iter += step_P_fermion(P, U, phi, D, (2.0*lambda)*eps);
 	}
-	step_U(P, U, 0.5*eps);
-	iter += step_P(P, U, phi, D, (1.0 - 2.0*lambda)*eps);
-	step_U(P, U, 0.5*eps);
-	iter += step_P(P, U, phi, D, (lambda)*eps);
+	//step_U(P, U, 0.5*eps);
+	OMF2_pure_gauge(U, P);
+	iter += step_P_fermion(P, U, phi, D, (1.0 - 2.0*lambda)*eps);
+	//step_U(P, U, 0.5*eps);
+	OMF2_pure_gauge(U, P);
+	iter += step_P_fermion(P, U, phi, D, (lambda)*eps);
 	return iter;
 }
 
@@ -225,19 +248,22 @@ double hmc::action_F (field<gauge>& U, const field<fermion>& phi, dirac_op& D) {
 }
 
 void hmc::step_P_pure_gauge (field<gauge>& P, field<gauge> &U, double eps) {
-	field<gauge> force (U.grid);
-	force_gauge (force, U);
+	std::complex<double> ibeta_12 (0.0, -eps * params.beta / 12.0);
 	#pragma omp parallel for
 	for(int ix=0; ix<U.V; ++ix) {
 		for(int mu=0; mu<4; ++mu) {
-			P[ix][mu] -= eps * force[ix][mu];
+			SU3mat A = staple (ix, mu, U);
+			SU3mat F = U[ix][mu]*A;
+			A = F - F.adjoint();
+			P[ix][mu] -= ( A - (A.trace()/3.0)*SU3mat::Identity() ) * ibeta_12;
 		}
 	}
 }
 
-int hmc::step_P (field<gauge>& P, field<gauge> &U, const field<fermion>& phi, dirac_op& D, double eps) {
+int hmc::step_P_fermion (field<gauge>& P, field<gauge> &U, const field<fermion>& phi, dirac_op& D, double eps) {
 	field<gauge> force (U.grid);
-	force_gauge (force, U);
+	force.setZero();
+	//force_gauge (force, U);
 	int iter = force_fermion (force, U, phi, D);	
 	#pragma omp parallel for
 	for(int ix=0; ix<U.V; ++ix) {
@@ -260,10 +286,14 @@ void hmc::step_U (const field<gauge>& P, field<gauge> &U, double eps) {
 
 void hmc::random_U (field<gauge> &U, double eps) {
 	// NO openMP: rng not threadsafe!
-	gaussian_P(U);
+	field<gauge> P (U.grid);
+	gaussian_P(P);
+	if(eps > 1.0) {
+		eps = 1.0;
+	}
 	for(int ix=0; ix<U.V; ++ix) {
 		for(int mu=0; mu<4; ++mu) {
-			U[ix][mu] = ((std::complex<double> (0.0, eps) * U[ix][mu]).exp()).eval();
+			U[ix][mu] = exp_ch((std::complex<double> (0.0, eps) * P[ix][mu]));
 		}
 	}
 }

@@ -12,7 +12,8 @@ hmc_params hmc_pars = {
 	0.292, 	// mass
 	0.157, 	// mu_I
 	1.0, 	// tau
-	7, 		// n_steps
+	7, 		// n_steps_fermion
+	7, 		// n_steps_gauge
 	1.e-6,	// MD_eps
 	1234,	// seed
 	false, 	// EE
@@ -39,7 +40,7 @@ int main(int argc, char *argv[]) {
 	int N_eigenvalues = static_cast<int>(atof(argv[5]));
 	double eps = atof(argv[6]);
 
-	lattice grid (40, 20, 20, 20, true);
+	lattice grid (8, 24, true);
 	//field<fermion>::eo_storage_options eo_storage = field<fermion>::FULL;
 	field<fermion>::eo_storage_options eo_storage = field<fermion>::EVEN_ONLY;
 

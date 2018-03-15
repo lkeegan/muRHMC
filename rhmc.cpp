@@ -17,17 +17,6 @@ int main(int argc, char *argv[]) {
 
 	std::cout.precision(14);
 
-	// RHMC parameters
-	rational_approx RA(0.0006, 3.2);
-/*
-	for(int i : {1, 2, 3, 4, 6, 8, 12, 16}) {
-		std::cout << "# " << i << std::endl;
-		for(int j=1; j<RA.alpha_inv_lo[i].size(); ++j) {
-			std::cout << j << "\t" << RA.alpha_inv_lo[i][j] << std::endl;
-		}
-		std::cout << std::endl;
-	}
-*/
 	rhmc_params rhmc_pars = {
 		5.4, 	// beta
 		0.05, 	// mass
@@ -35,11 +24,11 @@ int main(int argc, char *argv[]) {
 		2, 	// n_f
 		4, 	// n_pf
 		1.0, 	// tau
-		3, 		// n_steps
+		3, 		// n_steps_fermion
+		2, 		// n_steps_gauge
 		1.e-6,	// MD_eps
 		1234,	// seed
 		false, 	// EE: only simulate even-even sub-block (requires mu_I=0)
-		RA		// set of rational approximations
 	};
 	run_params run_pars;
 
@@ -57,7 +46,8 @@ int main(int argc, char *argv[]) {
 	log("n_f", rhmc_pars.n_f);
 	log("n_pf", rhmc_pars.n_pf);
 	log("tau", rhmc_pars.tau);
-	log("n_steps", rhmc_pars.n_steps);
+	log("n_steps_fermion", rhmc_pars.n_steps_fermion);
+	log("n_steps_gauge", rhmc_pars.n_steps_gauge);
 	log("MD epsilon", rhmc_pars.MD_eps);
 	log("RNG seed", rhmc_pars.seed);
 	log("EO-preconditioning", rhmc_pars.EE);

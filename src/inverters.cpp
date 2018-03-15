@@ -133,7 +133,8 @@ int cg(field<fermion>& x, const field<fermion>& b, field<gauge>& U, dirac_op& D,
 		if(iter>1e5)
 		{
 			std::cout << "CG not converging: iter= " << iter << " residual= " << sqrt(r2_new)/b_norm << std::endl; 
-			exit(1); 
+			//exit(1); 
+			return iter;
 		}
 	}
 	return iter;
@@ -599,12 +600,12 @@ int cg_block(std::vector<field<fermion>>& X, const std::vector<field<fermion>>& 
 		tmpE0 = X[0];
 		tmpE0.add(-1.0, x0_star);
 		D.DDdagger(tmpAE0, tmpE0, U);
-		/*
+		
 		double norm0 = sqrt(tmpE0.squaredNorm())/norm0_x0_star;
 		double norm1 = sqrt(tmpE0.dot(tmpAE0).real())/norm1_x0_star;
 		double norm2 = sqrt(tmpAE0.squaredNorm())/b_norm[0];
-		//std::cout << "#Error-norms <(x-x*)|(1,sqrt(A),A)|(x-x*)> " << iter << "\t" << norm0 << "\t" << norm1 << "\t" << norm2 << std::endl;
-
+		std::cout << "#Error-norms <(x-x*)|(1,sqrt(A),A)|(x-x*)> " << iter << "\t" << norm0 << "\t" << norm1 << "\t" << norm2 << std::endl;
+		/*
 		// [debugging] find eigenvalues of C
 		Eigen::SelfAdjointEigenSolver<Eigen::MatrixXcd> saes;
 		saes.compute(C);

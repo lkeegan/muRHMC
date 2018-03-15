@@ -39,7 +39,8 @@ int main(int argc, char *argv[]) {
 	log("mass", hmc_pars.mass);
 	log("mu_I", hmc_pars.mu_I);
 	log("tau", hmc_pars.tau);
-	log("n_steps", hmc_pars.n_steps);
+	log("n_steps_fermion", hmc_pars.n_steps_fermion);
+	log("n_steps_gauge", hmc_pars.n_steps_gauge);
 	log("MD epsilon", hmc_pars.MD_eps);
 	log("RNG seed", hmc_pars.seed);
 	log("EO-preconditioning", hmc_pars.EE);

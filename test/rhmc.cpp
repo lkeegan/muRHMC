@@ -15,7 +15,6 @@ TEST_CASE( "RHMC Gauge action self consistency", "[rhmc]" ) {
 	for(bool isEO : {false, true}) {
 		lattice grid (4, isEO);
 		field<gauge> U (grid);
-		rational_approx RA(0.0025, 16.0);
 		rhmc_params rhmc_pars = {
 			5.4, 	// beta
 			0.05, 	// mass
@@ -23,14 +22,14 @@ TEST_CASE( "RHMC Gauge action self consistency", "[rhmc]" ) {
 			2, 	// n_f
 			4, 	// n_pf
 			1.0, 	// tau
-			3, 		// n_steps
+			3, 		// n_steps_fermion
+			2, 		// n_steps_gauge
 			1.e-6,	// MD_eps
 			1234,	// seed
 			false, 	// EE: only simulate even-even sub-block (requires mu_I=0)
-			RA		// set of rational approximations
 		};
 		rhmc rhmc (rhmc_pars);
-		rhmc.random_U(U, 12.0);
+		rhmc.random_U(U, 0.3);
 		double ac_plaq = rhmc.action_U(U);
 		double ac_staple = 0;
 		for(int ix=0; ix<U.V; ++ix) {
@@ -52,7 +51,6 @@ TEST_CASE( "RHMC Momenta P have expected mean < Tr[P^2] > = 4 * VOL", "[rhmc]" )
 	for(bool isEO : {false, true}) {
 		lattice grid (4, isEO);
 		field<gauge> P (grid);
-		rational_approx RA(0.0025, 16.0);
 		rhmc_params rhmc_pars = {
 			5.4, 	// beta
 			0.05, 	// mass
@@ -60,11 +58,11 @@ TEST_CASE( "RHMC Momenta P have expected mean < Tr[P^2] > = 4 * VOL", "[rhmc]" )
 			2, 	// n_f
 			4, 	// n_pf
 			1.0, 	// tau
-			3, 		// n_steps
+			3, 		// n_steps_fermion
+			2, 		// n_steps_gauge
 			1.e-6,	// MD_eps
 			1234,	// seed
 			false, 	// EE: only simulate even-even sub-block (requires mu_I=0)
-			RA		// set of rational approximations
 		};
 		rhmc rhmc (rhmc_pars);
 		double eps = 10.0/sqrt(static_cast<double>(n*P.V));
@@ -87,7 +85,6 @@ TEST_CASE( "RHMC Gaussian pseudofermions have expected mean < |chi^2| > = 3 * VO
 	for(bool isEO : {false, true}) {
 		lattice grid (4, isEO);
 		field<fermion> chi (grid);
-		rational_approx RA(0.0025, 16.0);
 		rhmc_params rhmc_pars = {
 			5.4, 	// beta
 			0.05, 	// mass
@@ -95,11 +92,11 @@ TEST_CASE( "RHMC Gaussian pseudofermions have expected mean < |chi^2| > = 3 * VO
 			2, 	// n_f
 			4, 	// n_pf
 			1.0, 	// tau
-			3, 		// n_steps
+			3, 		// n_steps_fermion
+			2, 		// n_steps_gauge
 			1.e-6,	// MD_eps
 			1234,	// seed
 			false, 	// EE: only simulate even-even sub-block (requires mu_I=0)
-			RA		// set of rational approximations
 		};
 		rhmc rhmc (rhmc_pars);
 		double eps = 10.0/sqrt(static_cast<double>(n*chi.V));
@@ -121,7 +118,6 @@ TEST_CASE( "RHMC EE Gaussian pseudofermions have expected mean < |chi^2| > = 3 *
 	int n = 10;
 	lattice grid (4, true);
 	field<fermion> chi (grid, field<fermion>::EVEN_ONLY);
-	rational_approx RA(0.0025, 16.0);
 	rhmc_params rhmc_pars = {
 		5.4, 	// beta
 		0.05, 	// mass
@@ -129,11 +125,11 @@ TEST_CASE( "RHMC EE Gaussian pseudofermions have expected mean < |chi^2| > = 3 *
 		2, 	// n_f
 		4, 	// n_pf
 		1.0, 	// tau
-		3, 		// n_steps
+		3, 		// n_steps_fermion
+		2, 		// n_steps_gauge
 		1.e-6,	// MD_eps
 		1234,	// seed
 		false, 	// EE: only simulate even-even sub-block (requires mu_I=0)
-		RA		// set of rational approximations
 	};
 	rhmc_pars.EE = true;
 	rhmc rhmc (rhmc_pars);
@@ -162,7 +158,6 @@ double rhmc_is_field_SU3 (const field<gauge>& U) {
 TEST_CASE( "Reversibility of RHMC", "[rhmc]" ) {
 
 	double mass = 0.072;
-	rational_approx RA(mass*mass, 16.0);
 	for(int n_f : {2}) {
 		for(int n_pf : {4}) {
 			rhmc_params rhmc_pars = {
@@ -172,11 +167,11 @@ TEST_CASE( "Reversibility of RHMC", "[rhmc]" ) {
 				n_f, 	// n_f
 				n_pf, 	// n_pf
 				1.0, 	// tau
-				3, 		// n_steps
+				2, 		// n_steps_fermion
+				2, 		// n_steps_gauge
 				1.e-7,	// MD_eps NOTE: reversiblity seems to be linked to this value, which should not be the case!
 				1234,	// seed
 				false, 	// EE: only simulate even-even sub-block (requires mu_I=0)
-				RA		// set of rational approximations
 			};
 
 			// create 4^4 lattice with random U[mu] at each site, random gaussian P
@@ -232,13 +227,12 @@ TEST_CASE( "Reversibility of RHMC", "[rhmc]" ) {
 		}
 	}
 }
-/*
+
 TEST_CASE( "Energy conservation of RHMC", "[rhmc]" ) {
 
 	double mass = 0.055;
-	rational_approx RA(mass*mass, 16.0);
-	for(int n_f : {2}) {
-		for(int n_pf : {4}) {
+	for(int n_f : {4}) {
+		for(int n_pf : {2}) {
 			rhmc_params rhmc_pars = {
 				5.4, 	// beta
 				mass, 	// mass
@@ -246,11 +240,11 @@ TEST_CASE( "Energy conservation of RHMC", "[rhmc]" ) {
 				n_f, 	// n_f
 				n_pf, 	// n_pf
 				0.03, 	// tau
-				4, 	// n_steps
+				4, 		// n_steps_fermion
+				4, 		// n_steps_gauge
 				1.e-12,	// MD_eps
 				1234,	// seed
 				false, 	// EE: only simulate even-even sub-block (requires mu_I=0)
-				RA		// set of rational approximations
 			};
 
 			// create 4^4 lattice with random U[mu] at each site, random gaussian P
@@ -261,7 +255,7 @@ TEST_CASE( "Energy conservation of RHMC", "[rhmc]" ) {
 				field<gauge> U_old (grid);
 				rhmc rhmc (rhmc_pars);
 				dirac_op D (grid);
-				rhmc.random_U(U, 10.0);
+				rhmc.random_U(U, 0.2);
 				rhmc.trajectory(U, D);
 				CAPTURE(rhmc.deltaE);
 				REQUIRE( fabs(rhmc.deltaE) < 1.e-6 * U.V );		
@@ -273,7 +267,7 @@ TEST_CASE( "Energy conservation of RHMC", "[rhmc]" ) {
 				field<gauge> U_old (grid);
 				rhmc rhmc (rhmc_pars);
 				dirac_op D (grid);
-				rhmc.random_U(U, 10.0);
+				rhmc.random_U(U, 0.2);
 				rhmc.trajectory(U, D);
 				CAPTURE(rhmc.deltaE);
 				REQUIRE( fabs(rhmc.deltaE) < 1.e-6 * U.V );		
@@ -286,7 +280,7 @@ TEST_CASE( "Energy conservation of RHMC", "[rhmc]" ) {
 				field<gauge> U_old (grid);
 				rhmc rhmc (rhmc_pars);
 				dirac_op D (grid);
-				rhmc.random_U(U, 10.0);
+				rhmc.random_U(U, 0.2);
 				rhmc.trajectory(U, D);
 				CAPTURE(rhmc.deltaE);
 				REQUIRE( fabs(rhmc.deltaE) < 1.e-6 * U.V );		
@@ -294,4 +288,3 @@ TEST_CASE( "Energy conservation of RHMC", "[rhmc]" ) {
 		}
 	}
 }
-*/

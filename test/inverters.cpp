@@ -21,7 +21,8 @@ TEST_CASE( "CG inversions of isospin (D+m)(D+m)^dagger", "[inverters]") {
 		0.292, 	// mass
 		0.0557, // mu_I
 		1.0, 	// tau
-		3, 		// n_steps
+		10, 	// n_steps_fermion
+		5, 		// n_steps_gauge
 		1.e-6,	// MD_eps
 		1234,	// seed
 		false, 	// EE: only simulate even-even sub-block (requires mu_I=0)
@@ -49,7 +50,7 @@ TEST_CASE( "CG inversions of isospin (D+m)(D+m)^dagger", "[inverters]") {
 		lattice grid (4, isEO);
 		field<gauge> U (grid);
 		hmc rhmc (hmc_pars);
-		rhmc.random_U(U, 10.0);
+		rhmc.random_U(U, 0.2);
 		dirac_op D (grid, hmc_pars.mass, hmc_pars.mu_I);
 
 		field<fermion> Ax (grid, eo_storage_e);
@@ -188,7 +189,8 @@ TEST_CASE( "U perturbations: CG inversions of isospin (D+m)(D+m)^dagger", "[inve
 		0.0292, 	// mass
 		0.00, // mu_I
 		1.0, 	// tau
-		3, 		// n_steps
+		10, 	// n_steps_fermion
+		5, 		// n_steps_gauge
 		1.e-6,	// MD_eps
 		1234,	// seed
 		false, 	// EE: only simulate even-even sub-block (requires mu_I=0)
@@ -224,8 +226,8 @@ TEST_CASE( "U perturbations: CG inversions of isospin (D+m)(D+m)^dagger", "[inve
 		rhmc.gaussian_P(dP);
 		for(int ix=0; ix<Uprime.V; ++ix) {
 			for(int mu=0; mu<4; ++mu) {
-				U[ix][mu] = ((std::complex<double> (0.0, 10) * P[ix][mu]).exp()).eval();
-				Uprime[ix][mu] = ((std::complex<double> (0.0, 10) * P[ix][mu] + (std::complex<double> (0.0, 1e-14) * dP[ix][mu])).exp()).eval();
+				U[ix][mu] = exp_ch(std::complex<double> (0.0, 0.2) * P[ix][mu]);
+				Uprime[ix][mu] = exp_ch(std::complex<double> (0.0, 0.2) * P[ix][mu] + (std::complex<double> (0.0, 1e-14) * dP[ix][mu]));
 			}
 		}
 

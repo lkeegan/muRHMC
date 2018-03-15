@@ -5,7 +5,7 @@
 #include "dirac_op.hpp"
 #include "inverters.hpp"
 #include <random>
-#include <unsupported/Eigen/MatrixFunctions>
+//#include <unsupported/Eigen/MatrixFunctions>
 #include <string>
 
 struct hmc_params {
@@ -13,7 +13,8 @@ struct hmc_params {
 	double mass;
 	double mu_I;
 	double tau;
-	int n_steps;
+	int n_steps_fermion;
+	int n_steps_gauge;
 	double MD_eps;
 	int seed;
 	bool EE;
@@ -46,13 +47,12 @@ public:
 	int accept_reject (field<gauge>& U, const field<gauge>& U_old, double dE);
 
 	// do leapfrog integration of fields (returns # calls of dirac op)
-	void leapfrog_pure_gauge (field<gauge>& U, field<gauge>& P);
-
-	// do leapfrog integration of fields (returns # calls of dirac op)
 	int leapfrog (field<gauge>& U, field<fermion>& phi, field<gauge>& P, dirac_op& D);
+	void leapfrog_pure_gauge (field<gauge>& U, field<gauge>& P);
 
 	// 2nd order OMF integrator: 2x more forces per iteration than leapfrog but smaller errors
 	int OMF2 (field<gauge>& U, field<fermion>& phi, field<gauge>& P, dirac_op& D);
+	void OMF2_pure_gauge (field<gauge>& U, field<gauge>& P);
 
 	// total action
 	double action (field<gauge>& U, const field<fermion>& phi, const field<gauge>& P, dirac_op& D);
@@ -70,7 +70,7 @@ public:
 	void step_P_pure_gauge (field<gauge>& P, field<gauge> &U, double eps);
 
 	// do a single HMC integration step of length eps for the momenta (returns # calls of dirac op)
-	int step_P (field<gauge>& P, field<gauge> &U, const field<fermion>& phi, dirac_op& D, double eps);
+	int step_P_fermion (field<gauge>& P, field<gauge> &U, const field<fermion>& phi, dirac_op& D, double eps);
 
 	// do a single HMC integration step of length eps for the gauge links
 	void step_U (const field<gauge>& P, field<gauge> &U, double eps);

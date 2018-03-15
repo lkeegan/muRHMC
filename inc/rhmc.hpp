@@ -6,7 +6,6 @@
 #include "inverters.hpp"
 #include "rational_approx.hpp"
 #include <random>
-//#include <unsupported/Eigen/MatrixFunctions>
 #include <string>
 
 struct rhmc_params {
@@ -16,17 +15,17 @@ struct rhmc_params {
 	int n_f;
 	int n_pf;
 	double tau;
-	int n_steps;
+	int n_steps_fermion;
+	int n_steps_gauge;
 	double MD_eps;
 	int seed;
 	bool EE;
-	rational_approx& RA;
 };
 
 class rhmc {
 
 private:
-//	int n_shifts; //number of shifts from rational approx
+	rational_approx RA;
 	int n_rational; //rational approx A^(1/(2*n_rational))
 	field<fermion>::eo_storage_options eo_storage_e = field<fermion>::FULL;
 	field<fermion>::eo_storage_options eo_storage_o = field<fermion>::FULL;
@@ -48,9 +47,11 @@ public:
 
 	// do leapfrog integration of fields (returns # calls of dirac op)
 	int leapfrog (field<gauge>& U, field<gauge>& P, dirac_op& D);
+	void leapfrog_pure_gauge (field<gauge>& U, field<gauge>& P);
 
 	// 2nd order OMF integrator: 2x more forces per iteration than leapfrog but smaller errors
 	int OMF2 (field<gauge>& U, field<gauge>& P, dirac_op& D);
+	void OMF2_pure_gauge (field<gauge>& U, field<gauge>& P);
 
 	// total action
 	double action (field<gauge>& U, const field<gauge>& P, dirac_op& D);
@@ -68,8 +69,11 @@ public:
 	// action of pseudofermion field 
 	double action_F (field<gauge>& U, dirac_op& D);
 
+	// do a single HMC integration step of length eps for the momenta
+	void step_P_pure_gauge (field<gauge>& P, field<gauge> &U, double eps, bool MEASURE_FORCE_NORM = false);
+
 	// do a single HMC integration step of length eps for the momenta (returns # calls of dirac op)
-	int step_P (field<gauge>& P, field<gauge> &U, dirac_op& D, double eps);
+	int step_P_fermion (field<gauge>& P, field<gauge> &U, dirac_op& D, double eps, bool MEASURE_FORCE_NORM = true);
 
 	// do a single HMC integration step of length eps for the gauge links
 	void step_U (const field<gauge>& P, field<gauge> &U, double eps);

@@ -260,7 +260,7 @@ void dirac_op::chebyshev (int k, double u, double v, std::vector<field<fermion>>
 	}
 }
 
-double dirac_op::largest_eigenvalue_bound (field<gauge>& U, double rel_err, field<fermion>::eo_storage_options EO_STORAGE) {
+double dirac_op::largest_eigenvalue_bound (field<gauge>& U, field<fermion>::eo_storage_options EO_STORAGE, double rel_err) {
 	field<fermion> x (U.grid, EO_STORAGE), x2 (U.grid, EO_STORAGE);
 	for(int i=0; i<x.V; ++i) {
 		x[i] = fermion::Random();

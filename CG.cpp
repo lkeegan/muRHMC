@@ -56,7 +56,8 @@ int main(int argc, char *argv[]) {
 		0.00227,// mass
 		0.000, 	// mu_I
 		1.0, 	// tau
-		7, 		// n_steps
+		7, 		// n_steps_fermion
+		7, 		// n_steps_gauge
 		1.e-6,	// MD_eps
 		1234,	// seed
 		false, 	// EE
@@ -67,7 +68,7 @@ int main(int argc, char *argv[]) {
 	hmc hmc (hmc_params);
 	std::cout.precision(12);
 
-	lattice grid (24, 24, true);
+	lattice grid (12, 12, true);
 	field<gauge> U (grid);
 //	read_massimo_gauge_field(U, config_name);
 //	write_gauge_field(U, config_name, 1);

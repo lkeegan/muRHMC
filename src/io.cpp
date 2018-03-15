@@ -50,7 +50,8 @@ void read_input_file(const std::string& filename, hmc_params& hmc_params, run_pa
 		input >> var_name >> hmc_params.mass;
 		input >> var_name >> hmc_params.mu_I;
 		input >> var_name >> hmc_params.tau;
-		input >> var_name >> hmc_params.n_steps;
+		input >> var_name >> hmc_params.n_steps_fermion;
+		input >> var_name >> hmc_params.n_steps_gauge;
 		input >> var_name >> hmc_params.MD_eps;
 		input >> var_name >> hmc_params.seed;
 		input >> var_name >> hmc_params.EE;
@@ -82,7 +83,8 @@ void read_input_file(const std::string& filename, rhmc_params& rhmc_params, run_
 		input >> var_name >> rhmc_params.n_f;
 		input >> var_name >> rhmc_params.n_pf;
 		input >> var_name >> rhmc_params.tau;
-		input >> var_name >> rhmc_params.n_steps;
+		input >> var_name >> rhmc_params.n_steps_fermion;
+		input >> var_name >> rhmc_params.n_steps_gauge;
 		input >> var_name >> rhmc_params.MD_eps;
 		input >> var_name >> rhmc_params.seed;
 		input >> var_name >> rhmc_params.EE;

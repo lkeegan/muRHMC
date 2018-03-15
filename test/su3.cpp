@@ -33,9 +33,11 @@ TEST_CASE( "Cayley-Hamilton form of exp(X)", "[su3]" ) {
 	SU3mat tmpX = Eigen::Matrix3cd::Random();
 	SU3mat X = tmpX - tmpX.adjoint();
 	X -= (X.trace()/3.0)*SU3mat::Identity();
+	// make anti-hermitian
+	X *= std::complex<double>(0.0, 1.0);
 	INFO( "eigen exp(X)" << X.exp() );
 
-	// Choose N = max value of n such that 1/(N-1)! <= ULP
+	// Choose N = max value of n such that 1/(N-1)! << ULP
 	// c_n = 1/n!
 	std::vector<double> c_n(2, 1.0);
 	int N = 1;

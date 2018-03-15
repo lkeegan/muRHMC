@@ -8,6 +8,29 @@
 
 constexpr double EPS = 5.e-13;
 
+// returns average deviation from hermitian per matrix, should be ~1e-15
+double is_field_hermitian (const field<gauge>& P) {
+	double norm = 0.0;
+	for(int ix=0; ix<P.V; ++ix) {
+		for(int mu=0; mu<4; ++mu) {
+			norm += (P[ix][mu].adjoint() - P[ix][mu]).norm();
+		}
+	}
+	return norm / static_cast<double>(P.V*4);
+}
+
+// returns average deviation from unit determinant and unitarity per matrix, should be ~1e-15
+double is_field_SU3 (const field<gauge>& U) {
+	double norm = 0.0;
+	for(int ix=0; ix<U.V; ++ix) {
+		for(int mu=0; mu<4; ++mu) {
+			norm += fabs(U[ix][mu].determinant() - 1.0);
+			norm += (U[ix][mu]*U[ix][mu].adjoint() - SU3mat::Identity()).norm();
+		}
+	}
+	return norm / static_cast<double>(U.V*4*2);
+}
+
 TEST_CASE( "Gauge action self consistency", "[hmc]" ) {
 	// create 4^4 lattice with random U[mu] at each site
 	// construct gauge action from staples, compare to plaquette expression
@@ -18,7 +41,10 @@ TEST_CASE( "Gauge action self consistency", "[hmc]" ) {
 		hmc_pars.beta = 6.0;
 		hmc_pars.seed = 123;
 		hmc hmc (hmc_pars);
-		hmc.random_U(U, 12.0);
+		hmc.random_U(U, 0.5);
+		INFO( "U " << U[0][0]);
+		INFO ("UUdag " << U[0][0]*U[0][0].adjoint());
+		REQUIRE ( is_field_SU3(U) < EPS );
 		double ac_plaq = hmc.action_U(U);
 		double ac_plaq_local = 0;
 		double ac_staple = 0;
@@ -103,29 +129,6 @@ TEST_CASE( "EE Gaussian pseudofermions have expected mean < |chi^2| > = 3 * VOL"
 	REQUIRE( av == Approx(3.0).margin(eps) );
 }
 
-// returns average deviation from hermitian per matrix, should be ~1e-15
-double is_field_hermitian (const field<gauge>& P) {
-	double norm = 0.0;
-	for(int ix=0; ix<P.V; ++ix) {
-		for(int mu=0; mu<4; ++mu) {
-			norm += (P[ix][mu].adjoint() - P[ix][mu]).norm();
-		}
-	}
-	return norm / static_cast<double>(P.V*4);
-}
-
-// returns average deviation from unit determinant and unitarity per matrix, should be ~1e-15
-double is_field_SU3 (const field<gauge>& U) {
-	double norm = 0.0;
-	for(int ix=0; ix<U.V; ++ix) {
-		for(int mu=0; mu<4; ++mu) {
-			norm += fabs(U[ix][mu].determinant() - 1.0);
-			norm += (U[ix][mu]*U[ix][mu].adjoint() - SU3mat::Identity()).norm();
-		}
-	}
-	return norm / static_cast<double>(U.V*4*2);
-}
-
 TEST_CASE( "Reversibility of pure gauge HMC", "[hmc]" ) {
 
 	hmc_params hmc_pars = {
@@ -133,7 +136,8 @@ TEST_CASE( "Reversibility of pure gauge HMC", "[hmc]" ) {
 		0.100, 	// mass
 		0.005, // mu_I
 		1.0, 	// tau
-		3, 		// n_steps
+		3, 		// n_steps_fermion
+		2, 		// n_steps_gauge
 		1.e-7,	// MD_eps
 		1234,	// seed
 		false, 	// EE: only simulate even-even sub-block (requires mu_I=0)
@@ -185,7 +189,8 @@ TEST_CASE( "Reversibility of HMC", "[hmc]" ) {
 		0.100, 	// mass
 		0.005, // mu_I
 		1.0, 	// tau
-		3, 		// n_steps
+		3, 		// n_steps_fermion
+		2, 		// n_steps_gauge
 		1.e-7,	// MD_eps
 		1234,	// seed
 		false, 	// EE: only simulate even-even sub-block (requires mu_I=0)
@@ -255,7 +260,8 @@ TEST_CASE( "Reversibility of EE HMC", "[hmc_EE]" ) {
 		0.05, 	// mass
 		0.0157, // mu_I
 		1.0, 	// tau
-		3, 		// n_steps
+		3, 		// n_steps_fermion
+		2, 		// n_steps_gauge
 		1.e-3,	// MD_eps
 		1234,	// seed
 		true, 	// EE: only simulate even-even sub-block (requires mu_I=0)
@@ -322,7 +328,8 @@ TEST_CASE( "HMC EE force term matches full HMC term with even phi sites -> 0", "
 		0.292, 	// mass
 		0.00,   // mu_I
 		0.05, 	// tau
-		20, 	// n_steps
+		3, 		// n_steps_fermion
+		2, 		// n_steps_gauge
 		1.e-12,	// MD_eps
 		1234,	// seed
 		false, 	// EE: only simulate even-even sub-block (requires mu_I=0)
@@ -371,7 +378,8 @@ TEST_CASE( "HMC conserves action for small tau", "[hmc]" ) {
 		0.292, 	// mass
 		0.0157, // mu_I
 		0.05, 	// tau
-		20, 	// n_steps
+		10, 	// n_steps_fermion
+		5, 		// n_steps_gauge
 		1.e-10,	// MD_eps
 		1234,	// seed
 		false, 	// EE: only simulate even-even sub-block (requires mu_I=0)
@@ -390,7 +398,8 @@ TEST_CASE( "HMC conserves action for small tau", "[hmc]" ) {
 		hmc.trajectory(U, D);
 		CAPTURE(hmc.deltaE);
 		CAPTURE(hmc_pars.tau);
-		CAPTURE(hmc_pars.n_steps);
+		CAPTURE(hmc_pars.n_steps_fermion);
+		CAPTURE(hmc_pars.n_steps_gauge);
 		CAPTURE(hmc_pars.MD_eps);
 		REQUIRE( fabs(hmc.deltaE) < 1.e-6 * U.V );		
 	}
@@ -402,7 +411,8 @@ TEST_CASE( "EE HMC conserves action for small tau", "[hmc_EE]" ) {
 		0.292, 	// mass
 		0.0, 	// mu_I
 		0.05, 	// tau
-		20, 	// n_steps
+		10, 	// n_steps_fermion
+		5, 		// n_steps_gauge
 		1.e-10,	// MD_eps
 		1234,	// seed
 		true, 	// EE: only simulate even-even sub-block (requires mu_I=0)
@@ -421,7 +431,8 @@ TEST_CASE( "EE HMC conserves action for small tau", "[hmc_EE]" ) {
 	hmc.trajectory(U, D);
 	CAPTURE(hmc.deltaE);
 	CAPTURE(hmc_pars.tau);
-	CAPTURE(hmc_pars.n_steps);
+	CAPTURE(hmc_pars.n_steps_fermion);
+	CAPTURE(hmc_pars.n_steps_gauge);
 	CAPTURE(hmc_pars.MD_eps);
 	REQUIRE( fabs(hmc.deltaE) < 1.e-6 * U.V );		
 }
