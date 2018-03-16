@@ -280,10 +280,10 @@ int hmc::step_P_fermion (field<gauge>& P, field<gauge> &U, const field<fermion>&
 	field<gauge> force (U.grid);
 	force.setZero();
 	//force_gauge (force, U);
+	int iter = force_fermion (force, U, phi, D);	
 	if(MEASURE_FORCE_NORM) {
 		std::cout << "fermion_force_norm: " << sqrt(force.squaredNorm()/static_cast<double>(4*U.V)) << std::endl;
 	}
-	int iter = force_fermion (force, U, phi, D);	
 	#pragma omp parallel for
 	for(int ix=0; ix<U.V; ++ix) {
 		for(int mu=0; mu<4; ++mu) {
@@ -453,7 +453,7 @@ int hmc::force_fermion (field<gauge> &force, field<gauge> &U, const field<fermio
 		}
 	}
 	D.remove_eta_bcs_from_U(U);
-	std::cout << "#FFnorms " << sqrt(fermion_force_norm/static_cast<double>(4*U.V)) << std::endl;
+	//std::cout << "#FFnorms " << sqrt(fermion_force_norm/static_cast<double>(4*U.V)) << std::endl;
 
 	return iter;
 }
