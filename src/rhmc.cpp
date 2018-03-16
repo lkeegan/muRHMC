@@ -71,12 +71,10 @@ int rhmc::trajectory (field<gauge>& U, dirac_op& D, bool do_reversibility_test, 
 	U_old = U;
 
 	// debugging
-	/*
 	field<gauge> P_old (U.grid);
 	if(do_reversibility_test) {
 		P_old = P;
 	}
-	*/
 
 	double action_old = chi_norm + action_U (U) + action_P (P);
 
@@ -264,22 +262,29 @@ double rhmc::action_F (field<gauge>& U, dirac_op& D) {
 void rhmc::step_P_pure_gauge (field<gauge>& P, field<gauge> &U, double eps, bool MEASURE_FORCE_NORM) {
 	std::complex<double> ibeta_12 (0.0, -eps * params.beta / 12.0);
 	double force_norm = 0;
-	#pragma omp parallel for
-	for(int ix=0; ix<U.V; ++ix) {
-		for(int mu=0; mu<4; ++mu) {
-			SU3mat A = staple (ix, mu, U);
-			SU3mat F = U[ix][mu]*A;
-			A = F - F.adjoint();
-			F = ( A - (A.trace()/3.0)*SU3mat::Identity() ) * ibeta_12;
-			if(MEASURE_FORCE_NORM) {
-				force_norm += F.squaredNorm();
-			}
-			P[ix][mu] -= F;
-		}
-	}
 	if(MEASURE_FORCE_NORM) {
+		for(int ix=0; ix<U.V; ++ix) {
+			for(int mu=0; mu<4; ++mu) {
+				SU3mat A = staple (ix, mu, U);
+				SU3mat F = U[ix][mu]*A;
+				A = F - F.adjoint();
+				F = ( A - (A.trace()/3.0)*SU3mat::Identity() ) * ibeta_12;
+				force_norm += F.squaredNorm();
+				P[ix][mu] -= F;
+			}
+		}
 		force_norm /= eps*eps;
 		std::cout << "gauge_force_norm: " << sqrt(force_norm/static_cast<double>(4*U.V)) << std::endl;
+	} else {
+		#pragma omp parallel for
+		for(int ix=0; ix<U.V; ++ix) {
+			for(int mu=0; mu<4; ++mu) {
+				SU3mat A = staple (ix, mu, U);
+				SU3mat F = U[ix][mu]*A;
+				A = F - F.adjoint();
+				P[ix][mu] -= ( A - (A.trace()/3.0)*SU3mat::Identity() ) * ibeta_12;
+			}
+		}
 	}
 }
 

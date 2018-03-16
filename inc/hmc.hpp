@@ -67,10 +67,10 @@ public:
 	double action_F (field<gauge>& U, const field<fermion>& phi, dirac_op& D);
 
 	// do a single HMC integration step of length eps for the momenta
-	void step_P_pure_gauge (field<gauge>& P, field<gauge> &U, double eps);
+	void step_P_pure_gauge (field<gauge>& P, field<gauge> &U, double eps, bool MEASURE_FORCE_NORM = false);
 
 	// do a single HMC integration step of length eps for the momenta (returns # calls of dirac op)
-	int step_P_fermion (field<gauge>& P, field<gauge> &U, const field<fermion>& phi, dirac_op& D, double eps);
+	int step_P_fermion (field<gauge>& P, field<gauge> &U, const field<fermion>& phi, dirac_op& D, double eps, bool MEASURE_FORCE_NORM = true);
 
 	// do a single HMC integration step of length eps for the gauge links
 	void step_U (const field<gauge>& P, field<gauge> &U, double eps);

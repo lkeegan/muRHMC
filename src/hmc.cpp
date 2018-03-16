@@ -185,7 +185,7 @@ void hmc::OMF2_pure_gauge (field<gauge>& U, field<gauge>& P) {
 	double constexpr lambda = 0.19318; //tunable parameter
 	double eps = 0.5 * params.tau / static_cast<double>(params.n_steps_fermion * params.n_steps_gauge);
 	// OMF2 integration:
-	step_P_pure_gauge(P, U, (lambda)*eps);
+	step_P_pure_gauge(P, U, (lambda)*eps, true);
 	for(int i=0; i<params.n_steps_gauge-1; ++i) {
 		step_U(P, U, 0.5*eps);
 		step_P_pure_gauge(P, U, (1.0 - 2.0*lambda)*eps);
@@ -247,23 +247,42 @@ double hmc::action_F (field<gauge>& U, const field<fermion>& phi, dirac_op& D) {
 	return phi.dot(D2inv_phi).real();
 }
 
-void hmc::step_P_pure_gauge (field<gauge>& P, field<gauge> &U, double eps) {
+void hmc::step_P_pure_gauge (field<gauge>& P, field<gauge> &U, double eps, bool MEASURE_FORCE_NORM) {
 	std::complex<double> ibeta_12 (0.0, -eps * params.beta / 12.0);
-	#pragma omp parallel for
-	for(int ix=0; ix<U.V; ++ix) {
-		for(int mu=0; mu<4; ++mu) {
-			SU3mat A = staple (ix, mu, U);
-			SU3mat F = U[ix][mu]*A;
-			A = F - F.adjoint();
-			P[ix][mu] -= ( A - (A.trace()/3.0)*SU3mat::Identity() ) * ibeta_12;
+	double force_norm = 0;
+	if(MEASURE_FORCE_NORM) {
+		for(int ix=0; ix<U.V; ++ix) {
+			for(int mu=0; mu<4; ++mu) {
+				SU3mat A = staple (ix, mu, U);
+				SU3mat F = U[ix][mu]*A;
+				A = F - F.adjoint();
+				F = ( A - (A.trace()/3.0)*SU3mat::Identity() ) * ibeta_12;
+				force_norm += F.squaredNorm();
+				P[ix][mu] -= F;
+			}
+		}
+		force_norm /= eps*eps;
+		std::cout << "gauge_force_norm: " << sqrt(force_norm/static_cast<double>(4*U.V)) << std::endl;
+	} else {
+		#pragma omp parallel for
+		for(int ix=0; ix<U.V; ++ix) {
+			for(int mu=0; mu<4; ++mu) {
+				SU3mat A = staple (ix, mu, U);
+				SU3mat F = U[ix][mu]*A;
+				A = F - F.adjoint();
+				P[ix][mu] -= ( A - (A.trace()/3.0)*SU3mat::Identity() ) * ibeta_12;
+			}
 		}
 	}
 }
 
-int hmc::step_P_fermion (field<gauge>& P, field<gauge> &U, const field<fermion>& phi, dirac_op& D, double eps) {
+int hmc::step_P_fermion (field<gauge>& P, field<gauge> &U, const field<fermion>& phi, dirac_op& D, double eps, bool MEASURE_FORCE_NORM) {
 	field<gauge> force (U.grid);
 	force.setZero();
 	//force_gauge (force, U);
+	if(MEASURE_FORCE_NORM) {
+		std::cout << "fermion_force_norm: " << sqrt(force.squaredNorm()/static_cast<double>(4*U.V)) << std::endl;
+	}
 	int iter = force_fermion (force, U, phi, D);	
 	#pragma omp parallel for
 	for(int ix=0; ix<U.V; ++ix) {
