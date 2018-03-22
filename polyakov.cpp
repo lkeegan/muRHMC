@@ -33,10 +33,12 @@ int main(int argc, char *argv[]) {
 
 	for(int i=n_initial; ; i+=1) {
 		read_gauge_field(U, base_name, i);
-		std::cout << i << "n_smear = " << 0 << "\t" << hmc.polyakov_loop(U) << std::endl;
+		std::complex<double> p = hmc.polyakov_loop(U);
+		std::cout << i << "n_smear = " << 0 << "\t" << p.real() << "\t" << p.imag() << std::endl;
 		for(int i_smear=1; i_smear<n_smear; ++i_smear) {
 			hmc.stout_smear(rho, U);
-			std::cout << i << "n_smear = " << i_smear << "\t" << hmc.polyakov_loop(U) << std::endl;
+			std::complex<double> p = hmc.polyakov_loop(U);
+			std::cout << i << "n_smear = " << i_smear << "\t" << p.real() << "\t" << p.imag() << std::endl;
 		}
 	}
 	return(0);
