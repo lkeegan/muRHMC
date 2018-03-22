@@ -182,7 +182,6 @@ int hmc::leapfrog (field<gauge>& U, field<fermion>& phi, field<gauge>& P, dirac_
 }
 
 void hmc::OMF2_pure_gauge (field<gauge>& U, field<gauge>& P) {
-	double constexpr lambda = 0.19318; //tunable parameter
 	double eps = 0.5 * params.tau / static_cast<double>(params.n_steps_fermion * params.n_steps_gauge);
 	// OMF2 integration:
 	step_P_pure_gauge(P, U, (lambda)*eps, true);
@@ -199,7 +198,6 @@ void hmc::OMF2_pure_gauge (field<gauge>& U, field<gauge>& P) {
 }
 
 int hmc::OMF2 (field<gauge>& U, field<fermion>& phi, field<gauge>& P, dirac_op& D) {
-	double constexpr lambda = 0.19318; //tunable parameter
 	double eps = params.tau / static_cast<double>(params.n_steps_fermion);
 	int iter = 0;
 	// OMF2 integration:
@@ -454,6 +452,7 @@ int hmc::force_fermion (field<gauge> &force, field<gauge> &U, const field<fermio
 	}
 	D.remove_eta_bcs_from_U(U);
 	//std::cout << "#FFnorms " << sqrt(fermion_force_norm/static_cast<double>(4*U.V)) << std::endl;
+	std::cout << "#HMC_ForceCGIter " << iter << std::endl;
 
 	return iter;
 }

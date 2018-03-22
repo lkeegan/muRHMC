@@ -25,6 +25,7 @@ struct rhmc_params {
 class rhmc {
 
 private:
+	double lambda = 1.0/6.0; //tunable parameter for OMF2 integrator
 	rational_approx RA;
 	int n_rational; //rational approx A^(1/(2*n_rational))
 	field<fermion>::eo_storage_options eo_storage_e = field<fermion>::FULL;

@@ -26,6 +26,7 @@ struct hmc_params {
 class hmc {
 
 private:
+	double lambda = 1.0/6.0; //tunable parameter for OMF2 integrator
 
 public:
 

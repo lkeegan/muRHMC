@@ -187,7 +187,6 @@ int rhmc::leapfrog (field<gauge>& U, field<gauge>& P, dirac_op& D) {
 }
 
 void rhmc::OMF2_pure_gauge (field<gauge>& U, field<gauge>& P) {
-	double constexpr lambda = 0.19318; //tunable parameter
 	double eps = 0.5 * params.tau / static_cast<double>(params.n_steps_fermion * params.n_steps_gauge);
 	// OMF2 integration:
 	step_P_pure_gauge(P, U, (lambda)*eps, true);
@@ -204,7 +203,6 @@ void rhmc::OMF2_pure_gauge (field<gauge>& U, field<gauge>& P) {
 }
 
 int rhmc::OMF2 (field<gauge>& U, field<gauge>& P, dirac_op& D) {
-	double constexpr lambda = 0.19318; //tunable parameter
 	double eps = params.tau / static_cast<double>(params.n_steps_fermion);
 	int iter = 0;
 	// OMF2 integration:
