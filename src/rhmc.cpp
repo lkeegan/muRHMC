@@ -60,7 +60,7 @@ int rhmc::trajectory (field<gauge>& U, dirac_op& D, bool do_reversibility_test, 
 		// iter += rational_approx_cg_multishift(phi[i_pf], chi_e, U, RA.alpha_hi[n_rational], RA.beta_hi[n_rational], D, 1.e-15);
 	}
 	// construct phi[i] = M^{1/(2*n_rational) chi_e
-	iter += rational_approx_SBCGrQ(phi, chi, U, RA.alpha_hi[2*n_rational], RA.beta_hi[2*n_rational], D, 1.e-14);
+	iter += rational_approx_SBCGrQ(phi, chi, U, RA.alpha_hi[2*n_rational], RA.beta_hi[2*n_rational], D, params.HB_eps);
     auto timer_stop = std::chrono::high_resolution_clock::now();
     auto timer_count = std::chrono::duration_cast<std::chrono::seconds>(timer_stop-timer_start).count();
 	std::cout << "#RHMC_InitCGRuntime " << timer_count << std::endl;
@@ -80,6 +80,20 @@ int rhmc::trajectory (field<gauge>& U, dirac_op& D, bool do_reversibility_test, 
 
 	// FORCE MEASUREMENT: measure force norms once and exit:
 	if(MEASURE_FORCE_ERROR_NORMS) {
+
+		// just measure one force term using supplied MD_eps for inversion
+		std::cout.precision(15);
+		field<gauge> force (U.grid);
+		force.setZero();
+		int iterBCG = force_fermion_block (force, U, D);
+		std::cout << std::scientific << "fermion_force_normBCG: " << force.squaredNorm() << std::endl;
+		force.setZero();
+		int iterCG = force_fermion (force, U, D);
+		std::cout << std::scientific << "fermion_force_normCG: " << force.squaredNorm() << std::endl;
+		exit(0);
+
+		// do full force error measurements:
+		/*
 		std::cout.precision(12);
 		// get "exact" high precision solve force vector
 	    auto timer_start = std::chrono::high_resolution_clock::now();
@@ -115,6 +129,7 @@ int rhmc::trajectory (field<gauge>& U, dirac_op& D, bool do_reversibility_test, 
 					  << BLOCKiter << "\t" << BLOCKerr << "\t" << BLOCKtimer << "\t" << f_star_norm << std::endl;
 		}
 		exit(0);
+		*/
 	}
 
 	// DEBUGGING
@@ -189,38 +204,38 @@ int rhmc::leapfrog (field<gauge>& U, field<gauge>& P, dirac_op& D) {
 void rhmc::OMF2_pure_gauge (field<gauge>& U, field<gauge>& P) {
 	double eps = 0.5 * params.tau / static_cast<double>(params.n_steps_fermion * params.n_steps_gauge);
 	// OMF2 integration:
-	step_P_pure_gauge(P, U, (lambda)*eps, true);
+	step_P_pure_gauge(P, U, (params.lambda_OMF2)*eps, true);
 	for(int i=0; i<params.n_steps_gauge-1; ++i) {
 		step_U(P, U, 0.5*eps);
-		step_P_pure_gauge(P, U, (1.0 - 2.0*lambda)*eps);
+		step_P_pure_gauge(P, U, (1.0 - 2.0*params.lambda_OMF2)*eps);
 		step_U(P, U, 0.5*eps);
-		step_P_pure_gauge(P, U, (2.0*lambda)*eps);
+		step_P_pure_gauge(P, U, (2.0*params.lambda_OMF2)*eps);
 	}
 	step_U(P, U, 0.5*eps);
-	step_P_pure_gauge(P, U, (1.0 - 2.0*lambda)*eps);
+	step_P_pure_gauge(P, U, (1.0 - 2.0*params.lambda_OMF2)*eps);
 	step_U(P, U, 0.5*eps);
-	step_P_pure_gauge(P, U, (lambda)*eps);
+	step_P_pure_gauge(P, U, (params.lambda_OMF2)*eps);
 }
 
 int rhmc::OMF2 (field<gauge>& U, field<gauge>& P, dirac_op& D) {
 	double eps = params.tau / static_cast<double>(params.n_steps_fermion);
 	int iter = 0;
 	// OMF2 integration:
-	iter += step_P_fermion(P, U, D, (lambda)*eps);
+	iter += step_P_fermion(P, U, D, (params.lambda_OMF2)*eps);
 	for(int i=0; i<params.n_steps_fermion-1; ++i) {
 		//step_U(P, U, 0.5*eps);
 		OMF2_pure_gauge(U, P);
-		iter += step_P_fermion(P, U, D, (1.0 - 2.0*lambda)*eps);
+		iter += step_P_fermion(P, U, D, (1.0 - 2.0*params.lambda_OMF2)*eps);
 		//step_U(P, U, 0.5*eps);
 		OMF2_pure_gauge(U, P);
-		iter += step_P_fermion(P, U, D, (2.0*lambda)*eps);
+		iter += step_P_fermion(P, U, D, (2.0*params.lambda_OMF2)*eps);
 	}
 	//step_U(P, U, 0.5*eps);
 	OMF2_pure_gauge(U, P);
-	iter += step_P_fermion(P, U, D, (1.0 - 2.0*lambda)*eps);
+	iter += step_P_fermion(P, U, D, (1.0 - 2.0*params.lambda_OMF2)*eps);
 	//step_U(P, U, 0.5*eps);
 	OMF2_pure_gauge(U, P);
-	iter += step_P_fermion(P, U, D, (lambda)*eps);
+	iter += step_P_fermion(P, U, D, (params.lambda_OMF2)*eps);
 	return iter;
 }
 
@@ -250,7 +265,7 @@ double rhmc::action_F (field<gauge>& U, dirac_op& D) {
 	int iter = 0;
 	for(int i_pf=0; i_pf<params.n_pf; ++i_pf) {
 		// construct Ainv_phi = M^{-1/(n_rational)) phi[i]
-		iter += rational_approx_cg_multishift(Ainv_phi, phi[i_pf], U, RA.alpha_inv_hi[n_rational], RA.beta_inv_hi[n_rational], D, 1.e-15);
+		iter += rational_approx_cg_multishift(Ainv_phi, phi[i_pf], U, RA.alpha_inv_hi[n_rational], RA.beta_inv_hi[n_rational], D, params.HB_eps);
 		ac_F += phi[i_pf].dot(Ainv_phi).real();
 	}
 	std::cout << "#RHMC_ActionCGIter " << iter << std::endl;
@@ -653,6 +668,7 @@ int rhmc::force_fermion_block (field<gauge> &force, field<gauge> &U, dirac_op& D
 			D.remove_eta_bcs_from_U(U);
 		} // end of loop over shifts
 	} // end of loop over pseudo fermion flavours
+	std::cout << "#RHMC_ForceBCGIter " << iter << std::endl;
 
 	return iter;
 }

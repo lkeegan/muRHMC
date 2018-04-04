@@ -23,7 +23,9 @@ TEST_CASE( "CG inversions of isospin (D+m)(D+m)^dagger", "[inverters]") {
 		1.0, 	// tau
 		10, 	// n_steps_fermion
 		5, 		// n_steps_gauge
-		1.e-6,	// MD_eps
+		0.19, 	// lambda_OMF2
+		1.e-7,	// MD_eps
+		1.e-15,	// HB_eps
 		1234,	// seed
 		false, 	// EE: only simulate even-even sub-block (requires mu_I=0)
 		false,	// constrained HMC (fixed allowed range for pion susceptibility)
@@ -191,7 +193,9 @@ TEST_CASE( "U perturbations: CG inversions of isospin (D+m)(D+m)^dagger", "[inve
 		1.0, 	// tau
 		10, 	// n_steps_fermion
 		5, 		// n_steps_gauge
-		1.e-6,	// MD_eps
+		0.19, 	// lambda_OMF2
+		1.e-7,	// MD_eps
+		1.e-15,	// HB_eps
 		1234,	// seed
 		false, 	// EE: only simulate even-even sub-block (requires mu_I=0)
 		false,	// constrained HMC (fixed allowed range for pion susceptibility)

@@ -17,19 +17,7 @@ int main(int argc, char *argv[]) {
 
 	std::cout.precision(14);
 
-	rhmc_params rhmc_pars = {
-		5.4, 	// beta
-		0.05, 	// mass
-		0.0, 	// mu_I
-		2, 	// n_f
-		4, 	// n_pf
-		1.0, 	// tau
-		3, 		// n_steps_fermion
-		2, 		// n_steps_gauge
-		1.e-6,	// MD_eps
-		1234,	// seed
-		false, 	// EE: only simulate even-even sub-block (requires mu_I=0)
-	};
+	rhmc_params rhmc_pars;
 	run_params run_pars;
 
 	read_input_file(argv[1], rhmc_pars, run_pars);
@@ -49,6 +37,7 @@ int main(int argc, char *argv[]) {
 	log("n_steps_fermion", rhmc_pars.n_steps_fermion);
 	log("n_steps_gauge", rhmc_pars.n_steps_gauge);
 	log("MD epsilon", rhmc_pars.MD_eps);
+	log("HB epsilon", rhmc_pars.HB_eps);
 	log("RNG seed", rhmc_pars.seed);
 	log("EO-preconditioning", rhmc_pars.EE);
 
@@ -83,11 +72,12 @@ int main(int argc, char *argv[]) {
 	}
 	else {
 		// load specified gauge config
+		//	read_massimo_gauge_field(U, run_pars.base_name);
 		read_gauge_field (U, run_pars.base_name, run_pars.initial_config);
 	}
 
 	// just do force measurements:
-//	rhmc.trajectory (U, D, false, true);
+	rhmc.trajectory (U, D, false, true);
 //	exit(0);
 
 	// observables to measure

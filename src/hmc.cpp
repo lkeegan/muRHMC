@@ -27,14 +27,14 @@ int hmc::trajectory (field<gauge>& U, dirac_op& D, bool MEASURE_FORCE_ERROR_NORM
 	field<fermion> phi (U.grid, eo_storage_e);
 	if(params.EE) {
 		// Use rational approx for (m^2 - D_eo D_oe)^{1/2}:
-		//double lambda_max = D.largest_eigenvalue_bound(U);
-		//rational_approx RA(D.mass*D.mass, lambda_max);
+		//double params.lambda_OMF2_max = D.largest_eigenvalue_bound(U);
+		//rational_approx RA(D.mass*D.mass, params.lambda_OMF2_max);
 
 		// For now just hard code one with the right spectral range:
 		// Approx to x^(1/2) in range [4.000000e-06,1.000000e+01] with degree 32 and relative error 4.846799e-16
 		std::vector<double> alpha = {3.6890641698138090e+01, -1.0561012211778129e-10, -5.0290884785481546e-10, -1.4893043873142169e-09, -3.7857803364223508e-09, -9.0366581199976822e-09, -2.0947036800274181e-08, -4.7841931736674990e-08, -1.0841084668803320e-07, -2.4459660795632532e-07, -5.5051064324919543e-07, -1.2373025102634825e-06, -2.7786969358748370e-06, -6.2375418778515783e-06, -1.3998623100912925e-05, -3.1413674980792612e-05, -7.0495943812265722e-05, -1.5822508225685187e-04, -3.5524318538524512e-04, -7.9805022196072738e-04, -1.7946475593422942e-03, -4.0429235370409832e-03, -9.1354811567293404e-03, -2.0750787741912004e-02, -4.7559443531606085e-02, -1.1070294282398256e-01, -2.6467546517944529e-01, -6.6307169269270883e-01, -1.8044042558746902e+00, -5.7095320003236596e+00, -2.4204388167882527e+01, -1.9784900580824535e+02, -1.6442888944241899e+04};
 		std::vector<double> beta = {2.9716703733938721e-07, 1.2769764410245246e-06, 3.2305954737123776e-06, 6.7385760049491410e-06, 1.2843376392974904e-05, 2.3359148745684882e-05, 4.1410854018296570e-05, 7.2362923650595078e-05, 1.2541346908569054e-04, 2.1632788476453539e-04, 3.7212447235720212e-04, 6.3910535422472892e-04, 1.0966217098551470e-03, 1.8806712847496514e-03, 3.2243622356695097e-03, 5.5273314696792312e-03, 9.4749333138598405e-03, 1.6243167205269585e-02, 2.7851859697874980e-02, 4.7775821012012366e-02, 8.2009669916180375e-02, 1.4094451609143652e-01, 2.4273893822882503e-01, 4.1956324324506633e-01, 7.2973711037915645e-01, 1.2830890807447892e+00, 2.2996743689191512e+00, 4.2662231184512791e+00, 8.4410397767685961e+00, 1.9010796060417171e+01, 5.8057123846762863e+01, 5.4823859356097728e+02};
-		rational_approx_cg_multishift(phi, chi, U, alpha, beta, D, 1.e-15);
+		rational_approx_cg_multishift(phi, chi, U, alpha, beta, D, params.HB_eps);
 	} else {
 		D.D (phi, chi, U);
 	}
@@ -184,38 +184,38 @@ int hmc::leapfrog (field<gauge>& U, field<fermion>& phi, field<gauge>& P, dirac_
 void hmc::OMF2_pure_gauge (field<gauge>& U, field<gauge>& P) {
 	double eps = 0.5 * params.tau / static_cast<double>(params.n_steps_fermion * params.n_steps_gauge);
 	// OMF2 integration:
-	step_P_pure_gauge(P, U, (lambda)*eps, true);
+	step_P_pure_gauge(P, U, (params.lambda_OMF2)*eps, true);
 	for(int i=0; i<params.n_steps_gauge-1; ++i) {
 		step_U(P, U, 0.5*eps);
-		step_P_pure_gauge(P, U, (1.0 - 2.0*lambda)*eps);
+		step_P_pure_gauge(P, U, (1.0 - 2.0*params.lambda_OMF2)*eps);
 		step_U(P, U, 0.5*eps);
-		step_P_pure_gauge(P, U, (2.0*lambda)*eps);
+		step_P_pure_gauge(P, U, (2.0*params.lambda_OMF2)*eps);
 	}
 	step_U(P, U, 0.5*eps);
-	step_P_pure_gauge(P, U, (1.0 - 2.0*lambda)*eps);
+	step_P_pure_gauge(P, U, (1.0 - 2.0*params.lambda_OMF2)*eps);
 	step_U(P, U, 0.5*eps);
-	step_P_pure_gauge(P, U, (lambda)*eps);
+	step_P_pure_gauge(P, U, (params.lambda_OMF2)*eps);
 }
 
 int hmc::OMF2 (field<gauge>& U, field<fermion>& phi, field<gauge>& P, dirac_op& D) {
 	double eps = params.tau / static_cast<double>(params.n_steps_fermion);
 	int iter = 0;
 	// OMF2 integration:
-	iter += step_P_fermion(P, U, phi, D, (lambda)*eps);
+	iter += step_P_fermion(P, U, phi, D, (params.lambda_OMF2)*eps);
 	for(int i=0; i<params.n_steps_fermion-1; ++i) {
 		//step_U(P, U, 0.5*eps);
 		OMF2_pure_gauge(U, P);
-		iter += step_P_fermion(P, U, phi, D, (1.0 - 2.0*lambda)*eps);
+		iter += step_P_fermion(P, U, phi, D, (1.0 - 2.0*params.lambda_OMF2)*eps);
 		//step_U(P, U, 0.5*eps);
 		OMF2_pure_gauge(U, P);
-		iter += step_P_fermion(P, U, phi, D, (2.0*lambda)*eps);
+		iter += step_P_fermion(P, U, phi, D, (2.0*params.lambda_OMF2)*eps);
 	}
 	//step_U(P, U, 0.5*eps);
 	OMF2_pure_gauge(U, P);
-	iter += step_P_fermion(P, U, phi, D, (1.0 - 2.0*lambda)*eps);
+	iter += step_P_fermion(P, U, phi, D, (1.0 - 2.0*params.lambda_OMF2)*eps);
 	//step_U(P, U, 0.5*eps);
 	OMF2_pure_gauge(U, P);
-	iter += step_P_fermion(P, U, phi, D, (lambda)*eps);
+	iter += step_P_fermion(P, U, phi, D, (params.lambda_OMF2)*eps);
 	return iter;
 }
 
@@ -240,7 +240,7 @@ double hmc::action_P (const field<gauge>& P) {
 
 double hmc::action_F (field<gauge>& U, const field<fermion>& phi, dirac_op& D) {
 	field<fermion> D2inv_phi (phi.grid, phi.eo_storage);
-	int iter = cg(D2inv_phi, phi, U, D, 1.e-15);
+	int iter = cg(D2inv_phi, phi, U, D, params.HB_eps);
 	//std::cout << "Action CG iterations: " << iter << std::endl;
 	return phi.dot(D2inv_phi).real();
 }

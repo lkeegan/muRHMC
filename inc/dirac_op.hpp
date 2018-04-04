@@ -52,7 +52,7 @@ public:
 
 	// Hermitian D D^{\dagger} operator: lhs = DDdagger(rhs)
 	// If lhs and rhs are EVEN_ONLY fermion fields then this is the even-even sub-block of D Ddagger for mu_I=0 
-	void DDdagger (field<fermion>& lhs, const field<fermion>& rhs, field<gauge>& U);
+	void DDdagger (field<fermion>& lhs, const field<fermion>& rhs, field<gauge>& U, bool LEAVE_ETA_BCS_IN_GAUGE_FIELD = false);
 
 	// Returns eigenvalues of Dirac op
 	// Explicitly constructs dense (3*VOL)x(3*VOL) matrix Dirac op and finds all eigenvalues 

@@ -197,7 +197,7 @@ void dirac_op::D (field<fermion>& lhs, const field<fermion>& rhs, field<gauge>& 
 	remove_eta_bcs_from_U(U);
 }
 
-void dirac_op::DDdagger (field<fermion>& lhs, const field<fermion>& rhs, field<gauge>& U) {
+void dirac_op::DDdagger (field<fermion>& lhs, const field<fermion>& rhs, field<gauge>& U, bool LEAVE_ETA_BCS_IN_GAUGE_FIELD) {
 	// without isospin:
 	// (D+m)(D+m)^dagger = g5 D g5 D + m^2 = -D^2 + m^2
 	// however with isospin: D(mu)^dag(mu) = -D(-mu) so above no longer holds,

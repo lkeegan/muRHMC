@@ -115,7 +115,7 @@ int cg(field<fermion>& x, const field<fermion>& b, field<gauge>& U, dirac_op& D,
 	while (sqrt(r2_new)/b_norm > eps)
 	{
 		// a = A p
-		D.DDdagger(a, p, U);
+		D.DDdagger(a, p, U, true);
 		++iter;
 		r2_old = r2_new;
 		// beta = -<r|r>/<p|a>
@@ -137,6 +137,7 @@ int cg(field<fermion>& x, const field<fermion>& b, field<gauge>& U, dirac_op& D,
 			return iter;
 		}
 	}
+	D.remove_eta_bcs_from_U(U);
 	return iter;
 }
 

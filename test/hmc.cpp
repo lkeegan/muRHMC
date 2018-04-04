@@ -138,7 +138,9 @@ TEST_CASE( "Reversibility of pure gauge HMC", "[hmc]" ) {
 		1.0, 	// tau
 		3, 		// n_steps_fermion
 		2, 		// n_steps_gauge
+		0.19, 	// lambda_OMF2
 		1.e-7,	// MD_eps
+		1.e-15,	// HB_eps
 		1234,	// seed
 		false, 	// EE: only simulate even-even sub-block (requires mu_I=0)
 		false,	// constrained HMC (fixed allowed range for pion susceptibility)
@@ -191,7 +193,9 @@ TEST_CASE( "Reversibility of HMC", "[hmc]" ) {
 		1.0, 	// tau
 		3, 		// n_steps_fermion
 		2, 		// n_steps_gauge
+		0.19, 	// lambda_OMF2
 		1.e-7,	// MD_eps
+		1.e-15,	// HB_eps
 		1234,	// seed
 		false, 	// EE: only simulate even-even sub-block (requires mu_I=0)
 		false,	// constrained HMC (fixed allowed range for pion susceptibility)
@@ -262,7 +266,9 @@ TEST_CASE( "Reversibility of EE HMC", "[hmc_EE]" ) {
 		1.0, 	// tau
 		3, 		// n_steps_fermion
 		2, 		// n_steps_gauge
-		1.e-3,	// MD_eps
+		0.19, 	// lambda_OMF2
+		1.e-7,	// MD_eps
+		1.e-15,	// HB_eps
 		1234,	// seed
 		true, 	// EE: only simulate even-even sub-block (requires mu_I=0)
 		false,	// constrained HMC (fixed allowed range for pion susceptibility)
@@ -279,7 +285,7 @@ TEST_CASE( "Reversibility of EE HMC", "[hmc_EE]" ) {
 	field<gauge> P_old (grid);
 	hmc hmc (hmc_pars);
 	dirac_op D (grid, hmc_pars.mass, hmc_pars.mu_I);
-	hmc.random_U(U, 0.2);
+	hmc.random_U(U, 0.18);
 	U_old = U;
 	hmc.gaussian_P(P);
 	P_old = P;
@@ -298,8 +304,8 @@ TEST_CASE( "Reversibility of EE HMC", "[hmc_EE]" ) {
 		P_old += P;
 		double devP = P_old.norm();
 		INFO("HMC reversibility violation: " << dev << "\t P_dev: " << devP << "\t MD_eps: " << hmc_pars.MD_eps << "\t CG iter: " << iter);
-		REQUIRE( dev < EPS );
-		REQUIRE( devP < EPS );
+		REQUIRE( dev < 50*EPS );
+		REQUIRE( devP < 50*EPS );
 		REQUIRE( is_field_hermitian(P) < EPS );
 		REQUIRE( is_field_SU3(U) < EPS );		
 	}
@@ -330,7 +336,9 @@ TEST_CASE( "HMC EE force term matches full HMC term with even phi sites -> 0", "
 		0.05, 	// tau
 		3, 		// n_steps_fermion
 		2, 		// n_steps_gauge
-		1.e-12,	// MD_eps
+		0.19, 	// lambda_OMF2
+		1.e-7,	// MD_eps
+		1.e-15,	// HB_eps
 		1234,	// seed
 		false, 	// EE: only simulate even-even sub-block (requires mu_I=0)
 		false,	// constrained HMC (fixed allowed range for pion susceptibility)
@@ -380,7 +388,9 @@ TEST_CASE( "HMC conserves action for small tau", "[hmc]" ) {
 		0.05, 	// tau
 		10, 	// n_steps_fermion
 		5, 		// n_steps_gauge
-		1.e-10,	// MD_eps
+		0.19,	// lambda_OMF2
+		1.e-7,	// MD_eps
+		1.e-15,	// HB_eps
 		1234,	// seed
 		false, 	// EE: only simulate even-even sub-block (requires mu_I=0)
 		false,	// constrained HMC (fixed allowed range for pion susceptibility)
@@ -413,7 +423,9 @@ TEST_CASE( "EE HMC conserves action for small tau", "[hmc_EE]" ) {
 		0.05, 	// tau
 		10, 	// n_steps_fermion
 		5, 		// n_steps_gauge
-		1.e-10,	// MD_eps
+		0.19, 	// lambda_OMF2
+		1.e-7,	// MD_eps
+		1.e-15,	// HB_eps
 		1234,	// seed
 		true, 	// EE: only simulate even-even sub-block (requires mu_I=0)
 		false,	// constrained HMC (fixed allowed range for pion susceptibility)

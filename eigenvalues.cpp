@@ -14,7 +14,9 @@ hmc_params hmc_pars = {
 	1.0, 	// tau
 	7, 		// n_steps_fermion
 	7, 		// n_steps_gauge
+	0.19,	// lambda
 	1.e-6,	// MD_eps
+	1.e-14,	// MD_eps
 	1234,	// seed
 	false, 	// EE
 	false,	// constrained HMC (fixed allowed range for pion susceptibility)

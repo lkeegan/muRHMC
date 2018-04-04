@@ -24,7 +24,9 @@ TEST_CASE( "RHMC Gauge action self consistency", "[rhmc]" ) {
 			1.0, 	// tau
 			3, 		// n_steps_fermion
 			2, 		// n_steps_gauge
+			0.19, 	// lambda_OMF2
 			1.e-6,	// MD_eps
+			1.e-15,	// HB_eps
 			1234,	// seed
 			false, 	// EE: only simulate even-even sub-block (requires mu_I=0)
 		};
@@ -60,7 +62,9 @@ TEST_CASE( "RHMC Momenta P have expected mean < Tr[P^2] > = 4 * VOL", "[rhmc]" )
 			1.0, 	// tau
 			3, 		// n_steps_fermion
 			2, 		// n_steps_gauge
+			0.19, 	// lambda_OMF2
 			1.e-6,	// MD_eps
+			1.e-15,	// HB_eps
 			1234,	// seed
 			false, 	// EE: only simulate even-even sub-block (requires mu_I=0)
 		};
@@ -94,7 +98,9 @@ TEST_CASE( "RHMC Gaussian pseudofermions have expected mean < |chi^2| > = 3 * VO
 			1.0, 	// tau
 			3, 		// n_steps_fermion
 			2, 		// n_steps_gauge
+			0.19, 	// lambda_OMF2
 			1.e-6,	// MD_eps
+			1.e-15,	// HB_eps
 			1234,	// seed
 			false, 	// EE: only simulate even-even sub-block (requires mu_I=0)
 		};
@@ -127,7 +133,9 @@ TEST_CASE( "RHMC EE Gaussian pseudofermions have expected mean < |chi^2| > = 3 *
 		1.0, 	// tau
 		3, 		// n_steps_fermion
 		2, 		// n_steps_gauge
+		0.19, 	// lambda_OMF2
 		1.e-6,	// MD_eps
+		1.e-15,	// HB_eps
 		1234,	// seed
 		false, 	// EE: only simulate even-even sub-block (requires mu_I=0)
 	};
@@ -169,7 +177,9 @@ TEST_CASE( "Reversibility of RHMC", "[rhmc]" ) {
 				1.0, 	// tau
 				2, 		// n_steps_fermion
 				2, 		// n_steps_gauge
-				1.e-7,	// MD_eps NOTE: reversiblity seems to be linked to this value, which should not be the case!
+				0.19, 	// lambda_OMF2
+				1.e-7,	// MD_eps
+				1.e-15,	// HB_eps
 				1234,	// seed
 				false, 	// EE: only simulate even-even sub-block (requires mu_I=0)
 			};
@@ -242,7 +252,9 @@ TEST_CASE( "Energy conservation of RHMC", "[rhmc]" ) {
 				0.03, 	// tau
 				4, 		// n_steps_fermion
 				4, 		// n_steps_gauge
+				0.19, 	// lambda_OMF2
 				1.e-12,	// MD_eps
+				1.e-15,	// HB_eps
 				1234,	// seed
 				false, 	// EE: only simulate even-even sub-block (requires mu_I=0)
 			};
