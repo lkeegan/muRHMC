@@ -6,32 +6,15 @@
 #include <iostream>
 #include <random>
 #include <Eigen/Eigenvalues>
-// some default parameters for the HMC
-hmc_params hmc_pars = {
-	5.4, 	// beta
-	0.292, 	// mass
-	0.157, 	// mu_I
-	1.0, 	// tau
-	7, 		// n_steps_fermion
-	7, 		// n_steps_gauge
-	0.19,	// lambda
-	1.e-6,	// MD_eps
-	1.e-14,	// MD_eps
-	1234,	// seed
-	false, 	// EE
-	false,	// constrained HMC (fixed allowed range for pion susceptibility)
-	3.0, 	// suscept_central
-	0.05	// suscept_eps
-};
 
 int main(int argc, char *argv[]) {
 
 	std::cout.precision(17);
 
     if (argc-1 != 6) {
-        std::cout << "This program requires 6 arguments:" << std::endl;
-        std::cout << "mass mu_I base_name config_number n_eigenvalues relative_error" << std::endl;
-        std::cout << "e.g. ./hmc 0.14 0.25 mu0.25_sus_3.1_3.3 1 64 1e-4" << std::endl;
+        std::cout << "This program requires 5 arguments:" << std::endl;
+        std::cout << "mass mu_I base_name config_number relative_error" << std::endl;
+        std::cout << "e.g. ./hmc 0.14 0.25 mu0.25_sus_3.1_3.3 1 1e-4" << std::endl;
         return 1;
     }
 
@@ -39,7 +22,7 @@ int main(int argc, char *argv[]) {
 	double mu_I = atof(argv[2]);
 	std::string base_name(argv[3]);
 	int config_number = static_cast<int>(atof(argv[4]));
-	int N_eigenvalues = static_cast<int>(atof(argv[5]));
+	int N_eigenvalues = N_rhs; //static_cast<int>(atof(argv[5]));
 	double eps = atof(argv[6]);
 
 	lattice grid (8, 24, true);
@@ -57,13 +40,15 @@ int main(int argc, char *argv[]) {
 	field<gauge> U (grid);
 	read_gauge_field(U, base_name, config_number);
 	dirac_op D (grid, mass, mu_I);
-	hmc hmc (hmc_pars);
+	rhmc_params rhmc_pars;
+	rhmc_pars.seed = 123;
+	rhmc rhmc (rhmc_pars, grid);
 
 	// Power method gives strict lower bound on lambda_max
 	// Iterate until relative error < eps
 
 	field<fermion> x (grid, eo_storage), x2 (grid, eo_storage);
-	hmc.gaussian_fermion(x);
+	rhmc.gaussian_fermion(x);
 	double x_norm = x.norm();
 	double lambda_max = 1;
 	double lambda_max_err = 100;
@@ -84,17 +69,15 @@ int main(int argc, char *argv[]) {
 	// since lambda_max is a lower bound, and lambda_max + lamda_max_err is an upper bound:
 	log("iterations", iter);
 	log("final_lambda_max", lambda_max + 0.5 * lambda_max_err, 0.5 * lambda_max_err);
+
 	// Find N lowest eigenvalues of DDdagger.
 	// Uses chebyshev acceleration as described in Appendix A of hep-lat/0512021
 	Eigen::MatrixXcd R = Eigen::MatrixXcd::Zero(N_eigenvalues, N_eigenvalues);	
 	Eigen::MatrixXd Evals = Eigen::MatrixXd::Zero(N_eigenvalues, 2);	
 
 	// make initial fermion vector basis of gaussian noise vectors
-	std::vector<field<fermion>> X;
-	for(int i=0; i<N_eigenvalues; ++i) {
-		hmc.gaussian_fermion (x);
-		X.push_back(x);
-	}
+	field<block_fermion> X (grid, field<block_fermion>::EVEN_ONLY);
+	rhmc.gaussian_fermion (X);
 	// orthonormalise X
 	thinQR(X, R);
 	// make X A-orthormal and get eigenvalues of matrix <X_i AX_j>

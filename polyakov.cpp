@@ -34,11 +34,11 @@ int main(int argc, char *argv[]) {
 	for(int i=n_initial; ; i+=1) {
 		read_gauge_field(U, base_name, i);
 		std::complex<double> p = hmc.polyakov_loop(U);
-		std::cout << i << "\tn_smear = " << 0 << "\t" << std::scientific << p.real() << "\t" << p.imag() << std::endl;
+		std::cout << i << "\tn_smear =\t" << 0 << "\t" << std::scientific << p.real() << "\t" << p.imag() << std::endl;
 		for(int i_smear=1; i_smear<n_smear; ++i_smear) {
 			hmc.stout_smear(rho, U);
 			std::complex<double> p = hmc.polyakov_loop(U);
-			std::cout << i << "\tn_smear = " << i_smear << "\t" << std::scientific << p.real() << "\t" << p.imag() << std::endl;
+			std::cout << i << "\tn_smear =\t" << i_smear << "\t" << std::scientific << p.real() << "\t" << p.imag() << std::endl;
 		}
 	}
 	return(0);

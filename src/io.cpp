@@ -92,6 +92,7 @@ void read_input_file(const std::string& filename, rhmc_params& rhmc_params, run_
 		input >> var_name >> rhmc_params.HB_eps;
 		input >> var_name >> rhmc_params.seed;
 		input >> var_name >> rhmc_params.EE;
+		input >> var_name >> rhmc_params.block;
 		input >> var_name >> run_params.initial_config;
 		input >> var_name >> run_params.n_therm;
 		input >> var_name >> run_params.n_traj;

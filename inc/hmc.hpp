@@ -9,20 +9,20 @@
 #include <string>
 
 struct hmc_params {
-	double beta;
-	double mass;
-	double mu_I;
-	double tau;
-	int n_steps_fermion;
-	int n_steps_gauge;
-	double lambda_OMF2;
-	double MD_eps;
-	double HB_eps;
-	int seed;
-	bool EE;
-	bool constrained;
-	double suscept_central;
-	double suscept_delta;
+	double beta = 5.4;
+	double mass = 0.05;
+	double mu_I = 0.0;
+	double tau = 1.0;
+	int n_steps_fermion = 3;
+	int n_steps_gauge = 2;
+	double lambda_OMF2 = 0.19;
+	double MD_eps = 1.e-6;
+	double HB_eps = 1.e-14;
+	int seed = 123;
+	bool EE = false;
+	bool constrained = false;
+	double suscept_central = 2.0;
+	double suscept_delta = 0.5;
 };
 
 class hmc {
@@ -119,6 +119,8 @@ public:
 
 	// average of polyakov loops in time (x_0) direction
 	std::complex<double> polyakov_loop (const field<gauge> &U);
+	// spatial polyakov loop
+	std::complex<double> polyakov_loop_spatial (const field<gauge> &U);
 
 	// returns estimate of chiral_condensate using 1 random gaussian fermion vector
 	double chiral_condensate (field<gauge> &U, dirac_op& D);

@@ -40,6 +40,7 @@ int main(int argc, char *argv[]) {
 	log("HB epsilon", rhmc_pars.HB_eps);
 	log("RNG seed", rhmc_pars.seed);
 	log("EO-preconditioning", rhmc_pars.EE);
+	log("block", rhmc_pars.block);
 
 	log("");
 	log("Run parameters:");
@@ -55,7 +56,7 @@ int main(int argc, char *argv[]) {
 	log("initial_config", run_pars.initial_config);
 
 	// Initialise RHMC
-	rhmc rhmc (rhmc_pars);
+	rhmc hmc (rhmc_pars, grid);
 
 	// make U[mu] field on lattice
 	field<gauge> U (grid);
@@ -68,18 +69,24 @@ int main(int argc, char *argv[]) {
 		run_pars.initial_config = 0;
 		// start from random gauge field: 2nd param = roughness
 		// so 0.0 gives unit gauge links, large value = random
-		rhmc.random_U (U, 0.5);
-	}
-	else {
+		hmc.random_U (U, 0.5);
+	} else {
 		// load specified gauge config
 		//	read_massimo_gauge_field(U, run_pars.base_name);
 		read_gauge_field (U, run_pars.base_name, run_pars.initial_config);
 	}
 
 	// just do force measurements:
-	rhmc.trajectory (U, D, false, true);
-//	exit(0);
-
+	/*
+	hmc.trajectory (U, D, false, true);
+	exit(0);
+	// repeat force measurements for other (not)blocked case:
+	rhmc_pars.block = !rhmc_pars.block;
+	rhmc rhmc_block (rhmc_pars, grid);
+	rhmc_block.trajectory (U, D, false, true);
+	exit(0);
+	*/
+	
 	// observables to measure
 	std::vector<double> dE;
 	std::vector<double> expdE;
@@ -93,12 +100,12 @@ int main(int argc, char *argv[]) {
 	log("");
 	int acc = 0;
 	for(int i=1; i<=run_pars.n_therm; ++i) {
-		acc += rhmc.trajectory (U, D);
+		acc += hmc.trajectory (U, D);
 
 		std::cout << "# therm " << i << "/" << run_pars.n_therm 
-				  << "\tplaq: " << rhmc.plaq(U) 
+				  << "\tplaq: " << hmc.plaq(U) 
 				  << "\t acc: " << acc/static_cast<double>(i)
-				  << "\t dE: " << rhmc.deltaE
+				  << "\t dE: " << hmc.deltaE
  				  << std::endl;
  	}
 	log("Thermalisation acceptance", static_cast<double>(acc)/static_cast<double>(run_pars.n_therm));
@@ -109,17 +116,17 @@ int main(int argc, char *argv[]) {
 	acc = 0;
 	int i_save = run_pars.initial_config;
 	for(int i=1; i<=run_pars.n_traj; ++i) {
-		acc += rhmc.trajectory (U, D);
-		dE.push_back(rhmc.deltaE);
-		expdE.push_back(exp(-rhmc.deltaE));
-		plq.push_back(rhmc.plaq(U));
-		std::complex<double> tmp_poly = rhmc.polyakov_loop(U);
+		acc += hmc.trajectory (U, D);
+		dE.push_back(hmc.deltaE);
+		expdE.push_back(exp(-hmc.deltaE));
+		plq.push_back(hmc.plaq(U));
+		std::complex<double> tmp_poly = hmc.polyakov_loop(U);
 		poly_re.push_back(tmp_poly.real());
 		poly_im.push_back(tmp_poly.imag());
 		std::cout << "# iter " << i << "/" << run_pars.n_traj 
-				  << "\tplaq: " << rhmc.plaq(U) 
+				  << "\tplaq: " << hmc.plaq(U) 
 				  << "\t acc: " << static_cast<double>(acc)/static_cast<double>(i)
-				  << "\t dE: " << rhmc.deltaE
+				  << "\t dE: " << hmc.deltaE
 				  << std::endl;
 		if(i%run_pars.n_save==0) {
 			// save gauge config

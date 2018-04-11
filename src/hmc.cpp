@@ -554,6 +554,23 @@ std::complex<double> hmc::polyakov_loop (const field<gauge> &U) {
 	return p / static_cast<double>(3 * U.VOL3);
 }
 
+std::complex<double> hmc::polyakov_loop_spatial (const field<gauge> &U) {
+	std::complex<double> p = 0;
+	// NB: no openmp reduction for std::complex, would have to split into real and imag parts
+	for(int ix=0; ix<U.V; ++ix) {
+		for(int mu=1; mu<4; ++mu) {
+			SU3mat P = U[ix][mu];
+			int ixmu = ix;
+			for(int n_mu=1; n_mu<U.L1; n_mu++) {
+				ixmu = U.iup(ixmu, mu);
+				P *= U[ixmu][mu];
+			}
+			p += P.trace();
+		}
+	}
+	return p / static_cast<double>(3 * 3 * U.V);
+}
+
 double hmc::chiral_condensate (field<gauge> &U, dirac_op& D) {
 	// inverter precision
 	double eps = 1.e-12;

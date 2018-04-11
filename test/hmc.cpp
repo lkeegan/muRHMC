@@ -131,22 +131,7 @@ TEST_CASE( "EE Gaussian pseudofermions have expected mean < |chi^2| > = 3 * VOL"
 
 TEST_CASE( "Reversibility of pure gauge HMC", "[hmc]" ) {
 
-	hmc_params hmc_pars = {
-		5.4, 	// beta
-		0.100, 	// mass
-		0.005, // mu_I
-		1.0, 	// tau
-		3, 		// n_steps_fermion
-		2, 		// n_steps_gauge
-		0.19, 	// lambda_OMF2
-		1.e-7,	// MD_eps
-		1.e-15,	// HB_eps
-		1234,	// seed
-		false, 	// EE: only simulate even-even sub-block (requires mu_I=0)
-		false,	// constrained HMC (fixed allowed range for pion susceptibility)
-		3.0, 	// suscept_central
-		0.05	// suscept_eps
-	};
+	hmc_params hmc_pars;
 
 	// create 4^4 lattice with random U[mu] at each site, random gaussian P
 	// integrate by tau, P -> -P, integrate by tau, compare to original U
@@ -186,22 +171,7 @@ TEST_CASE( "Reversibility of pure gauge HMC", "[hmc]" ) {
 
 TEST_CASE( "Reversibility of HMC", "[hmc]" ) {
 
-	hmc_params hmc_pars = {
-		5.4, 	// beta
-		0.100, 	// mass
-		0.005, // mu_I
-		1.0, 	// tau
-		3, 		// n_steps_fermion
-		2, 		// n_steps_gauge
-		0.19, 	// lambda_OMF2
-		1.e-7,	// MD_eps
-		1.e-15,	// HB_eps
-		1234,	// seed
-		false, 	// EE: only simulate even-even sub-block (requires mu_I=0)
-		false,	// constrained HMC (fixed allowed range for pion susceptibility)
-		3.0, 	// suscept_central
-		0.05	// suscept_eps
-	};
+	hmc_params hmc_pars;
 
 	// create 4^4 lattice with random U[mu] at each site, random gaussian P
 	// integrate by tau, P -> -P, integrate by tau, compare to original U
@@ -259,22 +229,7 @@ TEST_CASE( "Reversibility of HMC", "[hmc]" ) {
 
 TEST_CASE( "Reversibility of EE HMC", "[hmc_EE]" ) {
 
-	hmc_params hmc_pars = {
-		5.4, 	// beta
-		0.05, 	// mass
-		0.0157, // mu_I
-		1.0, 	// tau
-		3, 		// n_steps_fermion
-		2, 		// n_steps_gauge
-		0.19, 	// lambda_OMF2
-		1.e-7,	// MD_eps
-		1.e-15,	// HB_eps
-		1234,	// seed
-		true, 	// EE: only simulate even-even sub-block (requires mu_I=0)
-		false,	// constrained HMC (fixed allowed range for pion susceptibility)
-		3.0, 	// suscept_central
-		0.05	// suscept_eps
-	};
+	hmc_params hmc_pars;
 
 	// create 4^4 lattice with random U[mu] at each site, random gaussian P
 	// integrate by tau, P -> -P, integrate by tau, compare to original U
@@ -329,22 +284,7 @@ TEST_CASE( "Reversibility of EE HMC", "[hmc_EE]" ) {
 }
 
 TEST_CASE( "HMC EE force term matches full HMC term with even phi sites -> 0", "[hmc_EE]" ) {
-	hmc_params hmc_pars = {
-		5.4, 	// beta
-		0.292, 	// mass
-		0.00,   // mu_I
-		0.05, 	// tau
-		3, 		// n_steps_fermion
-		2, 		// n_steps_gauge
-		0.19, 	// lambda_OMF2
-		1.e-7,	// MD_eps
-		1.e-15,	// HB_eps
-		1234,	// seed
-		false, 	// EE: only simulate even-even sub-block (requires mu_I=0)
-		false,	// constrained HMC (fixed allowed range for pion susceptibility)
-		3.0, 	// suscept_central
-		0.05	// suscept_eps
-	};
+	hmc_params hmc_pars;
 
 	hmc_params hmc_EE_pars = hmc_pars;
 	hmc_EE_pars.EE = true;
@@ -381,22 +321,8 @@ TEST_CASE( "HMC EE force term matches full HMC term with even phi sites -> 0", "
 }
 
 TEST_CASE( "HMC conserves action for small tau", "[hmc]" ) {
-	hmc_params hmc_pars = {
-		5.4, 	// beta
-		0.292, 	// mass
-		0.0157, // mu_I
-		0.05, 	// tau
-		10, 	// n_steps_fermion
-		5, 		// n_steps_gauge
-		0.19,	// lambda_OMF2
-		1.e-7,	// MD_eps
-		1.e-15,	// HB_eps
-		1234,	// seed
-		false, 	// EE: only simulate even-even sub-block (requires mu_I=0)
-		false,	// constrained HMC (fixed allowed range for pion susceptibility)
-		3.0, 	// suscept_central
-		0.05	// suscept_eps
-	};
+	hmc_params hmc_pars;
+	hmc_pars.tau = 0.04;
 	// create 4^4 lattice with random U[mu] at each site, random gaussian P
 	// integrate by a small amount, check action is conserved within some eps
 	for(bool isEO : {false, true}) {
@@ -416,22 +342,8 @@ TEST_CASE( "HMC conserves action for small tau", "[hmc]" ) {
 }
 
 TEST_CASE( "EE HMC conserves action for small tau", "[hmc_EE]" ) {
-	hmc_params hmc_pars = {
-		5.4, 	// beta
-		0.292, 	// mass
-		0.0, 	// mu_I
-		0.05, 	// tau
-		10, 	// n_steps_fermion
-		5, 		// n_steps_gauge
-		0.19, 	// lambda_OMF2
-		1.e-7,	// MD_eps
-		1.e-15,	// HB_eps
-		1234,	// seed
-		true, 	// EE: only simulate even-even sub-block (requires mu_I=0)
-		false,	// constrained HMC (fixed allowed range for pion susceptibility)
-		3.0, 	// suscept_central
-		0.05	// suscept_eps
-	};
+	hmc_params hmc_pars;
+	hmc_pars.tau = 0.04;
 	// create 4^4 lattice with random U[mu] at each site, random gaussian P
 	// integrate by a small amount, check action is conserved within some eps
 	lattice grid (4, true);

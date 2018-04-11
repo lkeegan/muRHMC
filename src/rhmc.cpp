@@ -5,18 +5,24 @@
 #include "io.hpp" //DEBUGGING
 #include <chrono>
 
-rhmc::rhmc (const rhmc_params& params) : RA(1.0, 1.0), rng(params.seed), params(params) {
+rhmc::rhmc (const rhmc_params& params, const lattice& grid) : RA(1.0, 1.0), rng(params.seed), params(params), grid(grid), block_phi(grid) {
 	// rational approx for action: M^{n_f/(8 params.n_pf)} = M^{1/(n_rational)}
 	n_rational = 8 * params.n_pf / params.n_f;
 	if(params.EE) {
 		// only use even part of pseudofermions and even-even sub-block of dirac op
 		eo_storage_e = field<fermion>::EVEN_ONLY;
 		eo_storage_o = field<fermion>::ODD_ONLY;
+		block_eo_storage_e = field<block_fermion>::EVEN_ONLY;
+		block_eo_storage_o = field<block_fermion>::ODD_ONLY;
 		// rational approx for action: M^{n_f/(4 params.n_pf)} = M^{1/(n_rational)}
 		n_rational = 4 * params.n_pf / params.n_f;
 	}
 	if(n_rational<2) {
 		std::cout << "Invalid combination of n_f, n_pf: need n_pf >= n_f/2 for EE, or n_f/4 without e/o predconditioning" << std::endl;
+		exit(1);
+	}
+	if(params.block && (params.n_pf != N_rhs)) {
+		std::cout << "n_pf must be equal to N_rhs to use block operations" << std::endl;
 		exit(1);
 	}
 }
@@ -48,23 +54,34 @@ int rhmc::trajectory (field<gauge>& U, dirac_op& D, bool do_reversibility_test, 
 	field<gauge> P (U.grid);
 	gaussian_P (P);
 	//std::cout << "#RHMC: n_f=" << params.n_f << ", n_pf=" << params.n_pf << ", n_rational=" << n_rational << ", n_shifts hi/lo=" << RA.beta_hi[n_rational].size() << "/" << RA.beta_lo[n_rational].size() << std::endl;
-	std::vector< field<fermion> > chi (params.n_pf, field<fermion>(U.grid, eo_storage_e));
-	phi.resize(params.n_pf, chi[0]);
+
 	double chi_norm = 0;
-    auto timer_start = std::chrono::high_resolution_clock::now();
-	int iter = 0;
-	for(int i_pf=0; i_pf<params.n_pf; ++i_pf) {
-		gaussian_fermion (chi[i_pf]);
-		chi_norm += chi[i_pf].squaredNorm();
+	if(params.block) {
+		field<block_fermion> chi (U.grid, block_eo_storage_e);
+		block_phi = chi;
+	    auto timer_start = std::chrono::high_resolution_clock::now();
+		chi_norm = gaussian_fermion (chi);
 		// construct phi[i] = M^{1/(2*n_rational) chi_e
-		// iter += rational_approx_cg_multishift(phi[i_pf], chi_e, U, RA.alpha_hi[n_rational], RA.beta_hi[n_rational], D, 1.e-15);
+		int iter = rational_approx_SBCGrQ(block_phi, chi, U, RA.alpha_hi[2*n_rational], RA.beta_hi[2*n_rational], D, params.HB_eps);
+	    auto timer_stop = std::chrono::high_resolution_clock::now();
+	    auto timer_count = std::chrono::duration_cast<std::chrono::seconds>(timer_stop-timer_start).count();
+		std::cout << "#RHMC_InitBCGRuntime " << timer_count << std::endl;
+		std::cout << "#RHMC_InitBCGIter " << iter << std::endl;
+	} else {
+		std::vector< field<fermion> > chi (params.n_pf, field<fermion>(U.grid, eo_storage_e));
+		phi.resize(params.n_pf, chi[0]);
+	    auto timer_start = std::chrono::high_resolution_clock::now();
+		int iter = 0;
+		chi_norm = gaussian_fermion (chi);
+		for(int i_pf=0; i_pf<params.n_pf; ++i_pf) {
+			// construct phi[i] = M^{1/(2*n_rational) chi_e
+			iter += rational_approx_cg_multishift(phi[i_pf], chi[i_pf], U, RA.alpha_hi[2*n_rational], RA.beta_hi[2*n_rational], D, params.HB_eps);
+		}
+	    auto timer_stop = std::chrono::high_resolution_clock::now();
+	    auto timer_count = std::chrono::duration_cast<std::chrono::seconds>(timer_stop-timer_start).count();
+		std::cout << "#RHMC_InitCGRuntime " << timer_count << std::endl;
+		std::cout << "#RHMC_InitCGIter " << iter << std::endl;
 	}
-	// construct phi[i] = M^{1/(2*n_rational) chi_e
-	iter += rational_approx_SBCGrQ(phi, chi, U, RA.alpha_hi[2*n_rational], RA.beta_hi[2*n_rational], D, params.HB_eps);
-    auto timer_stop = std::chrono::high_resolution_clock::now();
-    auto timer_count = std::chrono::duration_cast<std::chrono::seconds>(timer_stop-timer_start).count();
-	std::cout << "#RHMC_InitCGRuntime " << timer_count << std::endl;
-	std::cout << "#RHMC_InitCGIter " << iter << std::endl;
 
 	// make copy of current gauge config in case update is rejected
 	field<gauge> U_old (U.grid);
@@ -85,12 +102,15 @@ int rhmc::trajectory (field<gauge>& U, dirac_op& D, bool do_reversibility_test, 
 		std::cout.precision(15);
 		field<gauge> force (U.grid);
 		force.setZero();
-		int iterBCG = force_fermion_block (force, U, D);
-		std::cout << std::scientific << "fermion_force_normBCG: " << force.squaredNorm() << std::endl;
-		force.setZero();
-		int iterCG = force_fermion (force, U, D);
-		std::cout << std::scientific << "fermion_force_normCG: " << force.squaredNorm() << std::endl;
-		exit(0);
+		if(params.block) {
+			int iterBCG = force_fermion_block (force, U, D);
+			std::cout << std::scientific << "fermion_force_normBCG: " << force.squaredNorm() << std::endl;
+		} else {
+			force.setZero();
+			int iterCG = force_fermion (force, U, D);
+			std::cout << std::scientific << "fermion_force_normCG: " << force.squaredNorm() << std::endl;		
+		}
+		return 1;
 
 		// do full force error measurements:
 		/*
@@ -260,16 +280,30 @@ double rhmc::action_P (const field<gauge>& P) {
 
 double rhmc::action_F (field<gauge>& U, dirac_op& D) {
 	//std::cout << "#RHMC fermion action: n_f=" << params.n_f << ", n_pf=" << params.n_pf << ", n_rational/2=" << n_rational/2 << ", n_shifts hi=" << RA.beta_inv_hi[n_rational/2].size() << std::endl;
-	double ac_F = 0;
-	field<fermion> Ainv_phi (phi[0].grid, phi[0].eo_storage);
-	int iter = 0;
-	for(int i_pf=0; i_pf<params.n_pf; ++i_pf) {
+	if(params.block) {
+		double ac_F = 0;
+		field<block_fermion> Ainv_phi (block_phi);
 		// construct Ainv_phi = M^{-1/(n_rational)) phi[i]
-		iter += rational_approx_cg_multishift(Ainv_phi, phi[i_pf], U, RA.alpha_inv_hi[n_rational], RA.beta_inv_hi[n_rational], D, params.HB_eps);
-		ac_F += phi[i_pf].dot(Ainv_phi).real();
+		int iter = rational_approx_SBCGrQ(Ainv_phi, block_phi, U, RA.alpha_inv_hi[n_rational], RA.beta_inv_hi[n_rational], D, params.HB_eps);
+		for(int i=0; i<block_phi.V; ++i) {
+			for(int i_pf=0; i_pf<params.n_pf; ++i_pf) {
+				ac_F += block_phi[i].col(i_pf).dot(Ainv_phi[i].col(i_pf)).real();			
+			}
+		}
+		std::cout << "#RHMC_ActionBCGIter " << iter << std::endl;
+		return ac_F;		
+	} else {
+		double ac_F = 0;
+		field<fermion> Ainv_phi (phi[0].grid, phi[0].eo_storage);
+		int iter = 0;
+		for(int i_pf=0; i_pf<params.n_pf; ++i_pf) {
+			// construct Ainv_phi = M^{-1/(n_rational)) phi[i]
+			iter += rational_approx_cg_multishift(Ainv_phi, phi[i_pf], U, RA.alpha_inv_hi[n_rational], RA.beta_inv_hi[n_rational], D, params.HB_eps);
+			ac_F += phi[i_pf].dot(Ainv_phi).real();
+		}
+		std::cout << "#RHMC_ActionCGIter " << iter << std::endl;
+		return ac_F;		
 	}
-	std::cout << "#RHMC_ActionCGIter " << iter << std::endl;
-	return ac_F;
 }
 
 void rhmc::step_P_pure_gauge (field<gauge>& P, field<gauge> &U, double eps, bool MEASURE_FORCE_NORM) {
@@ -304,8 +338,13 @@ void rhmc::step_P_pure_gauge (field<gauge>& P, field<gauge> &U, double eps, bool
 int rhmc::step_P_fermion (field<gauge>& P, field<gauge> &U, dirac_op& D, double eps, bool MEASURE_FORCE_NORM) {
 	field<gauge> force (U.grid);
 	force.setZero();
+	int iter = 0;
+	if (params.block) {
+		iter = force_fermion_block (force, U, D);	
+	} else {
+		iter = force_fermion (force, U, D);	
+	}
 	//std::cout << "F_g: " << force.norm() << std::endl;
-	int iter = force_fermion (force, U, D);	
 	if(MEASURE_FORCE_NORM) {
 		std::cout << "fermion_force_norm: " << sqrt(force.squaredNorm()/static_cast<double>(4*U.V)) << std::endl;
 	}
@@ -342,16 +381,23 @@ void rhmc::random_U (field<gauge> &U, double eps) {
 	}
 }
 
-void rhmc::gaussian_fermion (field<fermion>& chi) {
+double rhmc::gaussian_fermion (std::vector< field<fermion> >& chi) {
 	// normal distribution p(x) ~ exp(-x^2), i.e. mu=0, sigma=1/sqrt(2):
 	// NO openMP: rng not threadsafe!
+	int N = static_cast<int>(chi.size());
+	double norm = 0;
 	std::normal_distribution<double> randdist_gaussian (0, 1.0/sqrt(2.0));
-	for(int ix=0; ix<chi.V; ++ix) {
-		for(int i=0; i<3; ++i) {
-			std::complex<double> r (randdist_gaussian (rng), randdist_gaussian (rng));
-			chi[ix](i) = r;
+	for(int ix=0; ix<chi[0].V; ++ix) {
+		for(int j=0; j<N; ++j) {
+			for(int i=0; i<3; ++i) {
+				double re = randdist_gaussian (rng);
+				double im = randdist_gaussian (rng);
+				norm += re*re + im*im;
+				chi[j][ix](i) = std::complex<double> (re, im);
+			}
 		}
 	}
+	return norm;
 }
 
 void rhmc::gaussian_P (field<gauge>& P) {
@@ -500,10 +546,10 @@ int rhmc::force_fermion_norms (field<gauge> &force, field<gauge> &U, dirac_op& D
 
 int rhmc::force_fermion (field<gauge> &force, field<gauge> &U, dirac_op& D) {
 	//std::cout << "#RHMC force: n_f=" << params.n_f << ", n_pf=" << params.n_pf << ", n_rational/2=" << n_rational/2 << ", n_shifts lo=" << RA.beta_inv_lo[n_rational/2].size() << std::endl;
+    auto timer_start = std::chrono::high_resolution_clock::now();
 	int n_shifts = RA.beta_inv_lo[n_rational].size();
 	std::vector< field<fermion> > chi(n_shifts, phi[0]);
 
-    //auto timer_start = std::chrono::high_resolution_clock::now();
 	field<fermion> psi (phi[0].grid, eo_storage_o);
 
 	int iter = 0;
@@ -581,9 +627,9 @@ int rhmc::force_fermion (field<gauge> &force, field<gauge> &U, dirac_op& D) {
 	} // end of loop over pseudo fermion flavours
 	// output fermion force norms
 	
-    //auto timer_stop = std::chrono::high_resolution_clock::now();
-    //auto timer_count = std::chrono::duration_cast<std::chrono::seconds>(timer_stop-timer_start).count();
-	//std::cout << "#RHMC_InitCGRuntime " << timer_count << std::endl;
+    auto timer_stop = std::chrono::high_resolution_clock::now();
+    auto timer_count = std::chrono::duration_cast<std::chrono::seconds>(timer_stop-timer_start).count();
+	std::cout << "#RHMC_ForceCGRuntime " << timer_count << std::endl;
 	std::cout << "#RHMC_ForceCGIter " << iter << std::endl;
 
 	return iter;
@@ -591,32 +637,32 @@ int rhmc::force_fermion (field<gauge> &force, field<gauge> &U, dirac_op& D) {
 
 int rhmc::force_fermion_block (field<gauge> &force, field<gauge> &U, dirac_op& D) {
 	//std::cout << "#RHMC force: n_f=" << params.n_f << ", n_pf=" << params.n_pf << ", n_rational/2=" << n_rational/2 << ", n_shifts lo=" << RA.beta_inv_lo[n_rational/2].size() << std::endl;
+    auto timer_start = std::chrono::high_resolution_clock::now();
 	int n_shifts = RA.beta_inv_lo[n_rational].size();
-	std::vector< std::vector< field<fermion> > > chi(n_shifts, phi);
-//    auto timer_start = std::chrono::high_resolution_clock::now();
-	field<fermion> psi (phi[0].grid, eo_storage_o);
+	std::vector< field<block_fermion> > chi(n_shifts, block_phi);
+	field<block_fermion> psi (block_phi.grid, block_eo_storage_o);
 
-	int iter = SBCGrQ (chi, phi, U, RA.beta_inv_lo[n_rational], D, params.MD_eps);
-	for(int i_pf=0; i_pf<params.n_pf; ++i_pf) {
+	int iter = SBCGrQ (chi, block_phi, U, RA.beta_inv_lo[n_rational], D, params.MD_eps);
+	for(int i_s=0; i_s<n_shifts; ++i_s) {
 		// chi_{i_s} = [(DD^dagger + beta_{i_s}]^-1 phi[i_pf]
 		//std::cout << "ipf " << i_pf << "cum iter " << iter << " inv0 norm " << chi[0].norm() << " Unorm " << U.norm() << " phinorm " << phi[i_pf].norm() << std::endl;
-		for(int i_s=0; i_s<n_shifts; ++i_s) {
 			// psi_i = -D^dagger(mu,m) chi or Doe chi
 			// psi = -D^dagger(mu,m) chi = D(-mu, -m) chi
-			if(params.EE) {
-				D.apply_eta_bcs_to_U(U);
-				D.D_oe(psi, chi[i_s][i_pf], U);
-				D.remove_eta_bcs_from_U(U);
-			} else {
-				// apply -Ddagger = D(-m, -mu)
-				// NB: should put this in a function
-				D.mass = -D.mass;
-				D.mu_I = -D.mu_I;
-				D.D(psi, chi[i_s][i_pf], U);
-				D.mass = -D.mass;
-				D.mu_I = -D.mu_I;
-			}
+		if(params.EE) {
+			D.apply_eta_bcs_to_U(U);
+			D.D_oe(psi, chi[i_s], U);
+			D.remove_eta_bcs_from_U(U);
+		} else {
+			// apply -Ddagger = D(-m, -mu)
+			// NB: should put this in a function
+			D.mass = -D.mass;
+			D.mu_I = -D.mu_I;
+			D.D(psi, chi[i_s], U);
+			D.mass = -D.mass;
+			D.mu_I = -D.mu_I;
+		}
 
+		for(int i_pf=0; i_pf<params.n_pf; ++i_pf) {
 			// usual force term expressions
 			// but with multiplicative alpha_inv factor:
 			double a_rational = RA.alpha_inv_lo[n_rational][i_s+1];
@@ -626,21 +672,21 @@ int rhmc::force_fermion_block (field<gauge> &force, field<gauge> &U, dirac_op& D
 				// for even-even version half of the terms are zero:
 				// even ix: ix = ix_e
 				#pragma omp parallel for
-				for(int ix=0; ix<chi[i_s][i_pf].V; ++ix) {
+				for(int ix=0; ix<chi[i_s].V; ++ix) {
 					for(int mu=0; mu<4; ++mu) {
 						for(int a=0; a<8; ++a) {
-							double Fa = a_rational * (chi[i_s][i_pf][ix].dot(T[a] * U[ix][mu] * psi.up(ix,mu))).imag();
+							double Fa = a_rational * (chi[i_s][ix].col(i_pf).dot(T[a] * U[ix][mu] * psi.up(ix,mu).col(i_pf))).imag();
 							force[ix][mu] -= Fa * T[a];
 						}
 					}
 				}
 				// odd ix: ix = ix_o + chi.V
 				#pragma omp parallel for
-				for(int ix_o=0; ix_o<chi[i_s][i_pf].V; ++ix_o) {
-					int ix = ix_o + chi[i_s][i_pf].V;
+				for(int ix_o=0; ix_o<chi[i_s].V; ++ix_o) {
+					int ix = ix_o + chi[i_s].V;
 					for(int mu=0; mu<4; ++mu) {
 						for(int a=0; a<8; ++a) {
-							double Fa = a_rational * (chi[i_s][i_pf].up(ix,mu).dot(U[ix][mu].adjoint() * T[a] * psi[ix_o])).imag();
+							double Fa = a_rational * (chi[i_s].up(ix,mu).col(i_pf).dot(U[ix][mu].adjoint() * T[a] * psi[ix_o].col(i_pf))).imag();
 							force[ix][mu] -= Fa * T[a];
 						}
 					}
@@ -652,14 +698,14 @@ int rhmc::force_fermion_block (field<gauge> &force, field<gauge> &U, dirac_op& D
 				#pragma omp parallel for
 				for(int ix=0; ix<U.V; ++ix) {
 					for(int a=0; a<8; ++a) {
-						double Fa = a_rational * chi[i_s][i_pf][ix].dot(T[a] * mu_I_plus_factor * U[ix][0] * psi.up(ix,0)).imag();
-						Fa += a_rational * chi[i_s][i_pf].up(ix,0).dot(U[ix][0].adjoint() * mu_I_minus_factor * T[a] * psi[ix]).imag();
+						double Fa = a_rational * chi[i_s][ix].col(i_pf).dot(T[a] * mu_I_plus_factor * U[ix][0] * psi.up(ix,0).col(i_pf)).imag();
+						Fa += a_rational * chi[i_s].up(ix,0).col(i_pf).dot(U[ix][0].adjoint() * mu_I_minus_factor * T[a] * psi[ix].col(i_pf)).imag();
 						force[ix][0] -= Fa * T[a];
 					}
 					for(int mu=1; mu<4; ++mu) {
 						for(int a=0; a<8; ++a) {
-							double Fa = a_rational * (chi[i_s][i_pf][ix].dot(T[a] * U[ix][mu] * psi.up(ix,mu))).imag();
-							Fa += a_rational * (chi[i_s][i_pf].up(ix,mu).dot(U[ix][mu].adjoint() * T[a] * psi[ix])).imag();
+							double Fa = a_rational * (chi[i_s][ix].col(i_pf).dot(T[a] * U[ix][mu] * psi.up(ix,mu).col(i_pf))).imag();
+							Fa += a_rational * (chi[i_s].up(ix,mu).col(i_pf).dot(U[ix][mu].adjoint() * T[a] * psi[ix].col(i_pf))).imag();
 							force[ix][mu] -= Fa * T[a];
 						}
 					}
@@ -668,6 +714,9 @@ int rhmc::force_fermion_block (field<gauge> &force, field<gauge> &U, dirac_op& D
 			D.remove_eta_bcs_from_U(U);
 		} // end of loop over shifts
 	} // end of loop over pseudo fermion flavours
+    auto timer_stop = std::chrono::high_resolution_clock::now();
+    auto timer_count = std::chrono::duration_cast<std::chrono::seconds>(timer_stop-timer_start).count();
+	std::cout << "#RHMC_ForceBCGRuntime " << timer_count << std::endl;
 	std::cout << "#RHMC_ForceBCGIter " << iter << std::endl;
 
 	return iter;

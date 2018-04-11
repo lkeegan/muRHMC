@@ -90,11 +90,19 @@ public:
 				//must be EO grid to only store odd part!
 				exit(1);
 			}
-		} 
+		}
 	}
 
-	// assignment op just copies data, no check that lattices are consistent - TODO 
+	// assignment op just copies V and data from rhs - OK as long as both have the same grid.
 	field& operator=(const field& rhs) {
+		V = rhs.V;
+		VOL3 = rhs.VOL3;
+		L0 = rhs.L0;
+		L1 = rhs.L1;
+		L2 = rhs.L2;
+		L3 = rhs.L3;
+		eo_storage = rhs.eo_storage;
+		data_.resize(V);
 		for(int ix=0; ix<V; ++ix) {
 			data_[ix] = rhs[ix];
 		}
@@ -117,18 +125,11 @@ public:
 	    return *this;
 	}
 
-	field& operator*=(double scalar)
+	template<typename Targ>
+	field& operator*=(Targ multiplier)
 	{
 		for(int ix=0; ix<V; ++ix) {
-			data_[ix] *= scalar;
-		}
-	    return *this;
-	}
-
-	field& operator*=(std::complex<double> scalar)
-	{
-		for(int ix=0; ix<V; ++ix) {
-			data_[ix] *= scalar;
+			data_[ix] *= multiplier;
 		}
 	    return *this;
 	}
@@ -149,22 +150,32 @@ public:
 	    return *this;
 	}
 
-	// *this += rhs_multiplier * rhs
-	field& add(std::complex<double> rhs_multiplier, const field& rhs)
+	// *thisField += rhs_multiplier * rhsField
+	template<typename Targ>
+	field& add(const Targ& rhs_multiplier, const field& rhs)
+	{
+		for(int ix=0; ix<V; ++ix) {
+			data_[ix].noalias() += rhs_multiplier * rhs[ix];
+		}
+	    return *this;
+	}
+	// *thisField += rhsField * rhs_multiplier
+	template<typename Targ>
+	field& add(const field& rhs, const Targ& rhs_multiplier)
+	{
+		for(int ix=0; ix<V; ++ix) {
+			data_[ix].noalias() += rhs[ix] * rhs_multiplier;
+		}
+	    return *this;
+	}
+/*	field& add(double rhs_multiplier, const field& rhs)
 	{
 		for(int ix=0; ix<V; ++ix) {
 			data_[ix] += rhs_multiplier * rhs[ix];
 		}
 	    return *this;
 	}
-	field& add(double rhs_multiplier, const field& rhs)
-	{
-		for(int ix=0; ix<V; ++ix) {
-			data_[ix] += rhs_multiplier * rhs[ix];
-		}
-	    return *this;
-	}
-	// *this = scale * (*this) + rhs_multiplier * rhs
+*/	// *this = scale * (*this) + rhs_multiplier * rhs
 	field& scale_add(double scale, double rhs_multiplier, const field& rhs)
 	{
 		#pragma omp parallel for
@@ -188,7 +199,7 @@ public:
 	void setZero() {
 		for(int ix=0; ix<V; ++ix) {
 			data_[ix].setZero();
-		}		
+		}
 	}
 	// equivalent to real part of dot with itself i.e. l2-norm squared
 	double squaredNorm() const {
@@ -203,6 +214,24 @@ public:
 	double norm() const {
 		return sqrt(squaredNorm());		
 	}
+
+	// norm of first/second half of data, i.e. even/odd
+	// only used for testing / debugging
+	double norm_odd() const {
+		double norm = 0.0;
+		for(int ix=V/2; ix<V; ++ix) {
+			norm += data_[ix].squaredNorm();
+		}
+		return sqrt(norm);		
+	}
+	double norm_even() const {
+		double norm = 0.0;
+		for(int ix=0; ix<V/2; ++ix) {
+			norm += data_[ix].squaredNorm();
+		}
+		return sqrt(norm);		
+	}
+
 	//complex conjugate of this dotted with rhs
 	std::complex<double> dot (const field& rhs) const {
 		std::complex<double> sum (0.0, 0.0);

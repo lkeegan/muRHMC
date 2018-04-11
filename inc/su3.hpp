@@ -3,10 +3,26 @@
 #include <complex>
 #include <Eigen/Dense>
 #include <Eigen/StdVector>
+// hard code (for now) block fermion RHS
+constexpr int N_rhs = 6;
+constexpr int N_gauge = 3;
+// define types for gauge links and fermion fields
+typedef Eigen::Matrix<std::complex<double>, N_gauge, N_gauge> SU3mat;
+template <int N>
+using block_fermion_matrix = Eigen::Matrix<std::complex<double>, N_gauge, N>;
+typedef block_fermion_matrix<1> fermion;
+typedef block_fermion_matrix<N_rhs> block_fermion;
+typedef Eigen::Matrix<std::complex<double>, N_rhs, N_rhs>  block_matrix;
 
-EIGEN_DEFINE_STL_VECTOR_SPECIALIZATION(Eigen::Matrix3cd)
-typedef Eigen::Matrix3cd SU3mat;
-typedef Eigen::Vector3cd fermion;
+// the following is required to be able to use STL vectors of
+// these objects with correct alignment (i.e. otherwise segfaults!) 
+EIGEN_DEFINE_STL_VECTOR_SPECIALIZATION(SU3mat)
+EIGEN_DEFINE_STL_VECTOR_SPECIALIZATION(fermion)
+EIGEN_DEFINE_STL_VECTOR_SPECIALIZATION(block_fermion)
+EIGEN_DEFINE_STL_VECTOR_SPECIALIZATION(block_matrix)
+
+//template<int N_rhs>
+//using block_fermion = Eigen::Matrix<std::complex<double>, 3, N_rhs>;
 
 // return exp(X)
 // where X is 3x3 complex anti-hermitian traceless matrix

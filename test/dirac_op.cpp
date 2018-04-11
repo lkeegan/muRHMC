@@ -1,9 +1,10 @@
 #include "catch.hpp"
 #include "su3.hpp"
 #include "4d.hpp"
-#include "hmc.hpp"
+#include "rhmc.hpp"
 #include "dirac_op.hpp"
 #include "io.hpp"
+#include <iostream>
 
 constexpr double EPS = 5.e-14;
 
@@ -11,111 +12,191 @@ TEST_CASE( "D(m, mu) = -eta_5 D(-m, mu) eta_5", "[staggered]") {
 	for(bool isEO : {false, true}) {
 		lattice grid (4, isEO);
 		field<gauge> U (grid);
-		hmc hmc (hmc_params);
-		hmc_params.mass = 0.1322;
-		hmc_params.mu_I = 0.219;
-		hmc.random_U(U, 10.0);
-		dirac_op D (grid);
+		rhmc_params rhmc_params;
+		rhmc rhmc (rhmc_params, grid);
+		rhmc.random_U(U, 10.0);
+		dirac_op D (grid, rhmc_params.mass, rhmc_params.mu_I);
 
 		// make random fermion field chi
 		field<fermion> chi (grid);
-		hmc.gaussian_fermion(chi);
+		rhmc.gaussian_fermion(chi);
 
 		// psi1 = -D(mass, mu) chi
 		field<fermion> psi1 (grid);
-		D.D(psi1, chi, U, hmc_params.mass, hmc_params.mu_I);
+		D.D(psi1, chi, U);
 		psi1 *= -1;
 
 		// psi2 = eta_5 D(-mass, m) eta_5 chi
 		field<fermion> psi2 (grid);
 		D.gamma5(chi);
-		D.D(psi2, chi, U, -hmc_params.mass, hmc_params.mu_I);
+		D.mass *= -1.0;
+		D.D(psi2, chi, U);
 		D.gamma5(psi2);
-		REQUIRE( is_field_equal(psi1, psi2) == approx(0) );
+
+		psi2 -= psi1;
+		REQUIRE( psi2.norm() < EPS );
+	}
+}
+
+TEST_CASE( "BLOCK D(m, mu) = -eta_5 D(-m, mu) eta_5", "[block_staggered]") {
+	for(bool isEO : {false, true}) {
+		lattice grid (4, isEO);
+		field<gauge> U (grid);
+		rhmc_params rhmc_params;
+		rhmc rhmc (rhmc_params, grid);
+		rhmc.random_U(U, 10.0);
+		dirac_op D (grid, rhmc_params.mass, rhmc_params.mu_I);
+
+		// make random fermion field chi
+		field<block_fermion> chi (grid);
+		rhmc.gaussian_fermion(chi);
+
+		// psi1 = -D(mass, mu) chi
+		field<block_fermion> psi1 (grid);
+		D.D(psi1, chi, U);
+		psi1 *= -1;
+
+		// psi2 = eta_5 D(-mass, m) eta_5 chi
+		field<block_fermion> psi2 (grid);
+		D.gamma5(chi);
+		D.mass *= -1.0;
+		D.D(psi2, chi, U);
+		D.gamma5(psi2);
+
+		psi2 -= psi1;
+		REQUIRE( psi2.norm() < EPS );
 	}
 }
 
 TEST_CASE( "D(m=0,mu=0) phi (phi_O = 0) = D_OE phi_E, and E<->O", "[EO]") {
-	// set mass and mu_I to zero
-	hmc_params.mass = 0.0;
-	hmc_params.mu_I = 0.0;
 
 	// use EO-ordered lattice
 	lattice grid (4, true);
 	field<gauge> U (grid);
-	hmc hmc (hmc_params);
-	hmc.random_U(U, 10.0);
-	dirac_op D (grid);
+	rhmc_params rhmc_params;
+	rhmc rhmc (rhmc_params, grid);
+	rhmc.random_U(U, 10.0);
+	// massless dirac op
+	dirac_op D (grid, 0.0, 0.0);
 
 	// make random fermion field chi
 	field<fermion> chi (grid);
-	hmc.gaussian_fermion(chi);
+	rhmc.gaussian_fermion(chi);
 	// set odd sites to zero
 	for(int i=grid.V/2; i<grid.V; ++i) {
 		chi[i].setZero();
 	}
-	REQUIRE( norm_odd(chi) == approx(0) );
+	REQUIRE( chi.norm_odd() < EPS );
 
 	// psi1 = D(mass=0, mu=0) chi
 	field<fermion> psi1(grid), psi2(grid);
-	D.D(psi1, chi, U, 0.0, 0.0);
+	D.D(psi1, chi, U);
 	// check that psi1 is odd:
-	REQUIRE( norm_even(psi1) == approx(0) );
+	REQUIRE( psi1.norm_even() < EPS );
 	// chi = D(mass=0, mu=0) psi1
-	D.D(psi2, psi1, U, 0.0, 0.0);
+	D.D(psi2, psi1, U);
 	// check that psi2 is even:
-	REQUIRE( norm_odd(psi2) == approx(0) );
+	REQUIRE( psi2.norm_odd() < EPS );
 
 	// check that D_eo gives same result:
 	field<fermion> psi_e(grid, field<fermion>::EVEN_ONLY), psi_o(grid, field<fermion>::ODD_ONLY);
-	psi_e = chi;
-	REQUIRE( is_field_equal(psi_e, chi) == approx(0) );
+	for(int i=0; i<psi_e.V; ++i) {
+		psi_e[i] = chi[i];
+	}
 	D.apply_eta_bcs_to_U(U);
 	D.D_oe(psi_o, psi_e, U);
 	D.D_eo(psi_e, psi_o, U);
 	D.apply_eta_bcs_to_U(U);
-	REQUIRE( is_field_equal(psi_e, psi2) == approx(0) );
+	psi_e -= psi2;
+	REQUIRE( psi_e.norm() < EPS );
 }
 
-TEST_CASE( "DDdagger phi (phi_O = 0) = [m^2 - D_EO D_OE] phi_E", "[EO]") {
-	// set mu_I to zero
-	hmc_params.mu_I = 0.0;
-	hmc_params.mass = 0.128;
+TEST_CASE( "BLOCK D(m=0,mu=0) phi (phi_O = 0) = D_OE phi_E, and E<->O", "[block_EO]") {
 
+	constexpr int N = 3;
+	using bf = block_fermion_matrix<N>;
 	// use EO-ordered lattice
 	lattice grid (4, true);
 	field<gauge> U (grid);
-	hmc hmc (hmc_params);
-	hmc.random_U(U, 1.0);
-	dirac_op D (grid);
+	rhmc_params rhmc_params;
+	rhmc rhmc (rhmc_params, grid);
+	rhmc.random_U(U, 10.0);
+	// massless dirac op
+	dirac_op D (grid, 0.0, 0.0);
 
 	// make random fermion field chi
-	field<fermion> chi (grid);
-	hmc.gaussian_fermion(chi);
+	field<bf> chi (grid);
+	rhmc.gaussian_fermion(chi);
 	// set odd sites to zero
 	for(int i=grid.V/2; i<grid.V; ++i) {
 		chi[i].setZero();
 	}
-	REQUIRE( norm_odd(chi) == approx(0) );
+	REQUIRE( chi.norm_odd() < EPS );
 
-	// psi1 = DDdagger(mu=0) chi
-	field<fermion> psi1(grid);
-	D.DDdagger(psi1, chi, U, hmc_params.mass, 0.0);
-	// check that psi1 is even:
-	REQUIRE( norm_odd(psi1) == approx(0) );
+	// psi1 = D(mass=0, mu=0) chi
+	field<bf> psi1(grid), psi2(grid);
+	D.D(psi1, chi, U);
+	// check that psi1 is odd:
+	REQUIRE( psi1.norm_even() < EPS );
+	// chi = D(mass=0, mu=0) psi1
+	D.D(psi2, psi1, U);
+	// check that psi2 is even:
+	REQUIRE( psi2.norm_odd() < EPS );
 
 	// check that D_eo gives same result:
-	field<fermion> psi_e(grid, field<fermion>::EVEN_ONLY), psi_o(grid, field<fermion>::ODD_ONLY);
-	psi_e = chi;
-	REQUIRE( is_field_equal(psi_e, chi) == approx(0) );
+	field<bf> psi_e(grid, field<bf>::EVEN_ONLY), psi_o(grid, field<bf>::ODD_ONLY);
+	for(int i=0; i<psi_e.V; ++i) {
+		psi_e[i] = chi[i];
+	}
+//	REQUIRE( is_field_equal(psi_e, chi) == approx(0) );
 	D.apply_eta_bcs_to_U(U);
 	D.D_oe(psi_o, psi_e, U);
 	D.D_eo(psi_e, psi_o, U);
-	psi_e.scale_add(-1.0, hmc_params.mass*hmc_params.mass, chi);
-	D.remove_eta_bcs_from_U(U);
-	REQUIRE( is_field_equal(psi_e, psi1) == approx(0) );
+	D.apply_eta_bcs_to_U(U);
+	psi_e -= psi2;
+	REQUIRE( psi_e.norm() < EPS );
 }
 
+TEST_CASE( "DDdagger phi (phi_O = 0) = [m^2 - D_EO D_OE] phi_E", "[EO]") {
+	// use EO-ordered lattice
+	lattice grid (4, true);	
+	field<gauge> U (grid);
+	rhmc_params rhmc_params;
+	rhmc rhmc (rhmc_params, grid);
+	rhmc.random_U(U, 10.0);
+	// massive but mu_I=0 dirac op
+	dirac_op D (grid, rhmc_params.mass, 0.0);
+
+	// make random fermion field chi
+	field<fermion> chi (grid);
+	rhmc.gaussian_fermion(chi);
+	// set odd sites to zero
+	for(int i=grid.V/2; i<grid.V; ++i) {
+		chi[i].setZero();
+	}
+	REQUIRE( chi.norm_odd() < EPS );
+
+	// psi1 = DDdagger(mu=0) chi
+	field<fermion> psi1(grid);
+	D.DDdagger(psi1, chi, U);
+	// check that psi1 is even:
+	REQUIRE( psi1.norm_odd() < EPS );
+
+	// check that D_eo gives same result:
+	field<fermion> psi_e(grid, field<fermion>::EVEN_ONLY), psi_o(grid, field<fermion>::ODD_ONLY);
+	// set psi_e equal to even part of chi
+	for(int i=0; i<psi_e.V; ++i) {
+		psi_e[i] = chi[i];
+	}
+	D.apply_eta_bcs_to_U(U);
+	D.D_oe(psi_o, psi_e, U);
+	D.D_eo(psi_e, psi_o, U);
+	psi_e.scale_add(-1.0, rhmc_params.mass*rhmc_params.mass, chi);
+	D.remove_eta_bcs_from_U(U);
+	psi_e -= psi1;
+	REQUIRE( psi_e.norm() < EPS );
+}
+/*
 TEST_CASE( "DDdagger phi (phi_O = 0) = DDdagger_ee phi_e", "[EO]") {
 	// set mu_I to zero
 	hmc_params.mu_I = 0.0;
@@ -223,21 +304,21 @@ TEST_CASE( "Explicit Dirac op matrix equivalent to sparse MVM op", "[Eigenvalues
 	}
 }
 
-// Note: this routine is not required any more
-TEST_CASE( "Bartels-Stewart Matrix solution of AX + XB = C", "[Matrices]") {
-
-	int N = 12;
-	Eigen::MatrixXcd A = Eigen::MatrixXcd::Random(N, N);
-	Eigen::MatrixXcd B = Eigen::MatrixXcd::Random(N, N);
-	Eigen::MatrixXcd C = Eigen::MatrixXcd::Random(N, N);
-	Eigen::MatrixXcd X = Eigen::MatrixXcd::Zero(N, N);
+*/
+TEST_CASE( "Block fermion field", "[block_fermion]") {
 
 	lattice grid (4);
-	field<gauge> U (grid);
-	dirac_op D (grid);
-	D.bartels_stewart(X, A, B, C);
+	field<fermion> f (grid);
+	field<block_fermion> bf (grid);
 
-	double dev = (A*X + X*B - C).norm();
-	INFO ("|| A*X + X*B - C || = " << dev);	
-	REQUIRE ( dev == approx(0).margin(1e-14*N*N) );
+	double a = 0.346345;
+	f.setZero();
+	f[0][0] = a;
+	bf.setZero();
+	bf[0](0,0) = a;
+
+	REQUIRE( f[0][0] == a );
+	REQUIRE( f[0](0) == a );
+	REQUIRE( f[0](0,0) == a );
+	REQUIRE( bf[0](0,0) == a );
 }
