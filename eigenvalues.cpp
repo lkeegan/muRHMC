@@ -72,7 +72,7 @@ int main(int argc, char *argv[]) {
 
 	// Find N lowest eigenvalues of DDdagger.
 	// Uses chebyshev acceleration as described in Appendix A of hep-lat/0512021
-	Eigen::MatrixXcd R = Eigen::MatrixXcd::Zero(N_eigenvalues, N_eigenvalues);	
+	block_matrix R = block_matrix::Zero();	
 	Eigen::MatrixXd Evals = Eigen::MatrixXd::Zero(N_eigenvalues, 2);	
 
 	// make initial fermion vector basis of gaussian noise vectors

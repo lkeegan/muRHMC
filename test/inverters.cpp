@@ -134,11 +134,11 @@ TEST_CASE( "CG inversions of isospin (D+m)(D+m)^dagger", "[inverters]") {
 
 		SECTION( std::string("thinQR_") + lt ) {
 			block_X[0] = block_B;
-			Eigen::MatrixXcd R = Eigen::MatrixXcd::Zero(N_rhs, N_rhs);
+			block_matrix R = block_matrix::Zero();
 			thinQR(block_B, R);
 
 			// B should be orthornormal
-			Eigen::MatrixXcd Bdot = Eigen::MatrixXd::Zero(N_rhs, N_rhs);
+			Eigen::MatrixXcd Bdot = block_matrix::Zero();
 			for(int ix=0; ix<block_B.V; ++ix) {
 				for(int i=N_rhs-1; i>=0; --i) {
 					for(int j=N_rhs-1; j>=0; --j) {
@@ -146,7 +146,7 @@ TEST_CASE( "CG inversions of isospin (D+m)(D+m)^dagger", "[inverters]") {
 					}
 				}
 			}
-			REQUIRE( (Bdot - Eigen::MatrixXd::Identity(N_rhs, N_rhs)).norm() < EPS );
+			REQUIRE( (Bdot - block_matrix::Identity()).norm() < EPS );
 
 			// R should be upper triangular
 			double norm = 0;

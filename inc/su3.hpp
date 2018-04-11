@@ -1,6 +1,8 @@
 #ifndef LATTICE_SU3_H
 #define LATTICE_SU3_H
 #include <complex>
+// disable run-time eigen assertions that slow down execution
+#define EIGEN_NO_DEBUG
 #include <Eigen/Dense>
 #include <Eigen/StdVector>
 // hard code (for now) block fermion RHS
@@ -12,7 +14,7 @@ template <int N>
 using block_fermion_matrix = Eigen::Matrix<std::complex<double>, N_gauge, N>;
 typedef block_fermion_matrix<1> fermion;
 typedef block_fermion_matrix<N_rhs> block_fermion;
-typedef Eigen::Matrix<std::complex<double>, N_rhs, N_rhs>  block_matrix;
+typedef Eigen::Matrix<std::complex<double>, N_rhs, N_rhs> block_matrix;
 
 // the following is required to be able to use STL vectors of
 // these objects with correct alignment (i.e. otherwise segfaults!) 

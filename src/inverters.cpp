@@ -7,7 +7,7 @@
 // input: Q is a vector of N fermion fields
 // output: R is a NxN complex hermitian matrix such that Q_input R = Q_output
 // output: Q is a now a vector of N orthogonal fermion fields
-void thinQR(field<block_fermion>& Q, Eigen::MatrixXcd& R) {
+void thinQR(field<block_fermion>& Q, block_matrix& R) {
 	/*
 	int N = Q.size();
 	// Construct H_ij (using R for storage) = Q_i^dag Q_j = hermitian, 
@@ -55,7 +55,7 @@ void thinQR(field<block_fermion>& Q, Eigen::MatrixXcd& R) {
 // can do cholesky decomposition to find R, then back substitution:
 // V <- P = V R^-1
 // AV <- AP = AV R^-1
-void thinQRA(field<block_fermion>& V, field<block_fermion>& AV, Eigen::MatrixXcd& R) {
+void thinQRA(field<block_fermion>& V, field<block_fermion>& AV, block_matrix& R) {
 /*	int N = V.size();
 	// Construct [V^dag AV]_ij (using R for storage) - hermitian, 
 	// so only need to do the dot products needed for lower triangular part of matrix
@@ -103,7 +103,7 @@ void thinQRA(field<block_fermion>& V, field<block_fermion>& AV, Eigen::MatrixXcd
 void thinQRA_evals(field<block_fermion>& X, Eigen::MatrixXd& Evals, field<gauge>& U, dirac_op& D) {
 	field<block_fermion> AX(X);
 	// Construct lower triangular part of hermitian matrix <X_i|A|X_j> and diagonal part of <X_i|A^2|X_j> 
-	Eigen::MatrixXcd R = Eigen::MatrixXcd::Zero(N_rhs, N_rhs);
+	block_matrix R = block_matrix::Zero();
 	D.DDdagger (AX, X, U);
 	Evals.col(1).setZero();
 	for(int ix=0; ix<X.V; ++ix) {
@@ -123,7 +123,7 @@ void thinQRA_evals(field<block_fermion>& X, Eigen::MatrixXd& Evals, field<gauge>
 */
 	//find eigensystem of R - only references lower triangular part
 	//NB also finding eigenvectors here, but no need to..
-	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXcd> R_eigen_system(R);
+	Eigen::SelfAdjointEigenSolver<block_matrix> R_eigen_system(R);
 	Evals.col(0) = R_eigen_system.eigenvalues().col(0);
 	// A-orthonormalise X
 	R = R.llt().matrixL().adjoint();
@@ -424,19 +424,19 @@ int rational_approx_cg_multishift(field<fermion>& x, const field<fermion>& b, fi
 int cg_block(field<block_fermion>& X, const field<block_fermion>& B, field<gauge>& U, dirac_op& D, double eps, bool BCGA, bool dQ, bool dQA, bool rQ, const field<fermion>& x0_star) {
 	int N = N_rhs;
 	// S = 1 [NxN]
-	Eigen::MatrixXcd S = Eigen::MatrixXcd::Identity(N, N);
+	block_matrix S = block_matrix::Identity();
 	// C = 1 [NxN]
-	Eigen::MatrixXcd C = Eigen::MatrixXcd::Identity(N, N);
+	block_matrix C = block_matrix::Identity();
 	// beta = 0 [NxN]
-	Eigen::MatrixXcd beta = Eigen::MatrixXcd::Zero(N, N);
+	block_matrix beta = block_matrix::Zero();
 	// betaC = 0 [NxN]
-	Eigen::MatrixXcd betaC = Eigen::MatrixXcd::Zero(N, N);
+	block_matrix betaC = block_matrix::Zero();
 	// R = 1 [NxN]
-	Eigen::MatrixXcd R = Eigen::MatrixXcd::Identity(N, N);
+	block_matrix R = block_matrix::Identity();
 	// PQ, PAQ (for BCGA dot products) [NxN]
-	Eigen::MatrixXcd mPAPinv = Eigen::MatrixXcd::Identity(N, N);
-	Eigen::MatrixXcd mPQ = Eigen::MatrixXcd::Identity(N, N);
-	Eigen::MatrixXcd mPAQ = Eigen::MatrixXcd::Identity(N, N);
+	block_matrix mPAPinv = block_matrix::Identity();
+	block_matrix mPQ = block_matrix::Identity();
+	block_matrix mPAQ = block_matrix::Identity();
 	// AP, P, Q are [NxVOL]
 	field<block_fermion> AP(X), P(X), Q(B);
 	// for debugging (error norms of first vector):
@@ -521,7 +521,7 @@ int cg_block(field<block_fermion>& X, const field<block_fermion>& B, field<gauge
 		// beta^-1 = P^dag AP [NxN hermitian matrix]
 		if(dQA) {
 			// P^dag AP = I by construction
-			beta = Eigen::MatrixXcd::Identity(N, N);
+			beta = block_matrix::Identity();
 		} else {
 			// note beta is hermitian since A is hermitian so we
 			// only need to calculate lower triangular elements of matrix
@@ -531,7 +531,7 @@ int cg_block(field<block_fermion>& X, const field<block_fermion>& B, field<gauge
 			}
 			// Find inverse of beta via LDLT cholesky decomposition
 			// and solving beta beta^-1 = I
-			beta = beta.ldlt().solve(Eigen::MatrixXcd::Identity(N, N));
+			beta = beta.ldlt().solve(block_matrix::Identity());
 		}
 
 		if((dQ || dQA) && !BCGA) {
@@ -613,7 +613,7 @@ int cg_block(field<block_fermion>& X, const field<block_fermion>& B, field<gauge
 				S.adjointInPlace();
 			} else {
 				// find inverse of C = Q_old^dagQ_old by cholesky decomposition
-				S = C.ldlt().solve(Eigen::MatrixXcd::Identity(N, N));
+				S = C.ldlt().solve(block_matrix::Identity());
 				// update C to hermitian matrix Q^dag Q
 				C.setZero();
 				for(int ix=0; ix<Q.V; ++ix) {
@@ -651,7 +651,7 @@ int cg_block(field<block_fermion>& X, const field<block_fermion>& B, field<gauge
 		std::cout << "#Error-norms <(x-x*)|(1,sqrt(A),A)|(x-x*)> " << iter << "\t" << norm0 << "\t" << norm1 << "\t" << norm2 << std::endl;
 		/*
 		// [debugging] find eigenvalues of C
-		Eigen::SelfAdjointEigenSolver<Eigen::MatrixXcd> saes;
+		Eigen::SelfAdjointEigenSolver<block_matrix> saes;
 		saes.compute(C);
 		Eigen::ArrayXd evals = saes.eigenvalues();
 		std::cout << "#BCG";
@@ -691,25 +691,11 @@ int SBCGrQ(std::vector< field<block_fermion> >& X, const field<block_fermion>& B
 		shifts[i_shift] = input_shifts[i_shift+1] - input_shifts[0];
 	}
 
-
-	// std::cout << "#Shifted BCGrQ:\t" << std::endl;
-	// std::cout << "#mass:\t" << D.mass << std::endl;
-	// std::cout << "#input_shifts:\t";
-	// for(int i_shift=0; i_shift<N_shifts+1; ++i_shift) {
-	//		std::cout << "\t" << input_shifts[i_shift];
-	// }
-	// std::cout << std::endl;
-	// std::cout << "#remaining_rescaled_shifts:\t";
-	// for(int i_shift=0; i_shift<N_shifts; ++i_shift) {
-	// 		std::cout << "\t" << shifts[i_shift];
-	// }
-	// std::cout << std::endl;
-
 	// Unshifted matrices:
-	Eigen::MatrixXcd S = Eigen::MatrixXcd::Identity(N, N);
-	Eigen::MatrixXcd C = Eigen::MatrixXcd::Identity(N, N);
-	Eigen::MatrixXcd beta = Eigen::MatrixXcd::Identity(N, N);
-	Eigen::MatrixXcd betaC = Eigen::MatrixXcd::Zero(N, N);
+	block_matrix S = block_matrix::Identity();
+	block_matrix C = block_matrix::Identity();
+	block_matrix beta = block_matrix::Identity();
+	block_matrix betaC = block_matrix::Zero();
 	// AP, Q are [NxVOL]
 	field<block_fermion> AP(B), Q(B);
 	// start from X=0 initial guess, so residual Q = B [NxVOL]
@@ -731,24 +717,24 @@ int SBCGrQ(std::vector< field<block_fermion> >& X, const field<block_fermion>& B
 
 	// Shifted matrices:
 	// previous / inverted versions of beta
-	Eigen::MatrixXcd beta_inv = Eigen::MatrixXcd::Identity(N, N);
-	Eigen::MatrixXcd beta_inv_m1 = Eigen::MatrixXcd::Identity(N, N);
+	block_matrix beta_inv = block_matrix::Identity();
+	block_matrix beta_inv_m1 = block_matrix::Identity();
 	// Construct decomposition of S: can then do S^-1 M using S_inv.solve(M)
-	Eigen::ColPivHouseholderQR<Eigen::MatrixXcd> S_inv (S);
-	Eigen::MatrixXcd S_m1 = Eigen::MatrixXcd::Zero(N, N);
+	Eigen::ColPivHouseholderQR<block_matrix> S_inv (S);
+	block_matrix S_m1 = block_matrix::Zero();
 	// These are temporary matrices used for each shift
-	Eigen::MatrixXcd tmp_betaC, tmp_Sdag; 
+	block_matrix tmp_betaC, tmp_Sdag; 
 	// ksi_s are the scale factors related shifted and unshifted residuals
 	// 3-term recurrence so need _k, _k-1, _k-2 for each shift
 	// initially ksi_s_m2 = I, ksi_s_m1 = S
-	std::vector<Eigen::MatrixXcd> ksi_s, ksi_s_m1, ksi_s_m2; 
-	std::vector< Eigen::ColPivHouseholderQR<Eigen::MatrixXcd> > ksi_s_inv_m1, ksi_s_inv_m2;
+	std::vector<block_matrix> ksi_s, ksi_s_m1, ksi_s_m2; 
+	std::vector< Eigen::ColPivHouseholderQR<block_matrix> > ksi_s_inv_m1, ksi_s_inv_m2;
 	for(int i_shift=0; i_shift<N_shifts; ++i_shift) {
- 		ksi_s.push_back(Eigen::MatrixXcd::Identity(N, N));
+ 		ksi_s.push_back(block_matrix::Identity());
  		ksi_s_m1.push_back(S);
  		ksi_s_inv_m1.push_back(S_inv);
- 		ksi_s_m2.push_back(Eigen::MatrixXcd::Identity(N, N));
- 		ksi_s_inv_m2.push_back(Eigen::MatrixXcd::Identity(N, N).colPivHouseholderQr());
+ 		ksi_s_m2.push_back(block_matrix::Identity());
+ 		ksi_s_inv_m2.push_back(block_matrix::Identity().colPivHouseholderQr());
 	}
 
 	// main loop
@@ -781,32 +767,16 @@ int SBCGrQ(std::vector< field<block_fermion> >& X, const field<block_fermion>& B
 		}
 		// Find inverse of beta_inv via LDLT cholesky decomposition
 		// and solving beta beta_inv = I
-		beta = beta_inv.ldlt().solve(Eigen::MatrixXcd::Identity(N, N));
+		beta = beta_inv.ldlt().solve(block_matrix::Identity());
 		betaC = beta * C;
 
 		// X[0] = X[0] + P[0] beta C
 		X[0].add(P[0], betaC);
-	/*
-		for(int ix=0; ix<AP.V; ++ix) {
-			for(int i=0; i<N; ++i) {
-				for(int j=0; j<N; ++j) {
-					X[0][ix].col(i) += betaC(j,i) * P[0][ix].col(j);
-				}
-			}
-		}
-	*/
+
 		//Q -= AP beta
 		betaC = -beta;
 		Q.add(AP, betaC);
-	/*
-		for(int ix=0; ix<AP.V; ++ix) {
-			for(int i=0; i<N; ++i) {
-				for(int j=0; j<N; ++j) {
-					Q[ix].col(i) -= beta(j,i) * AP[ix].col(j);
-				}
-			}
-		}
-	*/
+
 		S_m1 = S;
 		// in-place thinQR decomposition of residuals matrix Q
 		thinQR(Q, S);
@@ -837,7 +807,7 @@ int SBCGrQ(std::vector< field<block_fermion> >& X, const field<block_fermion>& B
 			// calculate shifted coefficients
 			// ksi_s:
 			tmp_betaC = S_m1 * beta_inv_m1 - ksi_s_m1[i_shift] * ksi_s_inv_m2[i_shift].solve(beta_inv_m1);
-			tmp_Sdag = Eigen::MatrixXcd::Identity(N, N) + shifts[i_shift] * beta + tmp_betaC * S_m1.adjoint() * beta;
+			tmp_Sdag = block_matrix::Identity() + shifts[i_shift] * beta + tmp_betaC * S_m1.adjoint() * beta;
 			ksi_s[i_shift] = S * tmp_Sdag.colPivHouseholderQr().solve(ksi_s_m1[i_shift]);
 			// tmp_betaC == "alpha^sigma" in paper:
 			tmp_betaC = beta * S_inv.solve(ksi_s[i_shift]);
@@ -847,30 +817,11 @@ int SBCGrQ(std::vector< field<block_fermion> >& X, const field<block_fermion>& B
 			// X_s = X_s + P_s tmp_betaC
 			X[i_shift+1].add(P[i_shift+1], tmp_betaC);
 
-		/*	for(int ix=0; ix<AP.V; ++ix) {
-				for(int i=0; i<N; ++i) {
-					for(int j=0; j<N; ++j) {
-						X[i_shift+1][ix].col(i) += tmp_betaC(j,i) * P[i_shift+1][ix].col(j);
-					}
-				}
-			}
-		*/
 			// P_s <- Q + P_s tmp_Sdag (using AP as temporary storage)
-
 			AP = Q;
 			AP.add(P[i_shift+1], tmp_Sdag);
 			P[i_shift+1] = AP;
-		/*	
-			for(int ix=0; ix<AP.V; ++ix) {
-				for(int i=0; i<N; ++i) {
-					AP[ix].col(i) = Q[ix].col(i);
-					for(int j=0; j<N; ++j) {
-						AP[ix].col(i) += tmp_Sdag(j,i) * P[i_shift+1][ix].col(j);
-					}
-				}
-			}
-			P[i_shift+1] = AP;
-		*/
+
 			// update inverse ksi's for next iteration
 			ksi_s_m2[i_shift] = ksi_s_m1[i_shift];
 			ksi_s_inv_m2[i_shift] = ksi_s_inv_m1[i_shift];
@@ -894,7 +845,7 @@ int SBCGrQ(std::vector< field<block_fermion> >& X, const field<block_fermion>& B
 
 		// [debugging] find eigenvalues of C
 		/*
-		Eigen::SelfAdjointEigenSolver<Eigen::MatrixXcd> saes;
+		Eigen::SelfAdjointEigenSolver<block_matrix> saes;
 		saes.compute(C);
 		Eigen::ArrayXd evals = saes.eigenvalues();
 		*/
@@ -912,10 +863,10 @@ int SBCGrQ(std::vector< field<block_fermion> >& X, const field<block_fermion>& B
 	return iter;
 }
 
-int rational_approx_SBCGrQ(field<block_fermion>& X, const field<block_fermion>& B, field<gauge>& U, std::vector<double>& rational_alpha, std::vector<double>& rational_beta, dirac_op& D, double eps) {
+int rational_approx_SBCGrQ(field<block_fermion>& X, const field<block_fermion>& B, field<gauge>& U, std::vector<double>& rational_alpha, std::vector<double>& rational_beta, dirac_op& D, double eps, double eps_shifts) {
 	int N = N_rhs;
 	// count shifts (not including first one that is included in the dirac op)
-	int N_shifts = static_cast<int>(rational_beta.size()) - 1;
+	int N_shifts = static_cast<int>(rational_alpha.size()) - 1;
 	int N_unconverged_shifts = N_shifts;
 
 	// subtract first shift from remaining set of shifts
@@ -924,25 +875,11 @@ int rational_approx_SBCGrQ(field<block_fermion>& X, const field<block_fermion>& 
 		shifts[i_shift] = rational_beta[i_shift+1] - rational_beta[0];
 	}
 
-
-	// std::cout << "#Shifted BCGrQ:\t" << std::endl;
-	// std::cout << "#mass:\t" << D.mass << std::endl;
-	// std::cout << "#input_shifts:\t";
-	// for(int i_shift=0; i_shift<N_shifts+1; ++i_shift) {
-	//		std::cout << "\t" << input_shifts[i_shift];
-	// }
-	// std::cout << std::endl;
-	// std::cout << "#remaining_rescaled_shifts:\t";
-	// for(int i_shift=0; i_shift<N_shifts; ++i_shift) {
-	// 		std::cout << "\t" << shifts[i_shift];
-	// }
-	// std::cout << std::endl;
-
 	// Unshifted matrices:
-	Eigen::MatrixXcd S = Eigen::MatrixXcd::Identity(N, N);
-	Eigen::MatrixXcd C = Eigen::MatrixXcd::Identity(N, N);
-	Eigen::MatrixXcd beta = Eigen::MatrixXcd::Identity(N, N);
-	Eigen::MatrixXcd betaC = Eigen::MatrixXcd::Zero(N, N);
+	block_matrix S = block_matrix::Identity();
+	block_matrix C = block_matrix::Identity();
+	block_matrix beta = block_matrix::Identity();
+	block_matrix betaC = block_matrix::Zero();
 	// AP, Q are [NxVOL]
 	field<block_fermion> AP(B), Q(B);
 	// start from X=0 initial guess, so residual Q = B [NxVOL]
@@ -963,24 +900,24 @@ int rational_approx_SBCGrQ(field<block_fermion>& X, const field<block_fermion>& 
 
 	// Shifted matrices:
 	// previous / inverted versions of beta
-	Eigen::MatrixXcd beta_inv = Eigen::MatrixXcd::Identity(N, N);
-	Eigen::MatrixXcd beta_inv_m1 = Eigen::MatrixXcd::Identity(N, N);
+	block_matrix beta_inv = block_matrix::Identity();
+	block_matrix beta_inv_m1 = block_matrix::Identity();
 	// Construct decomposition of S: can then do S^-1 M using S_inv.solve(M)
-	Eigen::ColPivHouseholderQR<Eigen::MatrixXcd> S_inv (S);
-	Eigen::MatrixXcd S_m1 = Eigen::MatrixXcd::Zero(N, N);
+	Eigen::ColPivHouseholderQR<block_matrix> S_inv (S);
+	block_matrix S_m1 = block_matrix::Zero();
 	// These are temporary matrices used for each shift
-	Eigen::MatrixXcd tmp_betaC, tmp_Sdag; 
+	block_matrix tmp_betaC, tmp_Sdag; 
 	// ksi_s are the scale factors related shifted and unshifted residuals
 	// 3-term recurrence so need _k, _k-1, _k-2 for each shift
 	// initially ksi_s_m2 = I, ksi_s_m1 = S
-	std::vector<Eigen::MatrixXcd> ksi_s, ksi_s_m1, ksi_s_m2; 
-	std::vector< Eigen::ColPivHouseholderQR<Eigen::MatrixXcd> > ksi_s_inv_m1, ksi_s_inv_m2;
+	std::vector<block_matrix> ksi_s, ksi_s_m1, ksi_s_m2; 
+	std::vector< Eigen::ColPivHouseholderQR<block_matrix> > ksi_s_inv_m1, ksi_s_inv_m2;
 	for(int i_shift=0; i_shift<N_shifts; ++i_shift) {
- 		ksi_s.push_back(Eigen::MatrixXcd::Identity(N, N));
+ 		ksi_s.push_back(block_matrix::Identity());
  		ksi_s_m1.push_back(S);
  		ksi_s_inv_m1.push_back(S_inv);
- 		ksi_s_m2.push_back(Eigen::MatrixXcd::Identity(N, N));
- 		ksi_s_inv_m2.push_back(Eigen::MatrixXcd::Identity(N, N).colPivHouseholderQr());
+ 		ksi_s_m2.push_back(block_matrix::Identity());
+ 		ksi_s_inv_m2.push_back(block_matrix::Identity().colPivHouseholderQr());
 	}
 
 	// main loop
@@ -992,12 +929,19 @@ int rational_approx_SBCGrQ(field<block_fermion>& X, const field<block_fermion>& 
 	double residual = 1.0;
 
 	while(residual > eps) {
+		    //auto timer_start = std::chrono::high_resolution_clock::now();
 
 		// Apply dirac op (with lowest shift) to P[0]:
 		D.DDdagger(AP, P[0], U, true);
 		// do lowest shift as part of dirac op
 		AP.add(rational_beta[0], P[0]);
 		++iter;
+
+		    //auto timer_stop = std::chrono::high_resolution_clock::now();
+		    //auto timer_count = std::chrono::duration_cast<std::chrono::milliseconds>(timer_stop-timer_start).count();
+			//std::cout << "#SBCG_DiracOp_Runtime " << timer_count << std::endl;
+			//timer_start = std::chrono::high_resolution_clock::now();
+
 
 		beta_inv_m1 = beta_inv;
 		beta_inv.setZero();
@@ -1006,25 +950,17 @@ int rational_approx_SBCGrQ(field<block_fermion>& X, const field<block_fermion>& 
 		}
 		// Find inverse of beta_inv via LDLT cholesky decomposition
 		// and solving beta beta_inv = I
-		beta = beta_inv.ldlt().solve(Eigen::MatrixXcd::Identity(N, N));
+		beta = beta_inv.ldlt().solve(block_matrix::Identity());
 		betaC = beta * C;
 
-		// X += alpha[1] P[0] beta C
-		for(int ix=0; ix<AP.V; ++ix) {
-			for(int i=0; i<N; ++i) {
-				for(int j=0; j<N; ++j) {
-					X[ix].col(i) += rational_alpha[1] * betaC(j,i) * P[0][ix].col(j);
-				}
-			}
-		}
+		// X[0] = X[0] + P[0] beta C
+		betaC *= rational_alpha[1];
+		X.add(P[0], betaC);
+
 		//Q -= AP beta
-		for(int ix=0; ix<AP.V; ++ix) {
-			for(int i=0; i<N; ++i) {
-				for(int j=0; j<N; ++j) {
-					Q[ix].col(i) -= beta(j,i) * AP[ix].col(j);
-				}
-			}
-		}
+		betaC = -beta;
+		Q.add(AP, betaC);
+
 		S_m1 = S;
 		// in-place thinQR decomposition of residuals matrix Q
 		thinQR(Q, S);
@@ -1044,46 +980,41 @@ int rational_approx_SBCGrQ(field<block_fermion>& X, const field<block_fermion>& 
 				P[0][ix].col(i) += Q[ix].col(i);
 			}
 		}
+		    //timer_stop = std::chrono::high_resolution_clock::now();
+		    //timer_count = std::chrono::duration_cast<std::chrono::milliseconds>(timer_stop-timer_start).count();
+			//std::cout << "#SBCG_Remaining_Unshifted_Runtime " << timer_count << std::endl;
+			//timer_start = std::chrono::high_resolution_clock::now();
+
 		// calculate shifted X and P
 		// note X[0] and P[0] are the unshifted ones, so first shift has index 1 in X and P
 		for(int i_shift=0; i_shift<N_unconverged_shifts; ++i_shift) {
 			// calculate shifted coefficients
 			// ksi_s:
 			tmp_betaC = S_m1 * beta_inv_m1 - ksi_s_m1[i_shift] * ksi_s_inv_m2[i_shift].solve(beta_inv_m1);
-			tmp_Sdag = Eigen::MatrixXcd::Identity(N, N) + shifts[i_shift] * beta + tmp_betaC * S_m1.adjoint() * beta;
+			tmp_Sdag = block_matrix::Identity() + shifts[i_shift] * beta + tmp_betaC * S_m1.adjoint() * beta;
 			ksi_s[i_shift] = S * tmp_Sdag.colPivHouseholderQr().solve(ksi_s_m1[i_shift]);
 			// tmp_betaC == "alpha^sigma" in paper:
 			tmp_betaC = beta * S_inv.solve(ksi_s[i_shift]);
 			// tmp_Sdag == "beta^sigma" in paper:
 			tmp_Sdag = tmp_betaC * ksi_s_inv_m1[i_shift].solve(beta_inv * S.adjoint());
 			// update shifted X and P
-
 			// rational approx solution X is linear sum
 			// X += \alpha[i_shift+1] (P_s tmp_betaC)[i_shift]
-			for(int ix=0; ix<AP.V; ++ix) {
-				for(int i=0; i<N; ++i) {
-					for(int j=0; j<N; ++j) {
-						X[ix].col(i) += rational_alpha[i_shift+2] * tmp_betaC(j,i) * P[i_shift+1][ix].col(j);
-					}
-				}
-			}
+			tmp_betaC *= rational_alpha[i_shift+2];
+			X.add(P[i_shift+1], tmp_betaC);
+
 			// P_s <- Q + P_s tmp_Sdag (using AP as temporary storage)
-			for(int ix=0; ix<AP.V; ++ix) {
-				for(int i=0; i<N; ++i) {
-					AP[ix].col(i) = Q[ix].col(i);
-					for(int j=0; j<N; ++j) {
-						AP[ix].col(i) += tmp_Sdag(j,i) * P[i_shift+1][ix].col(j);
-					}
-				}
-			}
+			AP = Q;
+			AP.add(P[i_shift+1], tmp_Sdag);
 			P[i_shift+1] = AP;
+
 			// update inverse ksi's for next iteration
 			ksi_s_m2[i_shift] = ksi_s_m1[i_shift];
 			ksi_s_inv_m2[i_shift] = ksi_s_inv_m1[i_shift];
 			ksi_s_m1[i_shift] = ksi_s[i_shift];
 			ksi_s_inv_m1[i_shift].compute(ksi_s[i_shift]);
 			// check if largest unconverged shift has converged
-			if((ksi_s[N_unconverged_shifts-1].rowwise().norm().array()/b_norm).maxCoeff() < eps) {
+			if((ksi_s[N_unconverged_shifts-1].rowwise().norm().array()/b_norm).maxCoeff() < eps_shifts) {
 				--N_unconverged_shifts;
 			}
 		}
@@ -1093,20 +1024,11 @@ int rational_approx_SBCGrQ(field<block_fermion>& X, const field<block_fermion>& 
 		// worst vector should be equal to CG with same eps on that vector, others will be better
 		residual = (C.rowwise().norm().array()/b_norm).maxCoeff();
 
-		// [debugging] find eigenvalues of C
-		/*
-		Eigen::SelfAdjointEigenSolver<Eigen::MatrixXcd> saes;
-		saes.compute(C);
-		Eigen::ArrayXd evals = saes.eigenvalues();
-		*/
-			// Output iteration number and worst residual for each shift
-		/*
-		std::cout << "#SBCGrQ " << iter << "\t" << residual;
-		for(int i_shift=0; i_shift<N_shifts; ++i_shift) {
-			std::cout << "\t" << (ksi_s[i_shift].rowwise().norm().array()/b_norm).maxCoeff();
-		}
-		std::cout << std::endl;
-		*/
+		    //timer_stop = std::chrono::high_resolution_clock::now();
+		    //timer_count = std::chrono::duration_cast<std::chrono::milliseconds>(timer_stop-timer_start).count();
+			//std::cout << "#SBCG_Shifts_Runtime " << timer_count << std::endl;
+			//timer_start = std::chrono::high_resolution_clock::now();
+
 	}
 	D.remove_eta_bcs_from_U(U);			
 
@@ -1149,11 +1071,11 @@ int SBCGAdQArQ(std::vector< std::vector< field<fermion> > >& X, const std::vecto
 	std::cout << std::endl;
 
 	// Unshifted matrices:
-	Eigen::MatrixXcd S = Eigen::MatrixXcd::Identity(N, N);
-	Eigen::MatrixXcd C = Eigen::MatrixXcd::Identity(N, N);
-	Eigen::MatrixXcd beta = Eigen::MatrixXcd::Identity(N, N);
-	Eigen::MatrixXcd betaC = Eigen::MatrixXcd::Zero(N, N);
-	Eigen::MatrixXcd R = Eigen::MatrixXcd::Identity(N, N);
+	block_matrix S = block_matrix::Identity(N, N);
+	block_matrix C = block_matrix::Identity(N, N);
+	block_matrix beta = block_matrix::Identity(N, N);
+	block_matrix betaC = block_matrix::Zero(N, N);
+	block_matrix R = block_matrix::Identity(N, N);
 	// AP, Q are [NxVOL]
 	std::vector< field<fermion> > AP, Q;
 	// P has one NxVOL block per shift
@@ -1168,13 +1090,13 @@ int SBCGAdQArQ(std::vector< std::vector< field<fermion> > >& X, const std::vecto
 
 	// Shifted matrices:
 	// previous / inverted versions of beta
-	Eigen::MatrixXcd beta_inv = Eigen::MatrixXcd::Identity(N, N);
-	Eigen::MatrixXcd beta_inv_m1 = Eigen::MatrixXcd::Identity(N, N);
+	block_matrix beta_inv = block_matrix::Identity(N, N);
+	block_matrix beta_inv_m1 = block_matrix::Identity(N, N);
 	// Construct decomposition of S: can then do S^-1 A using S_inv.solve(A)
-	Eigen::ColPivHouseholderQR<Eigen::MatrixXcd> S_inv (S);
-	Eigen::MatrixXcd S_m1 = Eigen::MatrixXcd::Zero(N, N);
+	Eigen::ColPivHouseholderQR<block_matrix> S_inv (S);
+	block_matrix S_m1 = block_matrix::Zero(N, N);
 	// These are temporary matrices used for each shift
-	Eigen::MatrixXcd tmp_betaC, tmp_Sdag; 
+	block_matrix tmp_betaC, tmp_Sdag; 
 	// add a block to P for each shift s
 	for(int i_shift=0; i_shift<N_shifts; ++i_shift) {
 		// P = Q initially for all shifts
@@ -1183,14 +1105,14 @@ int SBCGAdQArQ(std::vector< std::vector< field<fermion> > >& X, const std::vecto
 	// ksi_s are the scale factors related shifted and unshifted residuals
 	// 3-term recurrence so need _k, _k-1, _k-2 for each shift
 	// initially ksi_s_m2 = I, ksi_s_m1 = S
-	std::vector<Eigen::MatrixXcd> ksi_s, ksi_s_m1, ksi_s_m2; 
-	std::vector< Eigen::ColPivHouseholderQR<Eigen::MatrixXcd> > ksi_s_inv_m1, ksi_s_inv_m2;
+	std::vector<block_matrix> ksi_s, ksi_s_m1, ksi_s_m2; 
+	std::vector< Eigen::ColPivHouseholderQR<block_matrix> > ksi_s_inv_m1, ksi_s_inv_m2;
 	for(int i_shift=0; i_shift<N_shifts; ++i_shift) {
- 		ksi_s.push_back(Eigen::MatrixXcd::Identity(N, N));
+ 		ksi_s.push_back(block_matrix::Identity(N, N));
  		ksi_s_m1.push_back(S);
  		ksi_s_inv_m1.push_back(S_inv);
- 		ksi_s_m2.push_back(Eigen::MatrixXcd::Identity(N, N));
- 		ksi_s_inv_m2.push_back(Eigen::MatrixXcd::Identity(N, N).colPivHouseholderQr());
+ 		ksi_s_m2.push_back(block_matrix::Identity(N, N));
+ 		ksi_s_inv_m2.push_back(block_matrix::Identity(N, N).colPivHouseholderQr());
 	}
 
 	// X = 0 for unshifted + all shifts
@@ -1237,7 +1159,7 @@ int SBCGAdQArQ(std::vector< std::vector< field<fermion> > >& X, const std::vecto
 		}
 		// Find inverse of beta_inv via LDLT cholesky decomposition
 		// and solving beta beta_inv = I
-		beta = beta_inv.ldlt().solve(Eigen::MatrixXcd::Identity(N, N));
+		beta = beta_inv.ldlt().solve(block_matrix::Identity(N, N));
 		betaC = beta * C;
 
 		// X[0] = X[0] + P[0] beta C
@@ -1278,7 +1200,7 @@ int SBCGAdQArQ(std::vector< std::vector< field<fermion> > >& X, const std::vecto
 			// calculate shifted coefficients
 			// ksi_s:
 			tmp_betaC = S_m1 * beta_inv_m1 - ksi_s_m1[i_shift] * ksi_s_inv_m2[i_shift].solve(beta_inv_m1);
-			tmp_Sdag = Eigen::MatrixXcd::Identity(N, N) + shifts[i_shift] * beta + tmp_betaC * S_m1.adjoint() * beta;
+			tmp_Sdag = block_matrix::Identity(N, N) + shifts[i_shift] * beta + tmp_betaC * S_m1.adjoint() * beta;
 			ksi_s[i_shift] = S * tmp_Sdag.colPivHouseholderQr().solve(ksi_s_m1[i_shift]);
 			// tmp_betaC == "alpha^sigma" in paper:
 			tmp_betaC = beta * S_inv.solve(ksi_s[i_shift]);
@@ -1317,7 +1239,7 @@ int SBCGAdQArQ(std::vector< std::vector< field<fermion> > >& X, const std::vecto
 
 		// [debugging] find eigenvalues of C
 		
-		//Eigen::SelfAdjointEigenSolver<Eigen::MatrixXcd> saes;
+		//Eigen::SelfAdjointEigenSolver<block_matrix> saes;
 		//saes.compute(C);
 		//Eigen::ArrayXd evals = saes.eigenvalues();
 		
@@ -1330,29 +1252,29 @@ int SBCGAdQArQ(std::vector< std::vector< field<fermion> > >& X, const std::vecto
 	}
 	return iter;
 }
-*/
+
 // Bartels–Stewart: O(N^3) algorithm to solve Sylvester equation for X:
 // AX + XB = C
 // (NB there also exists the Hessenberg-Schur method that only requires one Schur decomposition)
-void bartels_stewart(Eigen::MatrixXcd& X, const Eigen::MatrixXcd& A, const Eigen::MatrixXcd& B, const Eigen::MatrixXcd& C) {
+void bartels_stewart(block_matrix& X, const block_matrix& A, const block_matrix& B, const block_matrix& C) {
 	int N = X.rows();
 	// Compute Schur form U T U^dag of A and B
-	Eigen::ComplexSchur<Eigen::MatrixXcd> schurA(A);
-	Eigen::ComplexSchur<Eigen::MatrixXcd> schurB(B);
+	Eigen::ComplexSchur<block_matrix> schurA(A);
+	Eigen::ComplexSchur<block_matrix> schurB(B);
 
 	// Can now transform equation to the form
 	// TA X_tilde + X_tilde TB = C_tilde
 	// where TA, TB are upper triangular,
 	// X_tilde = UA^dag X UB
 	// C_tilde = UA^dag C UB
-	Eigen::MatrixXcd C_tilde = schurA.matrixU().adjoint() * C * schurB.matrixU();
-	Eigen::MatrixXcd X_tilde = Eigen::MatrixXcd::Zero(N, N);
+	block_matrix C_tilde = schurA.matrixU().adjoint() * C * schurB.matrixU();
+	block_matrix X_tilde = block_matrix::Zero(N, N);
 
 	// Solve triangular system by back substitution
 	// consider k-th vector of transformed equation
 	for(int k=0; k<N; ++k) {
 		// do subtractions from C_tilde
-		Eigen::MatrixXcd C_sub = C_tilde.col(k);
+		block_matrix C_sub = C_tilde.col(k);
 		for(int l=0; l<k; ++l) {
 			C_sub -= schurB.matrixT()(l,k) * X_tilde.col(l);
 		}
@@ -1368,3 +1290,4 @@ void bartels_stewart(Eigen::MatrixXcd& X, const Eigen::MatrixXcd& A, const Eigen
 	// Transform solution X_tilde back to X
 	X = schurA.matrixU() * X_tilde * schurB.matrixU().adjoint();
 }
+*/

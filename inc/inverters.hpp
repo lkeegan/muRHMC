@@ -7,10 +7,10 @@
 // Inverters
 
 // in-place thinQR decomposition of Q, making Q orthonormal, R is upper triangular matrix such that Q^{new} R = Q^{old}
-void thinQR (field<block_fermion>& Q, Eigen::MatrixXcd& R);
+void thinQR (field<block_fermion>& Q, block_matrix& R);
 
 // in-place QR A-orthonormalisation of V and AV, rotates V and AV such that [V^dag AV] = I:
-void thinQRA(field<block_fermion>& V, field<block_fermion>& AV, Eigen::MatrixXcd& R);
+void thinQRA(field<block_fermion>& V, field<block_fermion>& AV, block_matrix& R);
 
 // A-orthogonalise X in place, without having AX already, i.e. does a bunch of DDdag operations
 // Return the eigenvalues of the hermitian matrix <X_i|A|X_j> in first column of Evals [eigenvalues]
@@ -39,7 +39,7 @@ int cg_block (field<block_fermion>& X, const field<block_fermion>& B, field<gaug
 // NB assumes vector of shifts are positive and in ascending order
 int SBCGrQ(std::vector< field<block_fermion> >& X, const field<block_fermion>& B, field<gauge>& U, std::vector<double>& input_shifts, dirac_op& D, double eps, double eps_shifts = 1.e-14);
 
-int rational_approx_SBCGrQ(field<block_fermion>& X, const field<block_fermion>& B, field<gauge>& U, std::vector<double>& rational_alpha, std::vector<double>& rational_beta, dirac_op& D, double eps);
+int rational_approx_SBCGrQ(field<block_fermion>& X, const field<block_fermion>& B, field<gauge>& U, std::vector<double>& rational_alpha, std::vector<double>& rational_beta, dirac_op& D, double eps, double eps_shifts = 1.e-14);
 
 int SBCGAdQArQ(std::vector< std::vector< field<fermion> > >& X, const std::vector<field<fermion>>& B, field<gauge>& U, std::vector<double>& input_shifts, dirac_op& D, double eps);
 
@@ -47,6 +47,6 @@ int SBCGAdQArQ(std::vector< std::vector< field<fermion> > >& X, const std::vecto
 // AX + XB = C
 // Computes Schur form of A and B, then transforms equation to triangular form,
 // solves by back substitution, then transforms solution back to give X
-void bartels_stewart (Eigen::MatrixXcd& X, const Eigen::MatrixXcd& A, const Eigen::MatrixXcd& B, const Eigen::MatrixXcd& C);
+//void bartels_stewart (block_matrix& X, const block_matrix& A, const block_matrix& B, const block_matrix& C);
  
 #endif //LATTICE_INVERTERS_H

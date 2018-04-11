@@ -17,7 +17,7 @@ rhmc::rhmc (const rhmc_params& params, const lattice& grid) : RA(1.0, 1.0), rng(
 		// rational approx for action: M^{n_f/(4 params.n_pf)} = M^{1/(n_rational)}
 		n_rational = 4 * params.n_pf / params.n_f;
 	}
-	if(n_rational<2) {
+	if(n_rational<1) {
 		std::cout << "Invalid combination of n_f, n_pf: need n_pf >= n_f/2 for EE, or n_f/4 without e/o predconditioning" << std::endl;
 		exit(1);
 	}
