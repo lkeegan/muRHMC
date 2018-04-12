@@ -117,10 +117,8 @@ public:
 	// average of timelike plaquette over N_c, mu,nu and volume: range [0, 1]
 	double plaq_timelike (const field<gauge>& U);
 
-	// average of polyakov loops in time (x_0) direction
-	std::complex<double> polyakov_loop (const field<gauge> &U);
-	// spatial polyakov loop
-	std::complex<double> polyakov_loop_spatial (const field<gauge> &U);
+	// average of polyakov loops in mu direction
+	std::complex<double> polyakov_loop (const field<gauge> &U, int mu = 0);
 
 	// returns estimate of chiral_condensate using 1 random gaussian fermion vector
 	double chiral_condensate (field<gauge> &U, dirac_op& D);

@@ -29,20 +29,20 @@ int main(int argc, char *argv[]) {
 	log("Polyakov loop measurements with parameters:");
 	log("L", grid.L0);
 	log("rho", rho);
-	log("n_smear", n_smear);
+	log("max_n_smear", n_smear);
 
+	log("Data format: config number,\tsmearing_steps,\tunsmeared plaquette,\tre,im part of smeared polyakov loop in time, ditto for 3x spatial directions");
 	for(int i=n_initial; ; i+=1) {
 		read_gauge_field(U, base_name, i);
-		std::complex<double> pT = hmc.polyakov_loop(U);
-		std::complex<double> pX = hmc.polyakov_loop_spatial(U);
-		std::cout << "polyTIME\t" << i << "\tn_smear =\t" << 0 << "\t" << std::scientific << pT.real() << "\t" << pT.imag() << std::endl;
-		std::cout << "polySPACE\t" << i << "\tn_smear =\t" << 0 << "\t" << std::scientific << pX.real() << "\t" << pX.imag() << std::endl;
-		for(int i_smear=1; i_smear<n_smear; ++i_smear) {
+		double plq = hmc.plaq(U);
+		for(int i_smear=0; i_smear<n_smear; ++i_smear) {
+			std::cout << i << "\tn_smear= " << i_smear << "\t" << std::scientific << plq << "\t";
+			for(int mu=0; mu<4; ++mu) {
+				std::complex<double> ply = hmc.polyakov_loop(U, mu);
+			  	std::cout << std::scientific << ply.real() << "\t" << ply.imag() << "\t";
+			}
+			std::cout << std::endl;
 			hmc.stout_smear(rho, U);
-			std::complex<double> pT = hmc.polyakov_loop(U);
-			std::complex<double> pX = hmc.polyakov_loop_spatial(U);
-			std::cout << "polyTIME\t" << i << "\tn_smear =\t" << i_smear << "\t" << std::scientific << pT.real() << "\t" << pT.imag() << std::endl;
-			std::cout << "polySPACE\t" << i << "\tn_smear =\t" << i_smear << "\t" << std::scientific << pX.real() << "\t" << pX.imag() << std::endl;
 		}
 	}
 	return(0);
