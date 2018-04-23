@@ -52,6 +52,8 @@ add_executable(measure measure.cpp ${SRCS})
 add_executable(CG CG.cpp ${SRCS})
 add_executable(polyakov polyakov.cpp ${SRCS})
 
+add_executable(benchmark benchmark.cpp ${SRCS})
+
 #enable_testing()
 add_test(NAME Addition COMMAND tests)
 

@@ -3,10 +3,12 @@
 #include <complex>
 // disable run-time eigen assertions that slow down execution
 #define EIGEN_NO_DEBUG
+// disable eigen openMP routines
+#define EIGEN_DONT_PARALLELIZE
 #include <Eigen/Dense>
 #include <Eigen/StdVector>
 // hard code (for now) block fermion RHS
-constexpr int N_rhs = 6;
+constexpr int N_rhs = 3;
 constexpr int N_gauge = 3;
 // define types for gauge links and fermion fields
 typedef Eigen::Matrix<std::complex<double>, N_gauge, N_gauge> SU3mat;
@@ -18,13 +20,11 @@ typedef Eigen::Matrix<std::complex<double>, N_rhs, N_rhs> block_matrix;
 
 // the following is required to be able to use STL vectors of
 // these objects with correct alignment (i.e. otherwise segfaults!) 
-EIGEN_DEFINE_STL_VECTOR_SPECIALIZATION(SU3mat)
+//EIGEN_DEFINE_STL_VECTOR_SPECIALIZATION(SU3mat)
 EIGEN_DEFINE_STL_VECTOR_SPECIALIZATION(fermion)
-EIGEN_DEFINE_STL_VECTOR_SPECIALIZATION(block_fermion)
+//EIGEN_DEFINE_STL_VECTOR_SPECIALIZATION(block_fermion)
 EIGEN_DEFINE_STL_VECTOR_SPECIALIZATION(block_matrix)
-
-//template<int N_rhs>
-//using block_fermion = Eigen::Matrix<std::complex<double>, 3, N_rhs>;
+EIGEN_DEFINE_STL_VECTOR_SPECIALIZATION(Eigen::ColPivHouseholderQR<block_matrix>)
 
 // return exp(X)
 // where X is 3x3 complex anti-hermitian traceless matrix
@@ -42,6 +42,9 @@ constexpr double exp_ch_c_n[exp_ch_N+1] = {1.0, 1.0, 0.5, 0.16666666666666666,
  4.7794773323873859e-14, 2.811457254345521e-15, 1.5619206968586228e-16, 
  8.220635246624331e-18, 4.1103176233121653e-19, 1.9572941063391263e-20};
 SU3mat exp_ch (const SU3mat& X);
+
+//In-place F <- (F-F^dag) - Tr(F-F^dag)/3
+void project_traceless_antihermitian_part(SU3mat& F);
 
 // SU3 generators: complex 3x3 traceless hermitian matrices T_a
 class SU3_Generators {

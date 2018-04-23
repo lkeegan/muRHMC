@@ -4,7 +4,9 @@
 #include "su3.hpp"
 #include "dirac_op.hpp"
 
-// Inverters
+// Construct R_ij = X_i^dag Y_j assuming that the result is hermitian (e.g. Y = X, or Y = MX with M hermitian), 
+// so only does the dot products needed for the lower triangular part of matrix
+void hermitian_dot(const field<block_fermion>& X, const field<block_fermion>& Y, block_matrix& R);
 
 // in-place thinQR decomposition of Q, making Q orthonormal, R is upper triangular matrix such that Q^{new} R = Q^{old}
 void thinQR (field<block_fermion>& Q, block_matrix& R);
@@ -28,7 +30,7 @@ int cg_singleshift (field<fermion>& x, const field<fermion>& b, field<gauge>& U,
 // returns number of times Dirac operator was called
 // note larger shifts converge faster: currently only stop iterating a given shift if residual is zero to avoid NaN issues
 // could add vector of eps values for each shift in the future
-int cg_multishift (std::vector<field<fermion>>& x, const field<fermion>& b, field<gauge>& U, std::vector<double>& sigma, dirac_op& D, double eps, double eps_shifts = 1.e-15);
+int cg_multishift (std::vector<field<fermion>>& x, const field<fermion>& b, field<gauge>& U, std::vector<double>& sigma, dirac_op& D, double eps, double eps_shifts = 1.e-14);
 
 int rational_approx_cg_multishift(field<fermion>& x, const field<fermion>& b, field<gauge>& U, std::vector<double>& rational_alpha, std::vector<double>& rational_beta, dirac_op& D, double eps);
 

@@ -314,7 +314,7 @@ void write_gauge_field (field<gauge>& U, const std::string& base_name, int confi
 
 double checksum_plaquette (const field<gauge> &U) {
 	double p = 0;
-	#pragma omp parallel for reduction (+:p)
+	//#pragma omp parallel for reduction (+:p)
 	for(int ix=0; ix<U.V; ++ix) {
 		for(int mu=1; mu<4; ++mu) {
 			for(int nu=0; nu<mu; nu++) {

@@ -5,7 +5,6 @@
 #include "dirac_op.hpp"
 #include "inverters.hpp"
 #include <random>
-//#include <unsupported/Eigen/MatrixFunctions>
 #include <string>
 
 struct hmc_params {

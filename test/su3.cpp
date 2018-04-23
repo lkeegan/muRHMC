@@ -28,13 +28,20 @@ TEST_CASE( "SU3 Generators T_a", "[su3]" ) {
 	}
 }
 
+TEST_CASE( "anti-hermitian traceless projector", "[su3]" ) {
+	SU3mat X = SU3mat::Random();
+	project_traceless_antihermitian_part(X);
+
+	REQUIRE( std::abs(X.trace()) < EPS );
+	REQUIRE( (X + X.adjoint()).squaredNorm() < EPS );
+}
+
 TEST_CASE( "Cayley-Hamilton form of exp(X)", "[su3]" ) {
-	// Make random traceless hermitian complex 3x3 matrix X
-	SU3mat tmpX = Eigen::Matrix3cd::Random();
-	SU3mat X = tmpX - tmpX.adjoint();
-	X -= (X.trace()/3.0)*SU3mat::Identity();
-	// make anti-hermitian
-	X *= std::complex<double>(0.0, 1.0);
+	// Make random traceless anti-hermitian complex 3x3 matrix X
+	SU3mat X = SU3mat::Random();
+	project_traceless_antihermitian_part(X);
+	// X <- i eps * X
+	X *= std::complex<double>(0.0, 0.1);
 	INFO( "eigen exp(X)" << X.exp() );
 
 	// Choose N = max value of n such that 1/(N-1)! << ULP

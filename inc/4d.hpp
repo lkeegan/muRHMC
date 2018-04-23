@@ -3,7 +3,7 @@
 
 #include <vector>
 #include <complex>
-#include "omp.h"
+//#include "omp.h"
 
 // 4d lattice with pbcs
 // pair of integer vectors store indices of nearest up/dn neighbours
@@ -178,7 +178,7 @@ public:
 */	// *this = scale * (*this) + rhs_multiplier * rhs
 	field& scale_add(double scale, double rhs_multiplier, const field& rhs)
 	{
-		#pragma omp parallel for
+		//#pragma omp parallel for
 		for(int ix=0; ix<V; ++ix) {
 			data_[ix] = scale * data_[ix] + rhs_multiplier * rhs[ix];
 		}
@@ -186,7 +186,7 @@ public:
 	}
 	field& scale_add(std::complex<double> scale, std::complex<double> rhs_multiplier, const field& rhs)
 	{
-		#pragma omp parallel for
+		//#pragma omp parallel for
 		for(int ix=0; ix<V; ++ix) {
 			data_[ix] = scale * data_[ix] + rhs_multiplier * rhs[ix];
 		}
@@ -204,7 +204,7 @@ public:
 	// equivalent to real part of dot with itself i.e. l2-norm squared
 	double squaredNorm() const {
 		double norm = 0.0;
-		#pragma omp parallel for reduction(+:norm)
+		//#pragma omp parallel for reduction(+:norm)
 		for(int ix=0; ix<V; ++ix) {
 			norm += data_[ix].squaredNorm();
 		}

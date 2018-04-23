@@ -18,3 +18,17 @@ SU3mat exp_ch (const SU3mat& X) {
 	}
 	return q0*SU3mat::Identity() + q1*X + q2*XX;
 }
+
+//In-place F <- (F-F^dag) - Tr(F-F^dag)/3
+void project_traceless_antihermitian_part(SU3mat& F) {
+	double tr = (2.0/3.0)*(F(0,0).imag() + F(1,1).imag() + F(2,2).imag());
+	F(0,1) -= std::conj(F(1,0));
+	F(0,2) -= std::conj(F(2,0));
+	F(1,2) -= std::conj(F(2,1));
+	F(1,0) = -std::conj(F(0,1));
+	F(2,0) = -std::conj(F(0,2));
+	F(2,1) = -std::conj(F(1,2));
+	F(0,0) = std::complex<double>(0.0, 2.0*F(0,0).imag() - tr);
+	F(1,1) = std::complex<double>(0.0, 2.0*F(1,1).imag() - tr);
+	F(2,2) = std::complex<double>(0.0, 2.0*F(2,2).imag() - tr);
+}

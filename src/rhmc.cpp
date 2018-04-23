@@ -99,12 +99,30 @@ int rhmc::trajectory (field<gauge>& U, dirac_op& D, bool do_reversibility_test, 
 	if(MEASURE_FORCE_ERROR_NORMS) {
 
 		// just measure one force term using supplied MD_eps for inversion
+		std::vector<double> residuals = {1.e-1, 1.e-2, 1.e-3, 1.e-4, 1.e-5, 1.e-6, 1.e-7, 1e-8};
 		std::cout.precision(15);
 		field<gauge> force (U.grid);
 		force.setZero();
+		field<gauge> force_star (U.grid);
+		force_star.setZero();
 		if(params.block) {
-			int iterBCG = force_fermion_block (force, U, D);
-			std::cout << std::scientific << "fermion_force_normBCG: " << force.squaredNorm() << std::endl;
+			std::cout << "# eps, CGiter, CGerror-norm, CGruntime, BLOCKiter, BLOCKerror-norm, BLOCKruntime, true-force-norm" << std::endl;
+			params.MD_eps = 1.e-12;
+			int iterBCG = force_fermion_block (force_star, U, D);
+			double norm_star = force_star.squaredNorm();
+			std::cout << std::scientific << 1.e-12 << "\tfermion_force_star_normBCG: " << norm_star << std::endl;
+			for(int i_eps=0; i_eps<static_cast<int>(residuals.size()); ++i_eps) {
+				params.MD_eps = residuals[i_eps];
+				int iterBCG = force_fermion_block (force, U, D);
+				double norm = force.squaredNorm();
+				force -= force_star;
+				std::cout << std::scientific << residuals[i_eps] << "\t" << iterBCG
+						  << "\tfermion_force_normBCG: " << norm
+						  << "\tfermion_force_error_normBCG: " << force.squaredNorm()
+						  << "\tfermion_force_star_normBCG: " << norm_star
+						  << std::endl;
+				force.setZero();
+			}
 		} else {
 			force.setZero();
 			int iterCG = force_fermion (force, U, D);
@@ -269,7 +287,7 @@ double rhmc::action_U (const field<gauge>& U) {
 
 double rhmc::action_P (const field<gauge>& P) {
 	double ac = 0.0;
-	#pragma omp parallel for reduction (+:ac)
+	//#pragma omp parallel for reduction (+:ac)
 	for(int ix=0; ix<P.V; ++ix) {
 		for(int mu=0; mu<4; ++mu) {
 			ac += (P[ix][mu]*P[ix][mu]).trace().real();
@@ -314,8 +332,8 @@ void rhmc::step_P_pure_gauge (field<gauge>& P, field<gauge> &U, double eps, bool
 			for(int mu=0; mu<4; ++mu) {
 				SU3mat A = staple (ix, mu, U);
 				SU3mat F = U[ix][mu]*A;
-				A = F - F.adjoint();
-				F = ( A - (A.trace()/3.0)*SU3mat::Identity() ) * ibeta_12;
+				project_traceless_antihermitian_part(F);
+				F *= ibeta_12;
 				force_norm += F.squaredNorm();
 				P[ix][mu] -= F;
 			}
@@ -323,13 +341,13 @@ void rhmc::step_P_pure_gauge (field<gauge>& P, field<gauge> &U, double eps, bool
 		force_norm /= eps*eps;
 		std::cout << "gauge_force_norm: " << sqrt(force_norm/static_cast<double>(4*U.V)) << std::endl;
 	} else {
-		#pragma omp parallel for
+		//#pragma omp parallel for
 		for(int ix=0; ix<U.V; ++ix) {
 			for(int mu=0; mu<4; ++mu) {
 				SU3mat A = staple (ix, mu, U);
 				SU3mat F = U[ix][mu]*A;
-				A = F - F.adjoint();
-				P[ix][mu] -= ( A - (A.trace()/3.0)*SU3mat::Identity() ) * ibeta_12;
+				project_traceless_antihermitian_part(F);
+				P[ix][mu] -= F * ibeta_12;
 			}
 		}
 	}
@@ -349,7 +367,7 @@ int rhmc::step_P_fermion (field<gauge>& P, field<gauge> &U, dirac_op& D, double 
 		std::cout << "fermion_force_norm: " << sqrt(force.squaredNorm()/static_cast<double>(4*U.V)) << std::endl;
 	}
 	//std::cout << "F_g + F_pf: " << force.norm() << std::endl;
-	#pragma omp parallel for
+	//#pragma omp parallel for
 	for(int ix=0; ix<U.V; ++ix) {
 		for(int mu=0; mu<4; ++mu) {
 			P[ix][mu] -= eps * force[ix][mu];
@@ -359,7 +377,7 @@ int rhmc::step_P_fermion (field<gauge>& P, field<gauge> &U, dirac_op& D, double 
 }
 
 void rhmc::step_U (const field<gauge>& P, field<gauge> &U, double eps) {
-	#pragma omp parallel for
+	//#pragma omp parallel for
 	for(int ix=0; ix<U.V; ++ix) {
 		for(int mu=0; mu<4; ++mu) {
 			U[ix][mu] = exp_ch((std::complex<double> (0.0, eps) * P[ix][mu])) * U[ix][mu];
@@ -419,7 +437,7 @@ void rhmc::gaussian_P (field<gauge>& P) {
 }
 
 void rhmc::force_gauge (field<gauge> &force, const field<gauge> &U) {
-	#pragma omp parallel for
+	//#pragma omp parallel for
 	for(int ix=0; ix<U.V; ++ix) {
 		for(int mu=0; mu<4; ++mu) {
 			SU3mat A = staple (ix, mu, U);
@@ -474,7 +492,7 @@ int rhmc::force_fermion_norms (field<gauge> &force, field<gauge> &U, dirac_op& D
 				SU3_Generators T;
 					// for even-even version half of the terms are zero:
 					// even ix: ix = ix_e
-					#pragma omp parallel for
+					//#pragma omp parallel for
 					for(int ix=0; ix<chi_star[i_s].V; ++ix) {
 						for(int mu=0; mu<4; ++mu) {
 							for(int a=0; a<8; ++a) {
@@ -487,7 +505,7 @@ int rhmc::force_fermion_norms (field<gauge> &force, field<gauge> &U, dirac_op& D
 						}
 					}
 					// odd ix: ix = ix_o + chi.V
-					#pragma omp parallel for
+					//#pragma omp parallel for
 					for(int ix_o=0; ix_o<chi_star[i_s].V; ++ix_o) {
 						int ix = ix_o + chi_star[i_s].V;
 						for(int mu=0; mu<4; ++mu) {
@@ -582,7 +600,7 @@ int rhmc::force_fermion (field<gauge> &force, field<gauge> &U, dirac_op& D) {
 			if(params.EE) {
 				// for even-even version half of the terms are zero:
 				// even ix: ix = ix_e
-				#pragma omp parallel for
+				//#pragma omp parallel for
 				for(int ix=0; ix<chi[i_s].V; ++ix) {
 					for(int mu=0; mu<4; ++mu) {
 						for(int a=0; a<8; ++a) {
@@ -592,7 +610,7 @@ int rhmc::force_fermion (field<gauge> &force, field<gauge> &U, dirac_op& D) {
 					}
 				}
 				// odd ix: ix = ix_o + chi.V
-				#pragma omp parallel for
+				//#pragma omp parallel for
 				for(int ix_o=0; ix_o<chi[i_s].V; ++ix_o) {
 					int ix = ix_o + chi[i_s].V;
 					for(int mu=0; mu<4; ++mu) {
@@ -606,7 +624,7 @@ int rhmc::force_fermion (field<gauge> &force, field<gauge> &U, dirac_op& D) {
 				// mu=0 terms have extra chemical potential isospin factors exp(+-\mu_I/2):
 				double mu_I_plus_factor = exp(0.5 * params.mu_I);
 				double mu_I_minus_factor = exp(-0.5 * params.mu_I);
-				#pragma omp parallel for
+				//#pragma omp parallel for
 				for(int ix=0; ix<U.V; ++ix) {
 					for(int a=0; a<8; ++a) {
 						double Fa = a_rational * chi[i_s][ix].dot(T[a] * mu_I_plus_factor * U[ix][0] * psi.up(ix,0)).imag();
@@ -671,7 +689,7 @@ int rhmc::force_fermion_block (field<gauge> &force, field<gauge> &U, dirac_op& D
 			if(params.EE) {
 				// for even-even version half of the terms are zero:
 				// even ix: ix = ix_e
-				#pragma omp parallel for
+				//#pragma omp parallel for
 				for(int ix=0; ix<chi[i_s].V; ++ix) {
 					for(int mu=0; mu<4; ++mu) {
 						for(int a=0; a<8; ++a) {
@@ -681,7 +699,7 @@ int rhmc::force_fermion_block (field<gauge> &force, field<gauge> &U, dirac_op& D
 					}
 				}
 				// odd ix: ix = ix_o + chi.V
-				#pragma omp parallel for
+				//#pragma omp parallel for
 				for(int ix_o=0; ix_o<chi[i_s].V; ++ix_o) {
 					int ix = ix_o + chi[i_s].V;
 					for(int mu=0; mu<4; ++mu) {
@@ -695,7 +713,7 @@ int rhmc::force_fermion_block (field<gauge> &force, field<gauge> &U, dirac_op& D
 				// mu=0 terms have extra chemical potential isospin factors exp(+-\mu_I/2):
 				double mu_I_plus_factor = exp(0.5 * params.mu_I);
 				double mu_I_minus_factor = exp(-0.5 * params.mu_I);
-				#pragma omp parallel for
+				//#pragma omp parallel for
 				for(int ix=0; ix<U.V; ++ix) {
 					for(int a=0; a<8; ++a) {
 						double Fa = a_rational * chi[i_s][ix].col(i_pf).dot(T[a] * mu_I_plus_factor * U[ix][0] * psi.up(ix,0).col(i_pf)).imag();
@@ -736,7 +754,7 @@ SU3mat rhmc::staple (int ix, int mu, const field<gauge> &U) {
 
 double rhmc::plaq (const field<gauge> &U) {
 	double p = 0;
-	#pragma omp parallel for reduction (+:p)
+	//#pragma omp parallel for reduction (+:p)
 	for(int ix=0; ix<U.V; ++ix) {
 		for(int mu=1; mu<4; ++mu) {
 			for(int nu=0; nu<mu; nu++) {

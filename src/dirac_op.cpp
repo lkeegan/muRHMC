@@ -1,5 +1,4 @@
 #include "dirac_op.hpp"
-#include "omp.h"
 #include <iostream> //FOR DEBUGGING
 
 dirac_op::dirac_op (const lattice& grid, double mass, double mu_I) : mass(mass), mu_I(mu_I), eta(grid) {

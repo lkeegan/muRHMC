@@ -166,6 +166,23 @@ TEST_CASE( "Reversibility of pure gauge HMC", "[hmc]" ) {
 			REQUIRE( is_field_hermitian(P) < EPS );
 			REQUIRE( is_field_SU3(U) < EPS );	
 		}
+
+		SECTION( "OMF2 integrator isEO" + std::to_string(isEO)) {
+			hmc.OMF2_pure_gauge (U, P);
+			// P <- -P
+			P *= -1;
+			hmc.OMF2_pure_gauge (U, P);
+
+			U_old -= U;
+			double dev = U_old.norm();
+			P_old += P;
+			double devP = P_old.norm();
+			INFO("HMC reversibility violation: " << dev << "\t P_dev: " << devP);
+			REQUIRE( dev < EPS );
+			REQUIRE( devP < EPS );
+			REQUIRE( is_field_hermitian(P) < EPS );
+			REQUIRE( is_field_SU3(U) < EPS );	
+		}
 	}
 }
 
@@ -230,6 +247,7 @@ TEST_CASE( "Reversibility of HMC", "[hmc]" ) {
 TEST_CASE( "Reversibility of EE HMC", "[hmc_EE]" ) {
 
 	hmc_params hmc_pars;
+	hmc_pars.EE = true;
 
 	// create 4^4 lattice with random U[mu] at each site, random gaussian P
 	// integrate by tau, P -> -P, integrate by tau, compare to original U

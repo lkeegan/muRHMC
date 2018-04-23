@@ -3,46 +3,56 @@
 #include <iostream> //FOR DEBUGGING
 #include <chrono>
 
+// Construct R_ij = X_i^dag Y_j assuming that the result is hermitian (e.g. Y = X, or Y = MX with M hermitian), 
+// so only does the dot products needed for the lower triangular part of matrix
+void hermitian_dot(const field<block_fermion>& X, const field<block_fermion>& Y, block_matrix& R) {
+	// construct lower-triangular part of matrix
+	R.setZero();
+	for(int ix=0; ix<X.V; ++ix) {
+		for(int i=0; i<N_rhs; ++i) {
+			for(int j=0; j<=i; ++j) {
+				R(i, j) += X[ix].col(i).dot(Y[ix].col(j));
+			}
+		}
+	}
+	// upper triangular part from conjugate of lower triangular elements
+	for(int i=0; i<N_rhs; ++i) {
+		for(int j=0; j<=i; ++j) {
+			R(j, i) = std::conj(R(i, j));
+		}
+	}
+}
+
+// In-place Multiply field X on RHS by inverse of triangular matrix R, i.e.
+// X <- X R^{-1}
+void multiply_triangular_inverse_RHS(field<block_fermion>& X, block_matrix& R) {
+	for(int ix=0; ix<X.V; ++ix) {
+		for(int i=0; i<N_rhs; ++i) {
+			for(int j=0; j<i; ++j) {
+				X[ix].col(i) -= R(j,i) * X[ix].col(j);
+			}
+			X[ix].col(i) /= R(i,i);
+		}
+	}	
+	// NOTE: this could instead be done using eigen in one line:
+	// R.triangularView<Eigen::Upper>().solveInPlace<Eigen::OnTheRight>(Q[ix]);
+	// however the above must use temporaries, as it is much slower than my simple in-place implementation
+}
+
 // in-place thin QR decomposition of Q using Algorithm 2 from arXiv:1710.09745
 // input: Q is a vector of N fermion fields
 // output: R is a NxN complex hermitian matrix such that Q_input R = Q_output
 // output: Q is a now a vector of N orthogonal fermion fields
 void thinQR(field<block_fermion>& Q, block_matrix& R) {
-	/*
-	int N = Q.size();
-	// Construct H_ij (using R for storage) = Q_i^dag Q_j = hermitian, 
-	// so only need to do the dot products needed for lower triangular part of matrix
-	R.setZero();
-	for(int i=0; i<N; ++i) {
-		for(int j=0; j<=i; ++j) {
-			R(i, j) = Q[i].dot(Q[j]);
-		}
-	}
-	*/
-	R.setZero();
-	for(int ix=0; ix<Q.V; ++ix) {
-		R += Q[ix].adjoint()*Q[ix];	
-	}
+
+	// Construct R_ij = Q_i^dag Q_j = hermitian, 
+	hermitian_dot(Q, Q, R);
 	// Find upper triangular R such that R^dag R = H (i.e. previous contents of R) = Q^dag Q
 	// i.e. adjoint of cholesky decomposition L matrix: L L^dag = H
 	R = R.llt().matrixL().adjoint();
 
 	// Q <- Q R^-1
-	// can be done in-place by back-substitution
-	for(int ix=0; ix<Q.V; ++ix) {
-		R.triangularView<Eigen::Upper>().solveInPlace<Eigen::OnTheRight>(Q[ix]);
-	}
-	// Solve Q_new R = Q for Q_new, where R is upper triangular
-/*
-	for(int ix=0; ix<Q.V; ++ix) {
-		for(int i=0; i<N_rhs; ++i) {
-			for(int j=0; j<i; ++j) {
-				Q[ix].col(i) -= R(j,i) * Q[ix].col(j);
-			}
-			Q[ix].col(i) /= R(i,i);
-		}
-	}
-*/
+	multiply_triangular_inverse_RHS(Q, R);
 }
 
 
@@ -56,44 +66,16 @@ void thinQR(field<block_fermion>& Q, block_matrix& R) {
 // V <- P = V R^-1
 // AV <- AP = AV R^-1
 void thinQRA(field<block_fermion>& V, field<block_fermion>& AV, block_matrix& R) {
-/*	int N = V.size();
-	// Construct [V^dag AV]_ij (using R for storage) - hermitian, 
-	// so only need to do the dot products needed for lower triangular part of matrix
-	R.setZero();
-	for(int i=0; i<N; ++i) {
-		for(int j=0; j<=i; ++j) {
-			R(i, j) = V[i].dot(AV[j]);
-		}
-	}
-*/
-	R.setZero();
-	for(int ix=0; ix<AV.V; ++ix) {
-		R += V[ix].adjoint()*AV[ix];	
-	}
+
+	hermitian_dot(V, AV, R);
 
 	// Find upper triangular R such that R^dag R = [V^dag AV]
 	// i.e. adjoint of cholesky decomposition L matrix
 	R = R.llt().matrixL().adjoint();
 
 	// Solve V_new R = V and AV_new R = AV where R is upper triangular
-	for(int ix=0; ix<V.V; ++ix) {
-		R.triangularView<Eigen::Upper>().solveInPlace<Eigen::OnTheRight>(V[ix]);
-	}
-	for(int ix=0; ix<AV.V; ++ix) {
-		R.triangularView<Eigen::Upper>().solveInPlace<Eigen::OnTheRight>(AV[ix]);
-	}
-
-/*	for(int ix=0; ix<AV.V; ++ix) {
-		for(int i=0; i<N_rhs; ++i) {
-			for(int j=0; j<i; ++j) {
-				V[ix].col(i) -= R(j,i) * V[ix].col(j);
-				AV[ix].col(i) -= R(j,i) * AV[ix].col(j);
-			}
-			V[ix].col(i) /= R(i,i);
-			AV[ix].col(i) /= R(i,i);
-		}
-	}
-*/
+	multiply_triangular_inverse_RHS(V, R);
+	multiply_triangular_inverse_RHS(AV, R);
 }
 
 // A-orthogonalise X in place, without having AX already, i.e. does a bunch of DDdag operations
@@ -105,38 +87,15 @@ void thinQRA_evals(field<block_fermion>& X, Eigen::MatrixXd& Evals, field<gauge>
 	// Construct lower triangular part of hermitian matrix <X_i|A|X_j> and diagonal part of <X_i|A^2|X_j> 
 	block_matrix R = block_matrix::Zero();
 	D.DDdagger (AX, X, U);
-	Evals.col(1).setZero();
-	for(int ix=0; ix<X.V; ++ix) {
-		R += X[ix].adjoint()*AX[ix];
-		Evals.col(1) += (AX[ix].adjoint()*AX[ix]).diagonal().real();
-	}
-	Evals.col(1) = Evals.col(1).array().sqrt();
-/*
-	for(int i=0; i<N; ++i) {
-		// x = A X[i]
-		D.DDdagger (x, X[i], U);
-		Evals.col(1)[i] = x.norm();
-		for(int j=0; j<=i; ++j) {
-			R(i, j) = x.dot(X[j]);
-		}
-	}
-*/
+	hermitian_dot(X, AX, R);
+	Evals.col(1) = R.diagonal().real().array().sqrt();
 	//find eigensystem of R - only references lower triangular part
 	//NB also finding eigenvectors here, but no need to..
 	Eigen::SelfAdjointEigenSolver<block_matrix> R_eigen_system(R);
 	Evals.col(0) = R_eigen_system.eigenvalues().col(0);
 	// A-orthonormalise X
 	R = R.llt().matrixL().adjoint();
-
-	for(int ix=0; ix<X.V; ++ix) {
-		for(int i=0; i<N_rhs; ++i) {
-			for(int j=0; j<i; ++j) {
-				X[ix].col(i) -= R(j,i) * X[ix].col(j);
-			}
-			X[ix].col(i) /= R(i,i);
-		}
-	}
-
+	multiply_triangular_inverse_RHS(X, R);
 }
 
 int cg(field<fermion>& x, const field<fermion>& b, field<gauge>& U, dirac_op& D, double eps) {
@@ -458,16 +417,16 @@ int cg_block(field<block_fermion>& X, const field<block_fermion>& B, field<gauge
 		for(int i=0; i<N; ++i) {
 			C.setZero();
 			for(int ix=0; ix<Q.V; ++ix) {
-				C += Q[ix].adjoint()*Q[ix];	
+				for(int i=0; i<N_rhs; ++i) {
+					C(i,i) += Q[ix].col(i).squaredNorm();
+//				C += Q[ix].adjoint()*Q[ix];	
+				}
 			}
 			//C(i, i) = Q[i].dot(Q[i]);
 		}
 	} else {
 		// set C to hermitian matrix Q^dag Q
-		C.setZero();
-		for(int ix=0; ix<Q.V; ++ix) {
-			C += Q[ix].adjoint()*Q[ix];	
-		}
+		hermitian_dot(Q, Q, C);
 		// S = C_old^-1 C_new = C since C_old=1.
 		S = C;
 	}
@@ -525,10 +484,7 @@ int cg_block(field<block_fermion>& X, const field<block_fermion>& B, field<gauge
 		} else {
 			// note beta is hermitian since A is hermitian so we
 			// only need to calculate lower triangular elements of matrix
-			beta.setZero();
-			for(int ix=0; ix<Q.V; ++ix) {
-				beta += P[ix].adjoint()*AP[ix];
-			}
+			hermitian_dot(P, AP, beta);
 			// Find inverse of beta via LDLT cholesky decomposition
 			// and solving beta beta^-1 = I
 			beta = beta.ldlt().solve(block_matrix::Identity());
@@ -570,22 +526,25 @@ int cg_block(field<block_fermion>& X, const field<block_fermion>& B, field<gauge
 			}
 		}
 		// X = X + P beta C
-		for(int ix=0; ix<X.V; ++ix) {
+		X.add(P, betaC);
+/*		for(int ix=0; ix<X.V; ++ix) {
 			for(int i=0; i<N; ++i) {
 				for(int j=0; j<N; ++j) {
 					X[ix].col(i) += betaC(j,i) * P[ix].col(j);
 				}
 			}
 		}
-		//Q -= AP beta
-		for(int ix=0; ix<Q.V; ++ix) {
+*/		//Q -= AP beta
+		betaC = -beta;
+		Q.add(AP, betaC);
+/*		for(int ix=0; ix<Q.V; ++ix) {
 			for(int i=0; i<N; ++i) {
 				for(int j=0; j<N; ++j) {
 					Q[ix].col(i) -= beta(j,i) * AP[ix].col(j);
 				}
 			}
 		}
-
+*/
 		if(BCGA) {
 			if(rQ) {
 				// in-place thinQR decomposition of residuals matrix Q
@@ -599,11 +558,12 @@ int cg_block(field<block_fermion>& X, const field<block_fermion>& B, field<gauge
 				}
 			}
 			// S <- -[P^dag AP]^-1 [Q^dag AP] = - PQ [Q^dag AP]
-			mPAQ.setZero();
+			hermitian_dot(Q, AP, mPAQ);
+/*			mPAQ.setZero();
 			for(int ix=0; ix<Q.V; ++ix) {
 				mPAQ += Q[ix].adjoint()*AP[ix];
 			}
-			S = -mPAPinv * mPAQ.adjoint();
+*/			S = -mPAPinv * mPAQ.adjoint();
 		} else {
 			if(rQ) {
 				// in-place thinQR decomposition of residuals matrix Q
@@ -615,11 +575,12 @@ int cg_block(field<block_fermion>& X, const field<block_fermion>& B, field<gauge
 				// find inverse of C = Q_old^dagQ_old by cholesky decomposition
 				S = C.ldlt().solve(block_matrix::Identity());
 				// update C to hermitian matrix Q^dag Q
-				C.setZero();
+				hermitian_dot(Q, Q, C);
+/*				C.setZero();
 				for(int ix=0; ix<Q.V; ++ix) {
 					C += Q[ix].adjoint()*Q[ix];	
 				}
-				// S = [Q_old^dag Q_old]^-1 [Q_new^dag Q_new]
+*/				// S = [Q_old^dag Q_old]^-1 [Q_new^dag Q_new]
 				S = S * C;
 			}
 			if(dQ || dQA) {
@@ -761,10 +722,11 @@ int SBCGrQ(std::vector< field<block_fermion> >& X, const field<block_fermion>& B
 
 
 		beta_inv_m1 = beta_inv;
-		beta_inv.setZero();
-		for(int ix=0; ix<AP.V; ++ix) {
-			beta_inv += P[0][ix].adjoint()*AP[ix];
-		}
+		hermitian_dot(P[0], AP, beta_inv);
+//		beta_inv.setZero();
+//		for(int ix=0; ix<AP.V; ++ix) {
+//			beta_inv += P[0][ix].adjoint()*AP[ix];
+//		}
 		// Find inverse of beta_inv via LDLT cholesky decomposition
 		// and solving beta beta_inv = I
 		beta = beta_inv.ldlt().solve(block_matrix::Identity());
@@ -786,7 +748,7 @@ int SBCGrQ(std::vector< field<block_fermion> >& X, const field<block_fermion>& B
 			S_inv.compute(S);
 		}
 
-		// P <- Q + P S^dag for lower triangular S
+		// P <- Q + P S^dag [in-place] for lower triangular S
 		for(int ix=0; ix<AP.V; ++ix) {
 			for(int i=0; i<N; ++i) {
 				P[0][ix].col(i) *= S(i,i);
@@ -866,7 +828,7 @@ int SBCGrQ(std::vector< field<block_fermion> >& X, const field<block_fermion>& B
 int rational_approx_SBCGrQ(field<block_fermion>& X, const field<block_fermion>& B, field<gauge>& U, std::vector<double>& rational_alpha, std::vector<double>& rational_beta, dirac_op& D, double eps, double eps_shifts) {
 	int N = N_rhs;
 	// count shifts (not including first one that is included in the dirac op)
-	int N_shifts = static_cast<int>(rational_alpha.size()) - 1;
+	int N_shifts = static_cast<int>(rational_beta.size()) - 1;
 	int N_unconverged_shifts = N_shifts;
 
 	// subtract first shift from remaining set of shifts

@@ -27,8 +27,8 @@ int hmc::trajectory (field<gauge>& U, dirac_op& D, bool MEASURE_FORCE_ERROR_NORM
 	field<fermion> phi (U.grid, eo_storage_e);
 	if(params.EE) {
 		// Use rational approx for (m^2 - D_eo D_oe)^{1/2}:
-		//double params.lambda_OMF2_max = D.largest_eigenvalue_bound(U);
-		//rational_approx RA(D.mass*D.mass, params.lambda_OMF2_max);
+		//double max = D.largest_eigenvalue_bound(U);
+		//rational_approx RA(D.mass*D.mass, max);
 
 		// For now just hard code one with the right spectral range:
 		// Approx to x^(1/2) in range [4.000000e-06,1.000000e+01] with degree 32 and relative error 4.846799e-16
@@ -199,6 +199,7 @@ void hmc::OMF2_pure_gauge (field<gauge>& U, field<gauge>& P) {
 
 int hmc::OMF2 (field<gauge>& U, field<fermion>& phi, field<gauge>& P, dirac_op& D) {
 	double eps = params.tau / static_cast<double>(params.n_steps_fermion);
+	std::cout << params.lambda_OMF2 << std::endl;
 	int iter = 0;
 	// OMF2 integration:
 	iter += step_P_fermion(P, U, phi, D, (params.lambda_OMF2)*eps);
@@ -229,7 +230,7 @@ double hmc::action_U (const field<gauge>& U) {
 
 double hmc::action_P (const field<gauge>& P) {
 	double ac = 0.0;
-	#pragma omp parallel for reduction (+:ac)
+	//#pragma omp parallel for reduction (+:ac)
 	for(int ix=0; ix<P.V; ++ix) {
 		for(int mu=0; mu<4; ++mu) {
 			ac += (P[ix][mu]*P[ix][mu]).trace().real();
@@ -253,8 +254,10 @@ void hmc::step_P_pure_gauge (field<gauge>& P, field<gauge> &U, double eps, bool 
 			for(int mu=0; mu<4; ++mu) {
 				SU3mat A = staple (ix, mu, U);
 				SU3mat F = U[ix][mu]*A;
-				A = F - F.adjoint();
-				F = ( A - (A.trace()/3.0)*SU3mat::Identity() ) * ibeta_12;
+				project_traceless_antihermitian_part(F);
+				F *= ibeta_12;
+				//A = F - F.adjoint();
+				//F = ( A - (A.trace()/3.0)*SU3mat::Identity() ) * ibeta_12;
 				force_norm += F.squaredNorm();
 				P[ix][mu] -= F;
 			}
@@ -262,13 +265,13 @@ void hmc::step_P_pure_gauge (field<gauge>& P, field<gauge> &U, double eps, bool 
 		force_norm /= eps*eps;
 		std::cout << "gauge_force_norm: " << sqrt(force_norm/static_cast<double>(4*U.V)) << std::endl;
 	} else {
-		#pragma omp parallel for
+		//#pragma omp parallel for
 		for(int ix=0; ix<U.V; ++ix) {
 			for(int mu=0; mu<4; ++mu) {
 				SU3mat A = staple (ix, mu, U);
 				SU3mat F = U[ix][mu]*A;
-				A = F - F.adjoint();
-				P[ix][mu] -= ( A - (A.trace()/3.0)*SU3mat::Identity() ) * ibeta_12;
+				project_traceless_antihermitian_part(F);
+				P[ix][mu] -= F * ibeta_12;
 			}
 		}
 	}
@@ -282,7 +285,7 @@ int hmc::step_P_fermion (field<gauge>& P, field<gauge> &U, const field<fermion>&
 	if(MEASURE_FORCE_NORM) {
 		std::cout << "fermion_force_norm: " << sqrt(force.squaredNorm()/static_cast<double>(4*U.V)) << std::endl;
 	}
-	#pragma omp parallel for
+	//#pragma omp parallel for
 	for(int ix=0; ix<U.V; ++ix) {
 		for(int mu=0; mu<4; ++mu) {
 			P[ix][mu] -= eps * force[ix][mu];
@@ -292,7 +295,7 @@ int hmc::step_P_fermion (field<gauge>& P, field<gauge> &U, const field<fermion>&
 }
 
 void hmc::step_U (const field<gauge>& P, field<gauge> &U, double eps) {
-	#pragma omp parallel for
+	//#pragma omp parallel for
 	for(int ix=0; ix<U.V; ++ix) {
 		for(int mu=0; mu<4; ++mu) {
 			//U[ix][mu] = ((std::complex<double> (0.0, eps) * P[ix][mu]).exp()) * U[ix][mu];
@@ -346,7 +349,7 @@ void hmc::gaussian_P (field<gauge>& P) {
 }
 
 void hmc::force_gauge (field<gauge> &force, const field<gauge> &U) {
-	#pragma omp parallel for
+	//#pragma omp parallel for
 	for(int ix=0; ix<U.V; ++ix) {
 		for(int mu=0; mu<4; ++mu) {
 			SU3mat A = staple (ix, mu, U);
@@ -362,7 +365,7 @@ void hmc::stout_smear (double rho, field<gauge> &U) {
 	// construct Q: arxiv:0311018 eq (2)
 	// with rho_munu = rho = constant real
 	field<gauge> Q (U.grid);
-	#pragma omp parallel for
+	//#pragma omp parallel for
 	for(int ix=0; ix<U.V; ++ix) {
 		for(int mu=0; mu<4; ++mu) {
 			SU3mat A = staple (ix, mu, U);
@@ -406,7 +409,7 @@ int hmc::force_fermion (field<gauge> &force, field<gauge> &U, const field<fermio
 	if(params.EE) {
 		// for even-even version half of the terms are zero:
 		// even ix: ix = ix_e
-		#pragma omp parallel for
+		//#pragma omp parallel for
 		for(int ix=0; ix<chi.V; ++ix) {
 			for(int mu=0; mu<4; ++mu) {
 				for(int a=0; a<8; ++a) {
@@ -417,7 +420,7 @@ int hmc::force_fermion (field<gauge> &force, field<gauge> &U, const field<fermio
 			}
 		}
 		// odd ix: ix = ix_o + chi.V
-		#pragma omp parallel for
+		//#pragma omp parallel for
 		for(int ix_o=0; ix_o<chi.V; ++ix_o) {
 			int ix = ix_o + chi.V;
 			for(int mu=0; mu<4; ++mu) {
@@ -432,7 +435,7 @@ int hmc::force_fermion (field<gauge> &force, field<gauge> &U, const field<fermio
 		// mu=0 terms have extra chemical potential isospin factors exp(+-\mu_I/2):
 		double mu_I_plus_factor = exp(0.5 * params.mu_I);
 		double mu_I_minus_factor = exp(-0.5 * params.mu_I);
-		#pragma omp parallel for
+		//#pragma omp parallel for
 		for(int ix=0; ix<U.V; ++ix) {
 			for(int a=0; a<8; ++a) {
 				double Fa = chi[ix].dot(T[a] * mu_I_plus_factor * U[ix][0] * psi.up(ix,0)).imag();
@@ -485,7 +488,7 @@ double hmc::plaq (int ix, const field<gauge> &U) {
 
 double hmc::plaq (const field<gauge> &U) {
 	double p = 0;
-	#pragma omp parallel for reduction (+:p)
+	//#pragma omp parallel for reduction (+:p)
 	for(int ix=0; ix<U.V; ++ix) {
 		for(int mu=1; mu<4; ++mu) {
 			for(int nu=0; nu<mu; nu++) {
@@ -498,7 +501,7 @@ double hmc::plaq (const field<gauge> &U) {
 
 double hmc::plaq_1x2 (const field<gauge> &U) {
 	double p = 0;
-	#pragma omp parallel for reduction (+:p)
+	//#pragma omp parallel for reduction (+:p)
 	for(int ix=0; ix<U.V; ++ix) {
 		for(int mu=0; mu<4; ++mu) {
 			for(int nu=0; nu<4; nu++) {
@@ -517,7 +520,7 @@ double hmc::plaq_1x2 (const field<gauge> &U) {
 
 double hmc::plaq_spatial (const field<gauge> &U) {
 	double p = 0;
-	#pragma omp parallel for reduction (+:p)
+	//#pragma omp parallel for reduction (+:p)
 	for(int ix=0; ix<U.V; ++ix) {
 		for(int mu=1; mu<4; ++mu) {
 			for(int nu=1; nu<mu; nu++) {
@@ -530,7 +533,7 @@ double hmc::plaq_spatial (const field<gauge> &U) {
 
 double hmc::plaq_timelike (const field<gauge> &U) {
 	double p = 0;
-	#pragma omp parallel for reduction (+:p)
+	//#pragma omp parallel for reduction (+:p)
 	for(int ix=0; ix<U.V; ++ix) {
 		for(int mu=1; mu<4; ++mu) {
 			p += plaq (ix, mu, 0, U);

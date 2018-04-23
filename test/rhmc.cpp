@@ -7,7 +7,7 @@
 #include "io.hpp"
 #include <iostream>
 
-constexpr double EPS = 5.e-12;
+constexpr double EPS = 5.e-10;
 
 TEST_CASE( "RHMC Gauge action self consistency", "[rhmc]" ) {
 	// create 4^4 lattice with random U[mu] at each site
@@ -89,10 +89,10 @@ TEST_CASE( "RHMC Gaussian block pseudofermions have expected mean < |chi^2| > = 
 		double av = 0;
 		for(int i=0; i<n; ++i) {
 			rhmc.gaussian_fermion(chi);
-			av += chi.squaredNorm() / static_cast<double>(chi.V);
+			av += chi.squaredNorm() / static_cast<double>(chi.V*N_rhs);
 		}
 		av /= static_cast<double>(n);
-		REQUIRE( av == Approx(3.0*N_rhs).margin(eps) );
+		REQUIRE( av == Approx(3.0).margin(eps) );
 	}
 }
 
@@ -132,10 +132,10 @@ TEST_CASE( "RHMC EE Gaussian block pseudofermions have expected mean < |chi^2| >
 	double av = 0;
 	for(int i=0; i<n; ++i) {
 		rhmc.gaussian_fermion(chi);
-		av += chi.squaredNorm() / static_cast<double>(chi.V);
+		av += chi.squaredNorm() / static_cast<double>(chi.V*N_rhs);
 	}
 	av /= static_cast<double>(n);
-	REQUIRE( av == Approx(3.0 * N_rhs).margin(eps) );
+	REQUIRE( av == Approx(3.0).margin(eps) );
 }
 
 // returns average deviation from unit determinant and unitarity per matrix, should be ~1e-15

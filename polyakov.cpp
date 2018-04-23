@@ -36,10 +36,10 @@ int main(int argc, char *argv[]) {
 		read_gauge_field(U, base_name, i);
 		double plq = hmc.plaq(U);
 		for(int i_smear=0; i_smear<n_smear; ++i_smear) {
-			std::cout << i << "\tn_smear= " << i_smear << "\t" << std::scientific << plq << "\t";
+			std::cout << i << "\tn_smear= " << i_smear << "\t" << std::scientific << plq << " \t";
 			for(int mu=0; mu<4; ++mu) {
 				std::complex<double> ply = hmc.polyakov_loop(U, mu);
-			  	std::cout << std::scientific << ply.real() << "\t" << ply.imag() << "\t";
+			  	std::cout << std::scientific << ply.real() << " \t" << ply.imag() << " \t";
 			}
 			std::cout << std::endl;
 			hmc.stout_smear(rho, U);

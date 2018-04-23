@@ -2,6 +2,7 @@
 #define LATTICE_DIRAC_OP_H
 #include "4d.hpp"
 #include "su3.hpp"
+#include "omp.h"
 
 // staggered space-dependent gamma matrices
 // for now stored as 5x doubles per site but they are just +/- signs, and g[0] is just + everywhere
@@ -54,6 +55,7 @@ public:
 		// massless even_odd part of dirac op (assumes mu_I=0):
 		// also assumes that gauge links contain eta matrices and bcs
 		// rhs is only defined for odd sites, lhs for even sites
+		#pragma omp parallel for
 		for(int ix=0; ix<lhs.V; ++ix) {
 			lhs[ix].setZero();
 			for(int mu=0; mu<4; ++mu) {
@@ -65,6 +67,7 @@ public:
 	template<int N>
 	void D_oe (field< block_fermion_matrix<N> >& lhs, const field< block_fermion_matrix<N> >& rhs, const field<gauge>& U) const {
 		// loop over odd ix_o = ix + V:
+		#pragma omp parallel for
 		for(int ix_o=0; ix_o<lhs.V; ++ix_o) {
 			lhs[ix_o].setZero();
 			// true ix has V offset from ix_o:
@@ -83,7 +86,7 @@ public:
 		double mu_I_plus_factor = exp(0.5 * mu_I);
 		double mu_I_minus_factor = exp(-0.5 * mu_I);
 		// default static scheduling, with N threads, split loop into N chunks, one per thread 
-		#pragma omp parallel for
+		//#pragma omp parallel for
 		for(int ix=0; ix<rhs.V; ++ix) {
 			lhs[ix] = mass * rhs[ix];
 			// mu=0 terms have extra chemical potential isospin factors exp(+-\mu_I/2):
