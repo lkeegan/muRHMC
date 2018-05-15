@@ -2,8 +2,9 @@
 #include "su3.hpp"
 #include "4d.hpp"
 #include "hmc.hpp"
+#include "rhmc.hpp"
 
-constexpr double EPS = 5.e-14;
+constexpr double EPS = 9.e-14;
 
 TEST_CASE( "moving forwards then backwards does nothing: 4^4 lattice of U[mu]", "[lattice]" ) {
 	for(bool isEO : {false, true}) {
@@ -169,4 +170,239 @@ TEST_CASE( "sqrt(x.squaredNorm()) and x.norm equivalent", "[4d]" ) {
 		rhmc.gaussian_fermion(chi);
 		REQUIRE( chi.norm() == Approx(sqrt(chi.squaredNorm())) );
 	}
+}
+
+TEST_CASE( "ZGEMM vs eigen: X beta", "[mkl]" ) {
+
+	block_fermion A = block_fermion::Random();
+	block_fermion B = block_fermion::Random();
+	block_matrix alpha = block_matrix::Random();
+	block_fermion A_mkl = A;
+
+	A += B * alpha;
+	std::complex<double> one (1.0, 0.0);
+    cblas_zgemm(CblasColMajor, CblasNoTrans, CblasNoTrans, 
+        3, N_rhs, N_rhs, &one, B.data(), 3, alpha.data(), N_rhs, &one, A_mkl.data(), 3);
+
+    CAPTURE(A);
+    CAPTURE(A_mkl);
+    REQUIRE ( (A - A_mkl).norm() < EPS );
+}
+
+TEST_CASE( "ZGEMM vs eigen U^dagger X", "[mkl]" ) {
+
+	block_fermion A = block_fermion::Random();
+	block_fermion B = block_fermion::Random();
+	SU3mat U = SU3mat::Random();
+	block_fermion A_mkl = A;
+
+	A += 0.5 * U.adjoint() * B;
+	std::complex<double> one (1.0, 0.0);
+	std::complex<double> phalf (0.5, 0.0);
+    cblas_zgemm(CblasColMajor, CblasConjTrans, CblasNoTrans, 
+		 3, N_rhs, 3, &phalf, U.data(), 3, B.data(), 3, &one, A_mkl.data(), 3);
+
+    CAPTURE(A);
+    CAPTURE(A_mkl);
+    REQUIRE ( (A - A_mkl).norm() < EPS );
+}
+
+TEST_CASE( "add_mkl vs add", "[mkl]" ) {
+
+	lattice grid (4, true);
+	rhmc_params rhmc_pars;
+	rhmc rhmc (rhmc_pars, grid);
+	field<block_fermion> A (grid);
+	field<block_fermion> B (grid);
+	block_matrix alpha = block_matrix::Random();
+	rhmc.gaussian_fermion(A);
+	rhmc.gaussian_fermion(B);
+	field<block_fermion> A_mkl (A);
+
+	A.add(B, alpha);
+	CAPTURE(A[0]);
+	A_mkl.add_mkl(B, alpha);
+	CAPTURE(A_mkl[0]);
+	A -= A_mkl;
+    REQUIRE ( A.norm() < EPS );
+}
+
+TEST_CASE( "add_eigen_bigmat vs add", "[mkl]" ) {
+
+	lattice grid (4, true);
+	rhmc_params rhmc_pars;
+	rhmc rhmc (rhmc_pars, grid);
+	field<block_fermion> A (grid);
+	field<block_fermion> B (grid);
+	block_matrix alpha = block_matrix::Random();
+	rhmc.gaussian_fermion(A);
+	rhmc.gaussian_fermion(B);
+
+	// make big eigem matrix containg copy of A,B
+	typedef Eigen::Matrix<std::complex<double>, Eigen::Dynamic, N_rhs> fermion_block_field;
+	fermion_block_field A_big = fermion_block_field::Zero(3*A.V, N_rhs);
+	fermion_block_field B_big = fermion_block_field::Zero(3*A.V, N_rhs);
+	for(int in=0; in<N_rhs; ++in) {
+		for(int ix=0; ix<A.V; ++ix) {
+			for(int ic=0; ic<3; ++ic) {
+				A_big(ic + 3*ix, in) = A[ix](ic,in);
+				B_big(ic + 3*ix, in) = B[ix](ic,in);
+			}
+		}
+	}
+
+	A.add(B, alpha);
+	CAPTURE(A[0]);
+
+	A_big.noalias() += B_big * alpha;
+
+    // A -= A_big
+	CAPTURE(A_big(0,0));
+	for(int ix=0; ix<A.V; ++ix) {
+		for(int ic=0; ic<3; ++ic) {
+			for(int in=0; in<N_rhs; ++in) {
+				A[ix](ic,in) -= A_big(ic + 3*ix, in);
+			}
+		}
+	}
+
+    REQUIRE ( A.norm() < EPS );
+}
+
+TEST_CASE( "add_mkl_bigmat vs add", "[mkl]" ) {
+
+	lattice grid (4, true);
+	rhmc_params rhmc_pars;
+	rhmc rhmc (rhmc_pars, grid);
+	field<block_fermion> A (grid);
+	field<block_fermion> B (grid);
+	block_matrix alpha = block_matrix::Random();
+	rhmc.gaussian_fermion(A);
+	rhmc.gaussian_fermion(B);
+
+	// make mkl_alloc'ed array containg copy of A
+	int sizeofA = 3*A.V*N_rhs;
+	std::complex<double> *A_mkl = (std::complex<double>*)mkl_malloc(sizeofA*sizeof(std::complex<double>), 64);
+	std::complex<double> *B_mkl = (std::complex<double>*)mkl_malloc(sizeofA*sizeof(std::complex<double>), 64);
+	for(int in=0; in<N_rhs; ++in) {
+		for(int ix=0; ix<A.V; ++ix) {
+			for(int ic=0; ic<3; ++ic) {
+				A_mkl[ic + 3*(ix + A.V*in)] = A[ix](ic,in);
+				B_mkl[ic + 3*(ix + A.V*in)] = B[ix](ic,in);
+			}
+		}
+	}
+
+	A.add(B, alpha);
+	CAPTURE(A[0]);
+
+	// A_mkl += B alpha
+	std::complex<double> one (1.0, 0.0);
+    cblas_zgemm(CblasColMajor, CblasNoTrans, CblasNoTrans, 
+		 3*A.V, N_rhs, N_rhs, &one, B_mkl, 3*A.V, alpha.data(), N_rhs, &one, A_mkl, 3*A.V);
+
+    // A -= A_mkl
+	CAPTURE(A_mkl[0]);
+	for(int ix=0; ix<A.V; ++ix) {
+		for(int ic=0; ic<3; ++ic) {
+			for(int in=0; in<N_rhs; ++in) {
+				A[ix](ic,in) -= A_mkl[ic + 3*(ix + A.V*in)];
+			}
+		}
+	}
+    REQUIRE ( A.norm() < EPS );
+    mkl_free(A_mkl);
+    mkl_free(B_mkl);
+}
+
+TEST_CASE( "add_mkl_compact vs add", "[mkl]" ) {
+
+	lattice grid (4, true);
+	rhmc_params rhmc_pars;
+	rhmc rhmc (rhmc_pars, grid);
+	field<block_fermion> A (grid);
+	field<block_fermion> B (grid);
+	field<block_fermion> AB (grid);
+	block_matrix alpha = block_matrix::Random();
+	rhmc.gaussian_fermion(A);
+	rhmc.gaussian_fermion(B);
+
+	int nm = A.V;
+
+	// make mkl_alloc'ed array containg copy of A, B, alpha
+	int sizeofA = 3*nm*N_rhs;
+	std::complex<double> *A_mkl = (std::complex<double>*)mkl_malloc(sizeofA*sizeof(std::complex<double>), 64);
+	std::complex<double> *B_mkl = (std::complex<double>*)mkl_malloc(sizeofA*sizeof(std::complex<double>), 64);
+	std::complex<double> *alpha_mkl = (std::complex<double>*)mkl_malloc(N_rhs*N_rhs*sizeof(std::complex<double>), 64);
+	for(int ix=0; ix<nm; ++ix) {
+		for(int in=0; in<N_rhs; ++in) {
+			for(int ic=0; ic<3; ++ic) {
+				A_mkl[ic + 3*(in + N_rhs*ix)] = A[ix](ic,in);
+				B_mkl[ic + 3*(in + N_rhs*ix)] = B[ix](ic,in);
+			}
+		}
+	}
+
+	for(int in=0; in<N_rhs; ++in) {
+		for(int ic=0; ic<N_rhs; ++ic) {
+			alpha_mkl[ic + N_rhs*in] = alpha(ic,in);
+		}
+	}
+
+	// make array of pointers to each of nm matrices
+	MKL_Complex16 *A_mkl_arr[nm];
+	MKL_Complex16 *B_mkl_arr[nm];
+	MKL_Complex16 *alpha_mkl_arr[nm];
+	for(int ix=0; ix<nm; ++ix) {
+		A_mkl_arr[ix] = A[ix].data(); //&A_mkl[ix*3*N_rhs];
+		B_mkl_arr[ix] = &B_mkl[ix*3*N_rhs];
+		alpha_mkl_arr[ix] = &alpha_mkl[0];
+	}
+
+	// A += B\alpha 
+	AB = A;
+	CAPTURE(AB[0]);
+	AB.add(B, alpha);
+	CAPTURE(AB[0]);
+
+    // Set up Compact arrays
+    MKL_COMPACT_PACK format = mkl_get_format_compact();
+
+    MKL_INT a_buffer_size = mkl_zget_size_compact(3, N_rhs, format, nm);
+    MKL_INT alpha_buffer_size = mkl_zget_size_compact(N_rhs, N_rhs, format, nm);
+
+	CAPTURE(A_mkl_arr[0][0]);
+	CAPTURE(A_mkl_arr[0][1]);
+
+    double *a_compact = (double *)mkl_malloc(a_buffer_size, 64);
+    double *b_compact = (double *)mkl_malloc(a_buffer_size, 64);
+    double *alpha_compact = (double *)mkl_malloc(alpha_buffer_size, 64);
+
+    /* Pack from P2P to Compact format */
+    mkl_zgepack_compact(MKL_COL_MAJOR, 3, N_rhs, reinterpret_cast<const MKL_Complex16* const*>(A_mkl_arr), 3, a_compact, 3, format, nm);
+    mkl_zgepack_compact(MKL_COL_MAJOR, 3, N_rhs, reinterpret_cast<const MKL_Complex16* const*>(B_mkl_arr), 3, b_compact, 3, format, nm);
+    mkl_zgepack_compact(MKL_COL_MAJOR, N_rhs, N_rhs, reinterpret_cast<const MKL_Complex16* const*>(alpha_mkl_arr), N_rhs, alpha_compact, N_rhs, format, nm);
+
+	// a_compact += b_compact alpha_compact
+	std::complex<double> one (1.0, 0.0);
+	mkl_zgemm_compact( MKL_COL_MAJOR, (MKL_TRANSPOSE)CblasNoTrans, (MKL_TRANSPOSE)CblasNoTrans, 3, N_rhs, N_rhs, reinterpret_cast<const MKL_Complex16*>(&one), b_compact, 3, alpha_compact, N_rhs, reinterpret_cast<const MKL_Complex16*>(&one), a_compact, 3, format, nm );
+
+    // Unpack from a_compact to A_mkl_arr
+    mkl_zgeunpack_compact(MKL_COL_MAJOR, 3, N_rhs, reinterpret_cast<MKL_Complex16* const*>(A_mkl_arr), 3, a_compact, 3, format, nm);
+
+	CAPTURE(A_mkl_arr[0][0]);
+	CAPTURE(A_mkl_arr[0][1]);
+
+    /* Deallocate arrays */
+    mkl_free(a_compact);
+    mkl_free(b_compact);
+    mkl_free(alpha_compact);
+
+    mkl_free(A_mkl);
+    mkl_free(B_mkl);
+
+	CAPTURE(A[0]);
+
+	A -= AB;
+    REQUIRE ( A.norm() < EPS );
 }

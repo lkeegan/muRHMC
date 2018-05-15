@@ -1,5 +1,5 @@
-#ifndef LATTICE_RATIONAL_APPROX_H
-#define LATTICE_RATIONAL_APPROX_H
+#ifndef LKEEGAN_MURHMC_RATIONAL_APPROX_H
+#define LKEEGAN_MURHMC_RATIONAL_APPROX_H
 #include <vector>
 
 class rational_approx {
@@ -18,4 +18,4 @@ public:
 	rational_approx(double lower_bound, double upper_bound);
 };
 
-#endif //LATTICE_RATIONAL_APPROX_H
+#endif //LKEEGAN_MURHMC_RATIONAL_APPROX_H

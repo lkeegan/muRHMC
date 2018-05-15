@@ -1,30 +1,31 @@
-# for anubis/euler use VERSION 2.8
 cmake_minimum_required(VERSION 3.1)
 project (muRHMC)
 
 set(CMAKE_VERBOSE_MAKEFILE ON)
 set(CMAKE_CXX_STANDARD 11)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -pedantic -Wextra -Wno-int-in-bool-context -std=c++11")
-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -march=native -g") #remove g if not profiling release code
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -pedantic -Wextra -std=c++11")
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -march=native -DEIGEN_NO_DEBUG -DEIGEN_DONT_PARALLELIZE -g") #remove g if not profiling release code
 
-#Comment out following line to disable openMP
-FIND_PACKAGE(OpenMP REQUIRED)
-if(OPENMP_FOUND)
-message("OPENMP FOUND")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
-set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
+# if the environment variable $MKLROOT is defined, then link with MKL
+# and define eigen macro EIGEN_USE_MKL_ALL
+if(DEFINED ENV{MKLROOT})
+	message("MKLROOT is defined: linking with MKL")
+	#Note: including MKL headers generates huge number of compiler warnings
+	#SYSTEM keyword here means include headers as system headers and therefore suppresses compiler warnings
+	include_directories(SYSTEM $ENV{MKLROOT}/include)
+	set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -DEIGEN_USE_MKL_ALL -L$ENV{MKLROOT}/lib/intel64 -Wl,--no-as-needed -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -lpthread -lm -ldl")
 endif()
 
-find_package(Eigen3 REQUIRED)
-# for anubis/euler comment out above line and instead use:
-#set(EIGEN3_INCLUDE_DIR "/home/keeganl/include/eigen3")
-#set(EIGEN3_INCLUDE_DIR "/cluster/home/keeganl/include/eigen3")
-include_directories(${EIGEN3_INCLUDE_DIR})
-message("Found Eigen3 in: ${EIGEN3_INCLUDE_DIR}")
+#FIND_PACKAGE(OpenMP REQUIRED)
+#if(OPENMP_FOUND)
+#message("OPENMP FOUND")
+#set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+#set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
+#endif()
 
-# Catch unit testing library (disable for euler currently due to old cmake version not supporting interface)
+# Catch unit testing library
 set(CATCH_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/catch)
 add_library(Catch INTERFACE)
 target_include_directories(Catch INTERFACE ${CATCH_INCLUDE_DIR})
@@ -58,4 +59,4 @@ add_executable(benchmark benchmark.cpp ${SRCS})
 add_test(NAME Addition COMMAND tests)
 
 #Make running the unit tests part of the build, so failed test = failed build
-#add_custom_command(TARGET tests POST_BUILD COMMAND tests -d yes)
+add_custom_command(TARGET tests POST_BUILD COMMAND tests -d yes)

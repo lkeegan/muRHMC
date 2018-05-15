@@ -1,9 +1,16 @@
-#ifndef LATTICE_4D_H
-#define LATTICE_4D_H
+#ifndef LKEEGAN_MURHMC_4D_H
+#define LKEEGAN_MURHMC_4D_H
 
 #include <vector>
 #include <complex>
 //#include "omp.h"
+
+// for mkl versions of some matrix ops
+#ifdef EIGEN_USE_MKL_ALL
+  // ugly hack to get mkl to work with c++ std::complex type 
+  #define MKL_Complex16 std::complex<double>
+  #include "mkl.h"
+#endif
 
 // 4d lattice with pbcs
 // pair of integer vectors store indices of nearest up/dn neighbours
@@ -150,7 +157,6 @@ public:
 	    return *this;
 	}
 
-	// *thisField += rhs_multiplier * rhsField
 	template<typename Targ>
 	field& add(const Targ& rhs_multiplier, const field& rhs)
 	{
@@ -163,11 +169,38 @@ public:
 	template<typename Targ>
 	field& add(const field& rhs, const Targ& rhs_multiplier)
 	{
+		//#pragma omp parallel for
 		for(int ix=0; ix<V; ++ix) {
 			data_[ix].noalias() += rhs[ix] * rhs_multiplier;
 		}
 	    return *this;
 	}
+  #ifdef EIGEN_USE_MKL_ALL
+	// mkl zgemm call at each site 
+	template<typename Targ>
+	field& add_mkl(const field& rhs, const Targ& rhs_multiplier)
+	{
+		std::complex<double> one (1.0, 0.0);
+		const int N_rhs = rhs_multiplier.cols();
+		for(int ix=0; ix<V; ++ix) {
+		    cblas_zgemm(CblasColMajor, CblasNoTrans, CblasNoTrans, 
+       			 3, N_rhs, N_rhs, &one, rhs[ix].data(), 3, rhs_multiplier.data(), N_rhs, &one, data_[ix].data(), 3);
+			//data_[ix].noalias() += rhs[ix] * rhs_multiplier;
+		}
+	    return *this;
+	}
+	// single mkl zgemm call for (3xvolume)xN_rhs fermion matrices [data must be mkl_malloced contiguous array]
+	template<typename Targ>
+	field& add_mkl_bigmat(const field& rhs, const Targ& rhs_multiplier)
+	{
+		std::complex<double> one (1.0, 0.0);
+		const int N_rhs = rhs_multiplier.cols();
+	    cblas_zgemm(CblasColMajor, CblasNoTrans, CblasNoTrans, 
+   			 3*V, N_rhs, N_rhs, &one, rhs[0].data(), 3*V, rhs_multiplier.data(), N_rhs, &one, data_[0].data(), 3*V);
+			//data_[ix].noalias() += rhs[ix] * rhs_multiplier;
+	    return *this;
+	}
+  #endif
 /*	field& add(double rhs_multiplier, const field& rhs)
 	{
 		for(int ix=0; ix<V; ++ix) {
@@ -178,7 +211,7 @@ public:
 */	// *this = scale * (*this) + rhs_multiplier * rhs
 	field& scale_add(double scale, double rhs_multiplier, const field& rhs)
 	{
-		//#pragma omp parallel for
+		////#pragma omp parallel for
 		for(int ix=0; ix<V; ++ix) {
 			data_[ix] = scale * data_[ix] + rhs_multiplier * rhs[ix];
 		}
@@ -186,7 +219,7 @@ public:
 	}
 	field& scale_add(std::complex<double> scale, std::complex<double> rhs_multiplier, const field& rhs)
 	{
-		//#pragma omp parallel for
+		////#pragma omp parallel for
 		for(int ix=0; ix<V; ++ix) {
 			data_[ix] = scale * data_[ix] + rhs_multiplier * rhs[ix];
 		}
@@ -204,7 +237,7 @@ public:
 	// equivalent to real part of dot with itself i.e. l2-norm squared
 	double squaredNorm() const {
 		double norm = 0.0;
-		//#pragma omp parallel for reduction(+:norm)
+		////#pragma omp parallel for reduction(+:norm)
 		for(int ix=0; ix<V; ++ix) {
 			norm += data_[ix].squaredNorm();
 		}
@@ -235,7 +268,7 @@ public:
 	//complex conjugate of this dotted with rhs
 	std::complex<double> dot (const field& rhs) const {
 		std::complex<double> sum (0.0, 0.0);
-		//#pragma omp parallel for reduction(+:sum)
+		////#pragma omp parallel for reduction(+:sum)
 		//note: openMP can't reduce std::complex<double> type
 		for(int ix=0; ix<V; ++ix) {
 			sum += data_[ix].dot(rhs[ix]);
@@ -268,4 +301,4 @@ public:
 
 };
 
-#endif //LATTICE_4D_H
+#endif //LKEEGAN_MURHMC_4D_H

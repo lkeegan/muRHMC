@@ -220,51 +220,54 @@ TEST_CASE( "Energy conservation of RHMC", "[rhmc]" ) {
 
 	double mass = 0.055;
 	for(int n_f : {4}) {
-		for(int n_pf : {2}) {
-			rhmc_params rhmc_pars;
-			rhmc_pars.n_f = n_f;
-			rhmc_pars.n_pf = n_pf;
-			rhmc_pars.tau = 0.03;
-			rhmc_pars.mass = 0.0755;
-			rhmc_pars.MD_eps = 1.e-12;
+		for(int n_pf : {N_rhs}) {
+			for(bool isBlock : {false, true}) {
+				rhmc_params rhmc_pars;
+				rhmc_pars.n_f = n_f;
+				rhmc_pars.n_pf = n_pf;
+				rhmc_pars.tau = 0.03;
+				rhmc_pars.mass = 0.0755;
+				rhmc_pars.MD_eps = 1.e-12;
+				rhmc_pars.block = isBlock;
 
-			// create 4^4 lattice with random U[mu] at each site, random gaussian P
-			// integrate by tau, P -> -P, integrate by tau, compare to original U
-			SECTION( "nf = " + std::to_string(rhmc_pars.n_f) + ", n_pf = " + std::to_string(rhmc_pars.n_pf) + " LEXI - FULL" ) {
-				lattice grid (4);
-				field<gauge> U (grid);
-				field<gauge> U_old (grid);
-				rhmc rhmc (rhmc_pars, grid);
-				dirac_op D (grid);
-				rhmc.random_U(U, 0.2);
-				rhmc.trajectory(U, D);
-				CAPTURE(rhmc.deltaE);
-				REQUIRE( fabs(rhmc.deltaE) < 1.e-6 * U.V );		
-			}
+				// create 4^4 lattice with random U[mu] at each site, random gaussian P
+				// integrate by tau, P -> -P, integrate by tau, compare to original U
+				SECTION( "nf = " + std::to_string(rhmc_pars.n_f) + ", n_pf = " + std::to_string(rhmc_pars.n_pf) + " LEXI - FULL, block=" + std::to_string(rhmc_pars.block) ) {
+					lattice grid (4);
+					field<gauge> U (grid);
+					field<gauge> U_old (grid);
+					rhmc rhmc (rhmc_pars, grid);
+					dirac_op D (grid);
+					rhmc.random_U(U, 0.2);
+					rhmc.trajectory(U, D);
+					CAPTURE(rhmc.deltaE);
+					REQUIRE( fabs(rhmc.deltaE) < 1.e-6 * U.V );		
+				}
 
-			SECTION( "nf = " + std::to_string(rhmc_pars.n_f) + ", n_pf = " + std::to_string(rhmc_pars.n_pf) + " EO - FULL" ) {
-				lattice grid (4, true);
-				field<gauge> U (grid);
-				field<gauge> U_old (grid);
-				rhmc rhmc (rhmc_pars, grid);
-				dirac_op D (grid);
-				rhmc.random_U(U, 0.2);
-				rhmc.trajectory(U, D);
-				CAPTURE(rhmc.deltaE);
-				REQUIRE( fabs(rhmc.deltaE) < 1.e-6 * U.V );		
-			}
+				SECTION( "nf = " + std::to_string(rhmc_pars.n_f) + ", n_pf = " + std::to_string(rhmc_pars.n_pf) + " EO - FULL, block=" + std::to_string(rhmc_pars.block) ) {
+					lattice grid (4, true);
+					field<gauge> U (grid);
+					field<gauge> U_old (grid);
+					rhmc rhmc (rhmc_pars, grid);
+					dirac_op D (grid);
+					rhmc.random_U(U, 0.2);
+					rhmc.trajectory(U, D);
+					CAPTURE(rhmc.deltaE);
+					REQUIRE( fabs(rhmc.deltaE) < 1.e-6 * U.V );		
+				}
 
-			SECTION( "nf = " + std::to_string(rhmc_pars.n_f) + ", n_pf = " + std::to_string(rhmc_pars.n_pf) + " EO - EVEN_ONLY" ) {
-				rhmc_pars.EE = true;
-				lattice grid (4, true);
-				field<gauge> U (grid);
-				field<gauge> U_old (grid);
-				rhmc rhmc (rhmc_pars, grid);
-				dirac_op D (grid);
-				rhmc.random_U(U, 0.2);
-				rhmc.trajectory(U, D);
-				CAPTURE(rhmc.deltaE);
-				REQUIRE( fabs(rhmc.deltaE) < 1.e-6 * U.V );		
+				SECTION( "nf = " + std::to_string(rhmc_pars.n_f) + ", n_pf = " + std::to_string(rhmc_pars.n_pf) + " EO - EVEN_ONLY, block=" + std::to_string(rhmc_pars.block) ) {
+					rhmc_pars.EE = true;
+					lattice grid (4, true);
+					field<gauge> U (grid);
+					field<gauge> U_old (grid);
+					rhmc rhmc (rhmc_pars, grid);
+					dirac_op D (grid);
+					rhmc.random_U(U, 0.2);
+					rhmc.trajectory(U, D);
+					CAPTURE(rhmc.deltaE);
+					REQUIRE( fabs(rhmc.deltaE) < 1.e-6 * U.V );			
+				}
 			}
 		}
 	}

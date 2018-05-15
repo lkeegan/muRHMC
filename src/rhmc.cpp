@@ -661,55 +661,67 @@ int rhmc::force_fermion_block (field<gauge> &force, field<gauge> &U, dirac_op& D
 	field<block_fermion> psi (block_phi.grid, block_eo_storage_o);
 
 	int iter = SBCGrQ (chi, block_phi, U, RA.beta_inv_lo[n_rational], D, params.MD_eps);
+	D.apply_eta_bcs_to_U(U);
 	for(int i_s=0; i_s<n_shifts; ++i_s) {
 		// chi_{i_s} = [(DD^dagger + beta_{i_s}]^-1 phi[i_pf]
 		//std::cout << "ipf " << i_pf << "cum iter " << iter << " inv0 norm " << chi[0].norm() << " Unorm " << U.norm() << " phinorm " << phi[i_pf].norm() << std::endl;
 			// psi_i = -D^dagger(mu,m) chi or Doe chi
 			// psi = -D^dagger(mu,m) chi = D(-mu, -m) chi
 		if(params.EE) {
-			D.apply_eta_bcs_to_U(U);
 			D.D_oe(psi, chi[i_s], U);
-			D.remove_eta_bcs_from_U(U);
 		} else {
 			// apply -Ddagger = D(-m, -mu)
 			// NB: should put this in a function
+			D.remove_eta_bcs_from_U(U);
 			D.mass = -D.mass;
 			D.mu_I = -D.mu_I;
 			D.D(psi, chi[i_s], U);
 			D.mass = -D.mass;
 			D.mu_I = -D.mu_I;
+			D.apply_eta_bcs_to_U(U);
 		}
 
-		for(int i_pf=0; i_pf<params.n_pf; ++i_pf) {
-			// usual force term expressions
-			// but with multiplicative alpha_inv factor:
-			double a_rational = RA.alpha_inv_lo[n_rational][i_s+1];
-			D.apply_eta_bcs_to_U(U);
-			SU3_Generators T;
-			if(params.EE) {
-				// for even-even version half of the terms are zero:
-				// even ix: ix = ix_e
-				//#pragma omp parallel for
-				for(int ix=0; ix<chi[i_s].V; ++ix) {
-					for(int mu=0; mu<4; ++mu) {
-						for(int a=0; a<8; ++a) {
-							double Fa = a_rational * (chi[i_s][ix].col(i_pf).dot(T[a] * U[ix][mu] * psi.up(ix,mu).col(i_pf))).imag();
-							force[ix][mu] -= Fa * T[a];
+		// usual force term expressions
+		// but with multiplicative alpha_inv factor:
+		double a_rational = RA.alpha_inv_lo[n_rational][i_s+1];
+		SU3_Generators T;
+		if(params.EE) {
+			// for even-even version half of the terms are zero:
+			// even ix: ix = ix_e
+			//#pragma omp parallel for
+			block_fermion tmpF, Ta_tmpF;
+			for(int ix=0; ix<chi[i_s].V; ++ix) {
+				for(int mu=0; mu<4; ++mu) {
+					tmpF = U[ix][mu] * psi.up(ix,mu);
+					for(int a=0; a<8; ++a) {
+						Ta_tmpF = T[a] * tmpF;
+						double Fa = 0;
+						for(int i_pf=0; i_pf<params.n_pf; ++i_pf) {
+							Fa += (chi[i_s][ix].col(i_pf).dot(Ta_tmpF.col(i_pf))).imag();
 						}
+						force[ix][mu] -= (Fa * a_rational) * T[a];
 					}
 				}
-				// odd ix: ix = ix_o + chi.V
-				//#pragma omp parallel for
-				for(int ix_o=0; ix_o<chi[i_s].V; ++ix_o) {
-					int ix = ix_o + chi[i_s].V;
-					for(int mu=0; mu<4; ++mu) {
-						for(int a=0; a<8; ++a) {
-							double Fa = a_rational * (chi[i_s].up(ix,mu).col(i_pf).dot(U[ix][mu].adjoint() * T[a] * psi[ix_o].col(i_pf))).imag();
-							force[ix][mu] -= Fa * T[a];
+			}
+			// odd ix: ix = ix_o + chi.V
+			//#pragma omp parallel for
+			for(int ix_o=0; ix_o<chi[i_s].V; ++ix_o) {
+				int ix = ix_o + chi[i_s].V;
+				for(int mu=0; mu<4; ++mu) {
+					tmpF = U[ix][mu] * chi[i_s].up(ix,mu);
+					for(int a=0; a<8; ++a) {
+						Ta_tmpF = T[a] * tmpF;
+						double Fa = 0;
+						for(int i_pf=0; i_pf<params.n_pf; ++i_pf) {
+							Fa -= psi[ix_o].col(i_pf).dot(Ta_tmpF.col(i_pf)).imag ();
+							//chi[i_s].up(ix,mu).col(i_pf).dot(U[ix][mu].adjoint() * T[a] * psi[ix_o].col(i_pf))).imag();
 						}
+						force[ix][mu] -= (Fa * a_rational) * T[a];
 					}
 				}
-			} else {
+			}
+		} else {
+			for(int i_pf=0; i_pf<params.n_pf; ++i_pf) {
 				// mu=0 terms have extra chemical potential isospin factors exp(+-\mu_I/2):
 				double mu_I_plus_factor = exp(0.5 * params.mu_I);
 				double mu_I_minus_factor = exp(-0.5 * params.mu_I);
@@ -729,9 +741,9 @@ int rhmc::force_fermion_block (field<gauge> &force, field<gauge> &U, dirac_op& D
 					}
 				}
 			}
-			D.remove_eta_bcs_from_U(U);
-		} // end of loop over shifts
-	} // end of loop over pseudo fermion flavours
+		}
+	} // end of loop over shifts
+	D.remove_eta_bcs_from_U(U);
     auto timer_stop = std::chrono::high_resolution_clock::now();
     auto timer_count = std::chrono::duration_cast<std::chrono::seconds>(timer_stop-timer_start).count();
 	std::cout << "#RHMC_ForceBCGRuntime " << timer_count << std::endl;

@@ -1,5 +1,5 @@
-#ifndef LATTICE_INVERTERS_H
-#define LATTICE_INVERTERS_H
+#ifndef LKEEGAN_MURHMC_INVERTERS_H
+#define LKEEGAN_MURHMC_INVERTERS_H
 #include "4d.hpp"
 #include "su3.hpp"
 #include "dirac_op.hpp"
@@ -51,4 +51,4 @@ int SBCGAdQArQ(std::vector< std::vector< field<fermion> > >& X, const std::vecto
 // solves by back substitution, then transforms solution back to give X
 //void bartels_stewart (block_matrix& X, const block_matrix& A, const block_matrix& B, const block_matrix& C);
  
-#endif //LATTICE_INVERTERS_H
+#endif //LKEEGAN_MURHMC_INVERTERS_H

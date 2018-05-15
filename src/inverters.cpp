@@ -1,5 +1,5 @@
 #include "inverters.hpp"
-#include "omp.h"
+//#include "omp.h"
 #include <iostream> //FOR DEBUGGING
 #include <chrono>
 

@@ -1,5 +1,5 @@
-#ifndef LATTICE_RHMC_H
-#define LATTICE_RHMC_H
+#ifndef LKEEGAN_MURHMC_RHMC_H
+#define LKEEGAN_MURHMC_RHMC_H
 #include "su3.hpp"
 #include "4d.hpp"
 #include "dirac_op.hpp"
@@ -129,4 +129,4 @@ public:
 	std::complex<double> polyakov_loop (const field<gauge> &U);
 };
 
-#endif //LATTICE_RHMC_H
+#endif //LKEEGAN_MURHMC_RHMC_H

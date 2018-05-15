@@ -1,3 +1,5 @@
+#ifndef LKEEGAN_MURHMC_STATS_H
+#define LKEEGAN_MURHMC_STATS_H
 #include <iostream>
 #include <vector>
 #include <algorithm>
@@ -138,3 +140,5 @@ void print_av(std::vector<double>& vec, const std::string& name) {
 			  << mean << "\t" << err << "\t"
 			  << tau << "\t" << tau_err << std::endl;
 }
+
+#endif //LKEEGAN_MURHMC_STATS_H

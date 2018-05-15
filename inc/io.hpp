@@ -1,5 +1,5 @@
-#ifndef LATTICE_IO_H
-#define LATTICE_IO_H
+#ifndef LKEEGAN_MURHMC_IO_H
+#define LKEEGAN_MURHMC_IO_H
 #include <fstream>
 #include <string>
 #include <complex>
@@ -54,4 +54,4 @@ bool write_fermion_field(field<fermion>& f, const std::string& filename);
 // calculate average plaqutte for use as checksum
 double checksum_plaquette (const field<gauge> &U);
 
-#endif //LATTICE_IO_H
+#endif //LKEEGAN_MURHMC_IO_H

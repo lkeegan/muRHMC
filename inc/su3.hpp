@@ -1,14 +1,19 @@
-#ifndef LATTICE_SU3_H
-#define LATTICE_SU3_H
+#ifndef LKEEGAN_MURHMC_SU3_H
+#define LKEEGAN_MURHMC_SU3_H
 #include <complex>
 // disable run-time eigen assertions that slow down execution
-#define EIGEN_NO_DEBUG
+//#define EIGEN_NO_DEBUG
 // disable eigen openMP routines
-#define EIGEN_DONT_PARALLELIZE
-#include <Eigen/Dense>
-#include <Eigen/StdVector>
+//#define EIGEN_DONT_PARALLELIZE
+#ifdef EIGEN_USE_MKL_ALL
+  // ugly hack to get mkl to work with c++ std::complex type 
+  #define MKL_Complex16 std::complex<double>
+  #include "mkl.h"
+#endif
+#include "Eigen3/Eigen/Dense"
+#include "Eigen3/Eigen/StdVector"
 // hard code (for now) block fermion RHS
-constexpr int N_rhs = 3;
+constexpr int N_rhs = 2;
 constexpr int N_gauge = 3;
 // define types for gauge links and fermion fields
 typedef Eigen::Matrix<std::complex<double>, N_gauge, N_gauge> SU3mat;
@@ -20,9 +25,9 @@ typedef Eigen::Matrix<std::complex<double>, N_rhs, N_rhs> block_matrix;
 
 // the following is required to be able to use STL vectors of
 // these objects with correct alignment (i.e. otherwise segfaults!) 
-//EIGEN_DEFINE_STL_VECTOR_SPECIALIZATION(SU3mat)
+EIGEN_DEFINE_STL_VECTOR_SPECIALIZATION(SU3mat)
 EIGEN_DEFINE_STL_VECTOR_SPECIALIZATION(fermion)
-//EIGEN_DEFINE_STL_VECTOR_SPECIALIZATION(block_fermion)
+EIGEN_DEFINE_STL_VECTOR_SPECIALIZATION(block_fermion)
 EIGEN_DEFINE_STL_VECTOR_SPECIALIZATION(block_matrix)
 EIGEN_DEFINE_STL_VECTOR_SPECIALIZATION(Eigen::ColPivHouseholderQR<block_matrix>)
 
@@ -149,4 +154,4 @@ public:
 
 };
 
-#endif //LATTICE_SU3_H
+#endif //LKEEGAN_MURHMC_SU3_H

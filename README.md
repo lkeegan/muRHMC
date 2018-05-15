@@ -1,7 +1,7 @@
 # muRHMC [![Build Status](https://travis-ci.org/lkeegan/muRHMC.svg?branch=master)](https://travis-ci.org/lkeegan/muRHMC)
 A simple lattice code: RHMC simulation of (n_f+n_f) flavor QCD with isospin chemical potential, using unimproved staggered fermions and the Wilson gauge action. See the [documentation](doc/muRHMC.pdf) for more details.
 
-Requires the [Eigen](http://eigen.tuxfamily.org) C++ template library for matrix operations, and supports openMP.
+Uses the [Eigen](http://eigen.tuxfamily.org) C++ template library for matrix operations, and supports openMP.
 
 ## Current working features
 - HMC for pure gauge + n_f=4+4 isospin chemical potential

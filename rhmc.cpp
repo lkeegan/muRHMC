@@ -77,11 +77,12 @@ int main(int argc, char *argv[]) {
 	}
 
 	// just do force measurements:
-	
+	/*
 	hmc.trajectory (U, D, false, true);
 	exit(0);
+	*/
 	/*
-	// repeat force measurements for other (not)blocked case:
+	// also repeat force measurements for other (not)blocked case:
 	rhmc_pars.block = !rhmc_pars.block;
 	rhmc rhmc_block (rhmc_pars, grid);
 	rhmc_block.trajectory (U, D, false, true);

@@ -1,5 +1,5 @@
-#ifndef LATTICE_HMC_H
-#define LATTICE_HMC_H
+#ifndef LKEEGAN_MURHMC_HMC_H
+#define LKEEGAN_MURHMC_HMC_H
 #include "su3.hpp"
 #include "4d.hpp"
 #include "dirac_op.hpp"
@@ -123,4 +123,4 @@ public:
 	double chiral_condensate (field<gauge> &U, dirac_op& D);
 };
 
-#endif //LATTICE_HMC_H
+#endif //LKEEGAN_MURHMC_HMC_H
