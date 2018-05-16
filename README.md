@@ -1,12 +1,16 @@
-# muRHMC [![Build Status](https://travis-ci.org/lkeegan/muRHMC.svg?branch=master)](https://travis-ci.org/lkeegan/muRHMC)
-A simple lattice code: RHMC simulation of (n_f+n_f) flavor QCD with isospin chemical potential, using unimproved staggered fermions and the Wilson gauge action. See the [documentation](doc/muRHMC.pdf) for more details.
+# muRHMC [![Build Status](https://travis-ci.org/lkeegan/muRHMC.svg?branch=master)](https://travis-ci.org/lkeegan/muRHMC) [![codecov](https://codecov.io/gh/lkeegan/muRHMC/branch/master/graph/badge.svg)](https://codecov.io/gh/lkeegan/muRHMC)
+A simple C++ lattice code: RHMC simulation of (n_f+n_f) flavor QCD with isospin chemical potential, using unimproved staggered fermions and the Wilson gauge action. See the [documentation](doc/muRHMC.pdf) for more details.
 
 Uses the [Eigen](http://eigen.tuxfamily.org) C++ template library for matrix operations, and supports openMP.
 
 ## Current working features
-- HMC for pure gauge + n_f=4+4 isospin chemical potential
+- RHMC for pure gauge + n_f staggered fermions [or n_f+n_f isospin chemical potential staggered fermions]
+- Even/odd preconditioning
 - Leapfrog and OMF2 integrator
-- CG, BCG and CG-multishift inverters
+- Mutiple timescale integration
+- CG, multishift CG solver
+- Block solvers: BCG[A][dQ/dQA][rQ]
+- Multishift block solver: SBCGrQ
 - Gauge observables
 	- Plaquette
 	- Polyakov loop
@@ -25,8 +29,3 @@ Uses the [Eigen](http://eigen.tuxfamily.org) C++ template library for matrix ope
 - Eigenvalues of Dirac op via Sparse MVM Arpack routines
 
 ## To do
-- RHMC: remez algorithm, maybe also zolotarev for square roots
-- CG block solver for multiple RHS
-- Mutiple timescale integration
-- OMF4 integrator
-- Even/odd preconditioning

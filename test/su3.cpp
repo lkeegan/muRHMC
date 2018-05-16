@@ -1,6 +1,6 @@
 #include "catch.hpp"
 #include "su3.hpp"
-#include "Eigen3/unsupported/Eigen/MatrixFunctions" //for matrix exponential
+#include "Eigen3/unsupported/Eigen/MatrixFunctions"	 //for matrix exponential
 #include <iostream>
 #include <limits>
 
