@@ -172,6 +172,7 @@ TEST_CASE( "sqrt(x.squaredNorm()) and x.norm equivalent", "[4d]" ) {
 	}
 }
 
+#ifdef EIGEN_USE_MKL_ALL
 TEST_CASE( "ZGEMM vs eigen: X beta", "[mkl]" ) {
 
 	block_fermion A = block_fermion::Random();
@@ -188,7 +189,9 @@ TEST_CASE( "ZGEMM vs eigen: X beta", "[mkl]" ) {
     CAPTURE(A_mkl);
     REQUIRE ( (A - A_mkl).norm() < EPS );
 }
+#endif
 
+#ifdef EIGEN_USE_MKL_ALL
 TEST_CASE( "ZGEMM vs eigen U^dagger X", "[mkl]" ) {
 
 	block_fermion A = block_fermion::Random();
@@ -206,7 +209,9 @@ TEST_CASE( "ZGEMM vs eigen U^dagger X", "[mkl]" ) {
     CAPTURE(A_mkl);
     REQUIRE ( (A - A_mkl).norm() < EPS );
 }
+#endif
 
+#ifdef EIGEN_USE_MKL_ALL
 TEST_CASE( "add_mkl vs add", "[mkl]" ) {
 
 	lattice grid (4, true);
@@ -226,6 +231,7 @@ TEST_CASE( "add_mkl vs add", "[mkl]" ) {
 	A -= A_mkl;
     REQUIRE ( A.norm() < EPS );
 }
+#endif
 
 TEST_CASE( "add_eigen_bigmat vs add", "[mkl]" ) {
 
@@ -269,6 +275,7 @@ TEST_CASE( "add_eigen_bigmat vs add", "[mkl]" ) {
     REQUIRE ( A.norm() < EPS );
 }
 
+#ifdef EIGEN_USE_MKL_ALL
 TEST_CASE( "add_mkl_bigmat vs add", "[mkl]" ) {
 
 	lattice grid (4, true);
@@ -314,7 +321,9 @@ TEST_CASE( "add_mkl_bigmat vs add", "[mkl]" ) {
     mkl_free(A_mkl);
     mkl_free(B_mkl);
 }
+#endif
 
+#ifdef EIGEN_USE_MKL_ALL
 TEST_CASE( "add_mkl_compact vs add", "[mkl]" ) {
 
 	lattice grid (4, true);
@@ -406,3 +415,4 @@ TEST_CASE( "add_mkl_compact vs add", "[mkl]" ) {
 	A -= AB;
     REQUIRE ( A.norm() < EPS );
 }
+#endif

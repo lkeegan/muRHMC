@@ -9,8 +9,8 @@ compiler:
   # - clang
 before_install:
   # install something:
-  #- sudo apt-get -qq update
-  #- sudo apt-get install -y [PACKAGE_NAME]
+  - sudo apt-get -qq update
+  - sudo apt-get install -y lcov curl
 install:
   # download and install eigen3 library
 #  - wget https://bitbucket.org/eigen/eigen/get/default.tar.gz
@@ -27,9 +27,18 @@ script:
   - export OMP_NUM_THREADS=1
   - mkdir Debug
   - cd Debug
-  - cmake -DCMAKE_BUILD_TYPE=Debug .. && make -j 2
+  - cmake -DCMAKE_BUILD_TYPE=Debug .. && make -j4
   - cd ../
   - mkdir Release
   - cd Release
-  - cmake -DCMAKE_BUILD_TYPE=Release .. && make -j 2
+  - cmake -DCMAKE_BUILD_TYPE=Release .. && make -j4
   - cd ../
+
+after_success:
+  - cd Debug
+  - lcov --directory . --capture --output-file coverage.info # capture coverage info
+  - lcov --remove coverage.info '/usr/*' --output-file coverage.info # filter out system
+  - lcov --remove coverage.info '*/inc/Eigen3/*' --output-file coverage.info # filter out system
+  - lcov --list coverage.info #debug info
+  # Uploading report to CodeCov
+  - bash <(curl -s https://codecov.io/bash) || echo "Codecov did not collect coverage reports"

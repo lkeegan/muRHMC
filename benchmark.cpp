@@ -80,7 +80,6 @@ int main(int argc, char *argv[]) {
     int block_add_count = tock();
 	std::cout << "# BLOCKAddRunTime: " << block_add_count << std::endl;
 
-
 	// vector add EIGEN-bigmat
 	tick();
 	// make big eigem matrix containg copy of A,B
@@ -101,6 +100,8 @@ int main(int argc, char *argv[]) {
     }
     int block_add_bigmat_count = tock();
 	std::cout << "# BLOCKAddBigmatRunTime: " << block_add_bigmat_count << std::endl;
+
+#ifdef EIGEN_USE_MKL_ALL
 
 	// vector add MKL-ZGEMM
 	tick();
@@ -203,6 +204,8 @@ int main(int argc, char *argv[]) {
 			  << block_add_mkl_bigmat_count << "\t" << block_add_mkl_compact_count << "\t"
 		      << std::endl;
 
+#endif
+		      
 	exit(0);
 
 
