@@ -2,6 +2,7 @@
 #define LKEEGAN_MURHMC_DIRAC_OP_H
 #include "4d.hpp"
 #include "su3.hpp"
+#include "Eigen3/Eigen/Eigenvalues"
 //#include "omp.h"
 
 // staggered space-dependent gamma matrices

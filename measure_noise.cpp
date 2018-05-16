@@ -5,7 +5,6 @@
 #include "stats.hpp"
 #include <iostream>
 #include <random>
-#include <Eigen/Eigenvalues>
 
 int main(int argc, char *argv[]) {
 
