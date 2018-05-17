@@ -1,10 +1,6 @@
 #ifndef LKEEGAN_MURHMC_SU3_H
 #define LKEEGAN_MURHMC_SU3_H
 #include <complex>
-// disable run-time eigen assertions that slow down execution
-//#define EIGEN_NO_DEBUG
-// disable eigen openMP routines
-//#define EIGEN_DONT_PARALLELIZE
 #ifdef EIGEN_USE_MKL_ALL
   // ugly hack to get mkl to work with c++ std::complex type 
   #define MKL_Complex16 std::complex<double>

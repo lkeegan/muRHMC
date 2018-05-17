@@ -1,5 +1,5 @@
 #include "dirac_op.hpp"
-#include "inverters.hpp"
+//#include "inverters.hpp"
 #include <iostream>
 #include <chrono>
 
@@ -205,7 +205,7 @@ int main(int argc, char *argv[]) {
 		      << std::endl;
 
 #endif
-		      
+
 	exit(0);
 
 

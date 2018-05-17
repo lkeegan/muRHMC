@@ -400,13 +400,14 @@ int cg_block(field<block_fermion>& X, const field<block_fermion>& B, field<gauge
 	field<block_fermion> AP(X), P(X), Q(B);
 
 	// for debugging (error norms of first vector):
-	double norm0_x0_star, norm1_x0_star;
+	double norm0_x0_star = 1.0;
+	double norm1_x0_star = 1.0;
 	if(OUTPUT_ERROR_NORMS) {
 		// get error norms for X=0 to normalise all to 1 intially
 		field<fermion> tmpAE0(*x0_star);
-		double norm0_x0_star = sqrt(x0_star->squaredNorm());
+		norm0_x0_star = sqrt(x0_star->squaredNorm());
 		D.DDdagger(tmpAE0, *x0_star, U);
-		double norm1_x0_star = sqrt(x0_star->dot(tmpAE0).real());
+		norm1_x0_star = sqrt(x0_star->dot(tmpAE0).real());
 		// note norm2 is just the residual so we already have the normalisation		
 	}
 

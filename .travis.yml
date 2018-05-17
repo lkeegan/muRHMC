@@ -7,35 +7,34 @@ language:
 compiler:
   - gcc
   # - clang
-before_install:
-  # install something:
-  - sudo apt-get -qq update
-  - sudo apt-get install -y lcov curl
-install:
-  # download and install eigen3 library
-#  - wget https://bitbucket.org/eigen/eigen/get/default.tar.gz
-#  - tar zxf default.tar.gz
-#  - cd eigen-eigen-*
-#  - mkdir Build
-#  - cd Build
-#  - cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
-#  - make
-#  - sudo make install
-#  - cd ../..
+
+addons:
+  apt:
+    sources:
+      - ubuntu-toolchain-r-test
+    packages:
+      #- gcc-7
+      - g++-7
+      - lcov
+      - curl
+script:
+  #- export CC=gcc-7
+  - export CXX=g++-7
 
 script:
   - export OMP_NUM_THREADS=1
   - mkdir Debug
   - cd Debug
-  - cmake -DCMAKE_BUILD_TYPE=Debug .. && make -j4
+  - cmake -DCMAKE_BUILD_TYPE=Debug .. && make benchmark -j4
   - cd ../
-  - mkdir Release
-  - cd Release
-  - cmake -DCMAKE_BUILD_TYPE=Release .. && make -j4
-  - cd ../
+  - #mkdir Release
+  - #cd Release
+  - #cmake -DCMAKE_BUILD_TYPE=Release .. && make -j4
+  - #cd ../
 
 after_success:
   - cd Debug
+  - ls CMakeFiles/benchmark.dir/test/
   - lcov --directory . --capture --output-file coverage.info # capture coverage info
   - lcov --remove coverage.info '/usr/*' --output-file coverage.info # filter out system
   - lcov --remove coverage.info '*/inc/Eigen3/*' --output-file coverage.info # filter out system
