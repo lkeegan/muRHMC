@@ -14,9 +14,9 @@ struct rhmc_params {
 	double mu_I = 0.0;
 	int n_f = 2;
 	int n_pf = 4;
-	double tau = 1.0;
-	int n_steps_fermion = 3;
-	int n_steps_gauge = 2;
+	double tau = 0.5;
+	int n_steps_fermion = 1;
+	int n_steps_gauge = 1;
 	double lambda_OMF2 = 0.19;
 	double MD_eps = 1.e-6;
 	double HB_eps = 1.e-14;

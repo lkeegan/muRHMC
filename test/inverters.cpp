@@ -7,17 +7,20 @@
 #include "io.hpp"
 #include <iostream>
 
+// default lattice size for tests
+constexpr int L = 2;
+// tolerance for values that should be zero
 constexpr double EPS = 5.e-14;
 
 TEST_CASE( "CG inversions of isospin (D+m)(D+m)^dagger", "[inverters]") {
 
 	double eps = 1.e-9;
 	int N_shifts = 3;
-	std::vector<double> shifts = {0.12986, 0.421, 0.88};
+	std::vector<double> shifts = {0.2986, 0.421, 0.88};
 
 	rhmc_params rhmc_pars;
 	rhmc_pars.mass = 0.292;
-	rhmc_pars.mu_I = 0.0557;
+	rhmc_pars.mu_I = 0.0157;
 	rhmc_pars.seed = 123;
 
 	// Loop over 3 setups: LEXI (default), EO, EO w/EO preconditioning
@@ -40,7 +43,7 @@ TEST_CASE( "CG inversions of isospin (D+m)(D+m)^dagger", "[inverters]") {
 			lt = "EO_EVEN_ONLY";
 		}
 
-		lattice grid (4, isEO);
+		lattice grid (L, isEO);
 		field<gauge> U (grid);
 		rhmc rhmc (rhmc_pars, grid);
 		rhmc.random_U(U, 0.2);
@@ -103,7 +106,7 @@ TEST_CASE( "CG inversions of isospin (D+m)(D+m)^dagger", "[inverters]") {
 						for (bool rQ: {false, true}) {
 							// can't have both dQ and dQA
 							if(!(dQ && dQA)) {
-								int iter = cg_block(block_X[0], block_B, U, D, eps, A, dQ, dQA, rQ, B);
+								int iter = cg_block(block_X[0], block_B, U, D, eps, A, dQ, dQA, rQ);
 								D.DDdagger(block_Ax, block_X[0], U);
 								block_Ax -= block_B;
 								double residual = Ax.norm();
@@ -201,7 +204,7 @@ TEST_CASE( "U perturbations: CG inversions of isospin (D+m)(D+m)^dagger", "[inve
 			lt = "EO_EVEN_ONLY";
 		}
 
-		lattice grid (4, isEO);
+		lattice grid (L, isEO);
 		field<gauge> U (grid);
 		field<gauge> Uprime (grid);
 		field<gauge> P (grid);

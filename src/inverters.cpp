@@ -380,7 +380,7 @@ int rational_approx_cg_multishift(field<fermion>& x, const field<fermion>& b, fi
 	return iter;	
 }
 
-int cg_block(field<block_fermion>& X, const field<block_fermion>& B, field<gauge>& U, dirac_op& D, double eps, bool BCGA, bool dQ, bool dQA, bool rQ, const field<fermion>& x0_star) {
+int cg_block(field<block_fermion>& X, const field<block_fermion>& B, field<gauge>& U, dirac_op& D, double eps, bool BCGA, bool dQ, bool dQA, bool rQ, bool OUTPUT_ERROR_NORMS, field<fermion>* x0_star) {
 	int N = N_rhs;
 	// S = 1 [NxN]
 	block_matrix S = block_matrix::Identity();
@@ -398,13 +398,17 @@ int cg_block(field<block_fermion>& X, const field<block_fermion>& B, field<gauge
 	block_matrix mPAQ = block_matrix::Identity();
 	// AP, P, Q are [NxVOL]
 	field<block_fermion> AP(X), P(X), Q(B);
+
 	// for debugging (error norms of first vector):
-	field<fermion> tmpE0(x0_star), tmpAE0(x0_star);
-	// get error norms for X=0 to normalise all to 1 intially
-	double norm0_x0_star = sqrt(x0_star.squaredNorm());
-	D.DDdagger(tmpAE0, x0_star, U);
-	double norm1_x0_star = sqrt(x0_star.dot(tmpAE0).real());
-	// note norm2 is just the residual so we already have the normalisation
+	double norm0_x0_star, norm1_x0_star;
+	if(OUTPUT_ERROR_NORMS) {
+		// get error norms for X=0 to normalise all to 1 intially
+		field<fermion> tmpAE0(*x0_star);
+		double norm0_x0_star = sqrt(x0_star->squaredNorm());
+		D.DDdagger(tmpAE0, *x0_star, U);
+		double norm1_x0_star = sqrt(x0_star->dot(tmpAE0).real());
+		// note norm2 is just the residual so we already have the normalisation		
+	}
 
 	// start from X=0 initial guess, so residual Q = B [NxVOL]
 	//Q = B;
@@ -599,17 +603,20 @@ int cg_block(field<block_fermion>& X, const field<block_fermion>& B, field<gauge
 			residual = (C.diagonal().real().array().sqrt()/b_norm).maxCoeff();
 		}
 
-		// debugging: use known solution to get error norms for first block vector
-		for(int ix=0; ix<Q.V; ++ix) {
-			tmpE0[ix] = X[ix].col(0);
+		if(OUTPUT_ERROR_NORMS) {
+			// debugging: use known solution to get error norms for first block vector
+			field<fermion> tmpE0(*x0_star), tmpAE0(*x0_star);
+			for(int ix=0; ix<Q.V; ++ix) {
+				tmpE0[ix] = X[ix].col(0);
+			}
+			tmpE0.add(-1.0, *x0_star);
+			D.DDdagger(tmpAE0, tmpE0, U);
+			
+			double norm0 = sqrt(tmpE0.squaredNorm())/norm0_x0_star;
+			double norm1 = sqrt(tmpE0.dot(tmpAE0).real())/norm1_x0_star;
+			double norm2 = sqrt(tmpAE0.squaredNorm())/b_norm[0];
+			std::cout << "#Error-norms <(x-x*)|(1,sqrt(A),A)|(x-x*)> " << iter << "\t" << norm0 << "\t" << norm1 << "\t" << norm2 << std::endl;
 		}
-		tmpE0.add(-1.0, x0_star);
-		D.DDdagger(tmpAE0, tmpE0, U);
-		
-		double norm0 = sqrt(tmpE0.squaredNorm())/norm0_x0_star;
-		double norm1 = sqrt(tmpE0.dot(tmpAE0).real())/norm1_x0_star;
-		double norm2 = sqrt(tmpAE0.squaredNorm())/b_norm[0];
-		std::cout << "#Error-norms <(x-x*)|(1,sqrt(A),A)|(x-x*)> " << iter << "\t" << norm0 << "\t" << norm1 << "\t" << norm2 << std::endl;
 		/*
 		// [debugging] find eigenvalues of C
 		Eigen::SelfAdjointEigenSolver<block_matrix> saes;

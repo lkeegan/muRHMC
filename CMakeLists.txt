@@ -60,4 +60,4 @@ add_executable(benchmark benchmark.cpp ${SRCS})
 add_test(NAME Addition COMMAND tests)
 
 #Make running the unit tests part of the build, so failed test = failed build
-add_custom_command(TARGET tests POST_BUILD COMMAND tests -d yes)
+#add_custom_command(TARGET tests POST_BUILD COMMAND tests -d yes)

@@ -6,6 +6,9 @@
 #include "io.hpp"
 #include <iostream>
 
+// default lattice size for tests
+constexpr int L = 2;
+// tolerance for values that should be zero
 constexpr double EPS = 5.e-13;
 
 // returns average deviation from hermitian per matrix, should be ~1e-15
@@ -32,10 +35,9 @@ double is_field_SU3 (const field<gauge>& U) {
 }
 
 TEST_CASE( "Gauge action self consistency", "[hmc]" ) {
-	// create 4^4 lattice with random U[mu] at each site
 	// construct gauge action from staples, compare to plaquette expression
 	for(bool isEO : {false, true}) {
-		lattice grid (4, isEO);
+		lattice grid (L, isEO);
 		field<gauge> U (grid);
 		hmc_params hmc_pars;
 		hmc_pars.beta = 6.0;
@@ -68,7 +70,7 @@ TEST_CASE( "Momenta P have expected mean < Tr[P^2] > = 4 * VOL", "[hmc]" ) {
 	// NB: set n very large to test this properly 
 	int n = 10;
 	for(bool isEO : {false, true}) {
-		lattice grid (4, isEO);
+		lattice grid (L, isEO);
 		field<gauge> P (grid);
 		hmc_params hmc_pars;
 		hmc_pars.seed = 123;
@@ -91,7 +93,7 @@ TEST_CASE( "Gaussian pseudofermions have expected mean < |chi^2| > = 3 * VOL", "
 	// NB: set n very large to test this properly 
 	int n = 10;
 	for(bool isEO : {false, true}) {
-		lattice grid (4, isEO);
+		lattice grid (L, isEO);
 		field<fermion> chi (grid);
 		hmc_params hmc_pars;
 		hmc_pars.seed = 123;
@@ -113,7 +115,7 @@ TEST_CASE( "EE Gaussian pseudofermions have expected mean < |chi^2| > = 3 * VOL"
 	// < |chi^2| > = < \sum_a (r_a)^2 + (i_a)^2 > = 2 * 3 * < variance of r_a > * VOL = 3 * VOL
 	// NB: set n very large to test this properly 
 	int n = 10;
-	lattice grid (4, true);
+	lattice grid (L, true);
 	field<fermion> chi (grid, field<fermion>::EVEN_ONLY);
 	hmc_params hmc_pars;
 	hmc_pars.seed = 123;
@@ -136,7 +138,7 @@ TEST_CASE( "Reversibility of pure gauge HMC", "[hmc]" ) {
 	// create 4^4 lattice with random U[mu] at each site, random gaussian P
 	// integrate by tau, P -> -P, integrate by tau, compare to original U
 	for(bool isEO : {false, true}) {
-		lattice grid (4, isEO);
+		lattice grid (L, isEO);
 		field<gauge> U (grid);
 		field<gauge> P (grid);
 		field<gauge> U_old (grid);
@@ -193,7 +195,7 @@ TEST_CASE( "Reversibility of HMC", "[hmc]" ) {
 	// create 4^4 lattice with random U[mu] at each site, random gaussian P
 	// integrate by tau, P -> -P, integrate by tau, compare to original U
 	for(bool isEO : {false, true}) {
-		lattice grid (4, isEO);
+		lattice grid (L, isEO);
 		field<gauge> U (grid);
 		field<gauge> P (grid);
 		field<gauge> U_old (grid);
@@ -251,7 +253,7 @@ TEST_CASE( "Reversibility of EE HMC", "[hmc_EE]" ) {
 
 	// create 4^4 lattice with random U[mu] at each site, random gaussian P
 	// integrate by tau, P -> -P, integrate by tau, compare to original U
-	lattice grid (4, true);
+	lattice grid (L, true);
 	field<gauge> U (grid);
 	field<gauge> P (grid);
 	field<gauge> U_old (grid);
@@ -309,7 +311,7 @@ TEST_CASE( "HMC EE force term matches full HMC term with even phi sites -> 0", "
 
 	// create 4^4 lattice with random U[mu] at each site, random gaussian P
 	// integrate by a small amount, check action is conserved within some eps
-	lattice grid (4, true);
+	lattice grid (L, true);
 	field<gauge> U (grid);
 	hmc hmc_FULL (hmc_pars);
 	hmc hmc_EE (hmc_EE_pars);
@@ -340,11 +342,11 @@ TEST_CASE( "HMC EE force term matches full HMC term with even phi sites -> 0", "
 
 TEST_CASE( "HMC conserves action for small tau", "[hmc]" ) {
 	hmc_params hmc_pars;
-	hmc_pars.tau = 0.04;
+	hmc_pars.tau = 0.01;
 	// create 4^4 lattice with random U[mu] at each site, random gaussian P
 	// integrate by a small amount, check action is conserved within some eps
 	for(bool isEO : {false, true}) {
-		lattice grid (4, isEO);
+		lattice grid (L, isEO);
 		field<gauge> U (grid);
 		hmc hmc (hmc_pars);
 		dirac_op D (grid);
@@ -361,10 +363,10 @@ TEST_CASE( "HMC conserves action for small tau", "[hmc]" ) {
 
 TEST_CASE( "EE HMC conserves action for small tau", "[hmc_EE]" ) {
 	hmc_params hmc_pars;
-	hmc_pars.tau = 0.04;
+	hmc_pars.tau = 0.02;
 	// create 4^4 lattice with random U[mu] at each site, random gaussian P
 	// integrate by a small amount, check action is conserved within some eps
-	lattice grid (4, true);
+	lattice grid (L, true);
 	field<gauge> U (grid);
 	field<gauge> P (grid);
 	hmc hmc (hmc_pars);

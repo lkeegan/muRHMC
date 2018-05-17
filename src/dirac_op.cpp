@@ -157,7 +157,7 @@ double dirac_op::largest_eigenvalue_bound (field<gauge>& U, field<fermion>::eo_s
 		}
 		lambda_max = x2.dot(x).real();
 		lambda_max_err = sqrt(x_norm * x_norm - lambda_max * lambda_max);
-		std::cout << "lambda_max" << lambda_max << ", " << lambda_max_err << std::endl;
+		//std::cout << "lambda_max" << lambda_max << ", " << lambda_max_err << std::endl;
 	}
 	return lambda_max + lambda_max_err;
 }

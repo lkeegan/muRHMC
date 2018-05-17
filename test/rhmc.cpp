@@ -7,13 +7,16 @@
 #include "io.hpp"
 #include <iostream>
 
+// default lattice size for tests
+constexpr int L = 2;
+// tolerance for values that should be zero
 constexpr double EPS = 5.e-10;
 
 TEST_CASE( "RHMC Gauge action self consistency", "[rhmc]" ) {
 	// create 4^4 lattice with random U[mu] at each site
 	// construct gauge action from staples, compare to plaquette expression
 	for(bool isEO : {false, true}) {
-		lattice grid (4, isEO);
+		lattice grid (L, isEO);
 		field<gauge> U (grid);
 		rhmc_params rhmc_pars;
 		rhmc rhmc (rhmc_pars, grid);
@@ -37,7 +40,7 @@ TEST_CASE( "RHMC Momenta P have expected mean < Tr[P^2] > = 4 * VOL", "[rhmc]" )
 	// NB: set n very large to test this properly 
 	int n = 10;
 	for(bool isEO : {false, true}) {
-		lattice grid (4, isEO);
+		lattice grid (L, isEO);
 		field<gauge> P (grid);
 		rhmc_params rhmc_pars;
 		rhmc rhmc (rhmc_pars, grid);
@@ -59,7 +62,7 @@ TEST_CASE( "RHMC Gaussian pseudofermions have expected mean < |chi^2| > = 3 * VO
 	// NB: set n very large to test this properly 
 	int n = 10;
 	for(bool isEO : {false, true}) {
-		lattice grid (4, isEO);
+		lattice grid (L, isEO);
 		field<fermion> chi (grid);
 		rhmc_params rhmc_pars;
 		rhmc rhmc (rhmc_pars, grid);
@@ -81,7 +84,7 @@ TEST_CASE( "RHMC Gaussian block pseudofermions have expected mean < |chi^2| > = 
 	// NB: set n very large to test this properly 
 	int n = 10;
 	for(bool isEO : {false, true}) {
-		lattice grid (4, isEO);
+		lattice grid (L, isEO);
 		field<block_fermion> chi (grid);
 		rhmc_params rhmc_pars;
 		rhmc rhmc (rhmc_pars, grid);
@@ -102,7 +105,7 @@ TEST_CASE( "RHMC EE Gaussian pseudofermions have expected mean < |chi^2| > = 3 *
 	// < |chi^2| > = < \sum_a (r_a)^2 + (i_a)^2 > = 2 * 3 * < variance of r_a > * VOL = 3 * VOL
 	// NB: set n very large to test this properly 
 	int n = 10;
-	lattice grid (4, true);
+	lattice grid (L, true);
 	field<fermion> chi (grid, field<fermion>::EVEN_ONLY);
 	rhmc_params rhmc_pars;
 	rhmc_pars.EE = true;
@@ -123,7 +126,7 @@ TEST_CASE( "RHMC EE Gaussian block pseudofermions have expected mean < |chi^2| >
 	// < |chi^2| > = < \sum_a (r_a)^2 + (i_a)^2 > = 2 * 3 * < variance of r_a > * VOL = 3 * VOL
 	// NB: set n very large to test this properly 
 	int n = 10;
-	lattice grid (4, true);
+	lattice grid (L, true);
 	field<block_fermion> chi (grid, field<block_fermion>::EVEN_ONLY);
 	rhmc_params rhmc_pars;
 	rhmc_pars.EE = true;
@@ -158,13 +161,13 @@ TEST_CASE( "Reversibility of RHMC", "[rhmc]" ) {
 				rhmc_params rhmc_pars;
 				rhmc_pars.n_f = n_f;
 				rhmc_pars.n_pf = n_pf;
-				rhmc_pars.mass = 0.092;
+				rhmc_pars.mass = 0.292;
 				rhmc_pars.block = isBlock;
 
 				// create 4^4 lattice with random U[mu] at each site, random gaussian P
 				// integrate by tau, P -> -P, integrate by tau, compare to original U
 				SECTION( "nf = " + std::to_string(rhmc_pars.n_f) + ", n_pf = " + std::to_string(rhmc_pars.n_pf) + " LEXI - FULL, block=" + std::to_string(rhmc_pars.block) ) {
-					lattice grid (4);
+					lattice grid (L);
 					field<gauge> U (grid);
 					field<gauge> U_old (grid);
 					rhmc rhmc (rhmc_pars, grid);
@@ -180,7 +183,7 @@ TEST_CASE( "Reversibility of RHMC", "[rhmc]" ) {
 				}
 
 				SECTION( "nf = " + std::to_string(rhmc_pars.n_f) + ", n_pf = " + std::to_string(rhmc_pars.n_pf) + " EO - FULL, block=" + std::to_string(rhmc_pars.block) ) {
-					lattice grid (4, true);
+					lattice grid (L, true);
 					field<gauge> U (grid);
 					field<gauge> U_old (grid);
 					rhmc rhmc (rhmc_pars, grid);
@@ -197,7 +200,7 @@ TEST_CASE( "Reversibility of RHMC", "[rhmc]" ) {
 
 				SECTION( "nf = " + std::to_string(rhmc_pars.n_f) + ", n_pf = " + std::to_string(rhmc_pars.n_pf) + " EO - EVEN_ONLY, block=" + std::to_string(rhmc_pars.block) ) {
 					rhmc_pars.EE = true;
-					lattice grid (4, true);
+					lattice grid (L, true);
 					field<gauge> U (grid);
 					field<gauge> U_old (grid);
 					rhmc rhmc (rhmc_pars, grid);
@@ -218,22 +221,22 @@ TEST_CASE( "Reversibility of RHMC", "[rhmc]" ) {
 
 TEST_CASE( "Energy conservation of RHMC", "[rhmc]" ) {
 
-	double mass = 0.055;
+	double mass = 0.155;
 	for(int n_f : {4}) {
 		for(int n_pf : {N_rhs}) {
 			for(bool isBlock : {false, true}) {
 				rhmc_params rhmc_pars;
 				rhmc_pars.n_f = n_f;
 				rhmc_pars.n_pf = n_pf;
-				rhmc_pars.tau = 0.03;
-				rhmc_pars.mass = 0.0755;
-				rhmc_pars.MD_eps = 1.e-12;
+				rhmc_pars.tau = 0.02;
+				rhmc_pars.mass = mass;
+				rhmc_pars.MD_eps = 1.e-10;
 				rhmc_pars.block = isBlock;
 
 				// create 4^4 lattice with random U[mu] at each site, random gaussian P
 				// integrate by tau, P -> -P, integrate by tau, compare to original U
 				SECTION( "nf = " + std::to_string(rhmc_pars.n_f) + ", n_pf = " + std::to_string(rhmc_pars.n_pf) + " LEXI - FULL, block=" + std::to_string(rhmc_pars.block) ) {
-					lattice grid (4);
+					lattice grid (L);
 					field<gauge> U (grid);
 					field<gauge> U_old (grid);
 					rhmc rhmc (rhmc_pars, grid);
@@ -245,7 +248,7 @@ TEST_CASE( "Energy conservation of RHMC", "[rhmc]" ) {
 				}
 
 				SECTION( "nf = " + std::to_string(rhmc_pars.n_f) + ", n_pf = " + std::to_string(rhmc_pars.n_pf) + " EO - FULL, block=" + std::to_string(rhmc_pars.block) ) {
-					lattice grid (4, true);
+					lattice grid (L, true);
 					field<gauge> U (grid);
 					field<gauge> U_old (grid);
 					rhmc rhmc (rhmc_pars, grid);
@@ -258,7 +261,7 @@ TEST_CASE( "Energy conservation of RHMC", "[rhmc]" ) {
 
 				SECTION( "nf = " + std::to_string(rhmc_pars.n_f) + ", n_pf = " + std::to_string(rhmc_pars.n_pf) + " EO - EVEN_ONLY, block=" + std::to_string(rhmc_pars.block) ) {
 					rhmc_pars.EE = true;
-					lattice grid (4, true);
+					lattice grid (L, true);
 					field<gauge> U (grid);
 					field<gauge> U_old (grid);
 					rhmc rhmc (rhmc_pars, grid);

@@ -11,9 +11,9 @@ struct hmc_params {
 	double beta = 5.4;
 	double mass = 0.05;
 	double mu_I = 0.0;
-	double tau = 1.0;
-	int n_steps_fermion = 3;
-	int n_steps_gauge = 2;
+	double tau = 0.5;
+	int n_steps_fermion = 1;
+	int n_steps_gauge = 1;
 	double lambda_OMF2 = 0.19;
 	double MD_eps = 1.e-6;
 	double HB_eps = 1.e-14;

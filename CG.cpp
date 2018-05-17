@@ -121,7 +121,7 @@ int main(int argc, char *argv[]) {
 
     auto timer_start = std::chrono::high_resolution_clock::now();
 	// x_i = (DD')^-1 chi_i
-	int iterBLOCK = cg_block(x, chi, U, D, eps, BCGA, dQ, dQA, rQ, x0_star);
+	int iterBLOCK = cg_block(x, chi, U, D, eps, BCGA, dQ, dQA, rQ, true, &x0_star);
     auto timer_stop = std::chrono::high_resolution_clock::now();
     auto timer_count = std::chrono::duration_cast<std::chrono::seconds>(timer_stop-timer_start).count();
 	log("BlockCG_runtime_sec", timer_count);

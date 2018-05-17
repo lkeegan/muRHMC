@@ -7,6 +7,8 @@
 #include "inverters.hpp"
 #include "io.hpp"
 
+// default lattice size for tests
+constexpr int L = 2;
 // if true, tests should run quickly, for use with every compile
 // if false, does extended tests that may be quite slow
 constexpr bool QUICK_TESTS_ONLY = true;
@@ -17,7 +19,7 @@ TEST_CASE( "Rational Approximations", "[rational_approx]") {
 
 	std::vector<int> n_values;
 	if(QUICK_TESTS_ONLY) {
-		n_values = {2, 3, 4};
+		n_values = {2};
 	} else {
 		n_values = {2, 3, 4, 5, 6, 12, 16, 24, 32, 48, 64};
 	}
@@ -46,7 +48,7 @@ TEST_CASE( "Rational Approximations", "[rational_approx]") {
 		}
 
 		int n_rhs = 3;
-		lattice grid (4, isEO);
+		lattice grid (L, isEO);
 		field<gauge> U (grid);
 		rhmc rhmc (rhmc_pars, grid);
 		rhmc.random_U(U, 0.4);

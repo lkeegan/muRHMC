@@ -35,7 +35,7 @@ int cg_multishift (std::vector<field<fermion>>& x, const field<fermion>& b, fiel
 int rational_approx_cg_multishift(field<fermion>& x, const field<fermion>& b, field<gauge>& U, std::vector<double>& rational_alpha, std::vector<double>& rational_beta, dirac_op& D, double eps);
 
 // BlockCG[A][dQ/dQA][rQ] as described in arXiv:1710.09745
-int cg_block (field<block_fermion>& X, const field<block_fermion>& B, field<gauge>& U, dirac_op& D, double eps, bool BCGA, bool dQ, bool dQA, bool rQ, const field<fermion>& x0_star);
+int cg_block (field<block_fermion>& X, const field<block_fermion>& B, field<gauge>& U, dirac_op& D, double eps, bool BCGA, bool dQ, bool dQA, bool rQ, bool OUTPUT_ERROR_NORMS = false, field<fermion>* x0_star = nullptr);
 
 // Shifted Block CG rQ:
 // NB assumes vector of shifts are positive and in ascending order
