@@ -38,7 +38,9 @@ include_directories(inc)
 set (SRCS ${SRCS} src/4d.cpp src/su3.cpp src/dirac_op.cpp src/inverters.cpp src/io.cpp src/hmc.cpp src/rhmc.cpp src/rational_approx.cpp)
 
 # Make unit test executable
-set (TEST_SRCS ${SRCS} test/4d.cpp test/su3.cpp test/io.cpp test/inverters.cpp test/hmc.cpp test/rhmc.cpp test/rational_approx.cpp test/dirac_op.cpp)
+#set (TEST_SRCS ${SRCS} test/4d.cpp test/su3.cpp test/io.cpp test/inverters.cpp test/hmc.cpp test/rhmc.cpp test/rational_approx.cpp test/dirac_op.cpp)
+set (TEST_SRCS src/su3.cpp test/su3.cpp)
+
 add_executable(tests test/main.cpp ${TEST_SRCS})
 target_link_libraries(tests Catch)
 
@@ -60,4 +62,4 @@ add_executable(benchmark benchmark.cpp src/4d.cpp src/su3.cpp src/dirac_op.cpp)
 add_test(NAME Addition COMMAND tests)
 
 #Make running the unit tests part of the build, so failed test = failed build
-#add_custom_command(TARGET tests POST_BUILD COMMAND tests -d yes)
+add_custom_command(TARGET tests POST_BUILD COMMAND tests -d yes)
