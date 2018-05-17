@@ -24,14 +24,11 @@ script:
   - mkdir Debug
   - cd Debug
   - cmake -DCMAKE_BUILD_TYPE=Debug .. && make tests -j4
-  - pwd
-  - ls
-  - ls CMakeFiles/tests.dir/*/*
   - cd ../
-  #- mkdir Release
-  #- cd Release
-  #- cmake -DCMAKE_BUILD_TYPE=Release .. && make -j4
-  #- cd ../
+  - mkdir Release
+  - cd Release
+  - cmake -DCMAKE_BUILD_TYPE=Release .. && make tests -j4
+  - cd ../
 
 after_success:
   - cd Debug
@@ -41,6 +38,8 @@ after_success:
   - lcov --directory . --capture --output-file coverage.info # capture coverage info
   - lcov --remove coverage.info '/usr/*' --output-file coverage.info # filter out system
   - lcov --remove coverage.info '*/inc/Eigen3/*' --output-file coverage.info # filter out system
+  - lcov --remove coverage.info '*/catch/*' --output-file coverage.info # filter out system
+  - lcov --remove coverage.info '*/test/*' --output-file coverage.info # filter out system
   - lcov --list coverage.info #debug info
   # Uploading report to CodeCov
   - bash <(curl -s https://codecov.io/bash) || echo "Codecov did not collect coverage reports"
