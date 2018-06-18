@@ -6,7 +6,7 @@ class rational_approx {
 private:
 	void initialise_rational_approx_LARGE();
 	void initialise_rational_approx_SMALL();
-	int N_MAX_SHIFTS = 128;
+	int N_MAX_SHIFTS = 256;
 
 public:
 	double lower_bound, upper_bound;

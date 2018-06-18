@@ -155,7 +155,7 @@ double rhmc_is_field_SU3 (const field<gauge>& U) {
 
 TEST_CASE( "Reversibility of RHMC", "[rhmc]" ) {
 
-	for(int n_f : {2}) {
+	for(int n_f : {4}) {
 		for(int n_pf : {N_rhs}) {
 			for(bool isBlock : {false, true}) {
 				rhmc_params rhmc_pars;

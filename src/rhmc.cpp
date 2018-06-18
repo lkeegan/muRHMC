@@ -28,6 +28,8 @@ rhmc::rhmc (const rhmc_params& params, const lattice& grid) : RA(1.0, 1.0), rng(
 }
 
 int rhmc::trajectory (field<gauge>& U, dirac_op& D, bool do_reversibility_test, bool MEASURE_FORCE_ERROR_NORMS) {
+    auto timer_trajectory_start = std::chrono::high_resolution_clock::now();
+
 	// set Dirac op mass and isospin mu values
 	D.mass = params.mass;
 	D.mu_I = params.mu_I;
@@ -64,7 +66,7 @@ int rhmc::trajectory (field<gauge>& U, dirac_op& D, bool do_reversibility_test, 
 		// construct phi[i] = M^{1/(2*n_rational) chi_e
 		int iter = rational_approx_SBCGrQ(block_phi, chi, U, RA.alpha_hi[2*n_rational], RA.beta_hi[2*n_rational], D, params.HB_eps);
 	    auto timer_stop = std::chrono::high_resolution_clock::now();
-	    auto timer_count = std::chrono::duration_cast<std::chrono::seconds>(timer_stop-timer_start).count();
+	    auto timer_count = std::chrono::duration_cast<std::chrono::milliseconds>(timer_stop-timer_start).count();
 		std::cout << "#RHMC_InitBCGRuntime " << timer_count << std::endl;
 		std::cout << "#RHMC_InitBCGIter " << iter << std::endl;
 	} else {
@@ -78,7 +80,7 @@ int rhmc::trajectory (field<gauge>& U, dirac_op& D, bool do_reversibility_test, 
 			iter += rational_approx_cg_multishift(phi[i_pf], chi[i_pf], U, RA.alpha_hi[2*n_rational], RA.beta_hi[2*n_rational], D, params.HB_eps);
 		}
 	    auto timer_stop = std::chrono::high_resolution_clock::now();
-	    auto timer_count = std::chrono::duration_cast<std::chrono::seconds>(timer_stop-timer_start).count();
+	    auto timer_count = std::chrono::duration_cast<std::chrono::milliseconds>(timer_stop-timer_start).count();
 		std::cout << "#RHMC_InitCGRuntime " << timer_count << std::endl;
 		std::cout << "#RHMC_InitCGIter " << iter << std::endl;
 	}
@@ -97,36 +99,28 @@ int rhmc::trajectory (field<gauge>& U, dirac_op& D, bool do_reversibility_test, 
 
 	// FORCE MEASUREMENT: measure force norms once and exit:
 	if(MEASURE_FORCE_ERROR_NORMS) {
-
-		// just measure one force term using supplied MD_eps for inversion
-		std::vector<double> residuals = {1.e-1, 1.e-2, 1.e-3, 1.e-4, 1.e-5, 1.e-6, 1.e-7, 1e-8};
-		std::cout.precision(15);
 		field<gauge> force (U.grid);
 		force.setZero();
-		field<gauge> force_star (U.grid);
-		force_star.setZero();
 		if(params.block) {
-			std::cout << "# eps, CGiter, CGerror-norm, CGruntime, BLOCKiter, BLOCKerror-norm, BLOCKruntime, true-force-norm" << std::endl;
-			params.MD_eps = 1.e-12;
-			int iterBCG = force_fermion_block (force_star, U, D);
-			double norm_star = force_star.squaredNorm();
-			std::cout << std::scientific << 1.e-12 << "\tfermion_force_star_normBCG: " << norm_star << std::endl;
-			for(int i_eps=0; i_eps<static_cast<int>(residuals.size()); ++i_eps) {
-				params.MD_eps = residuals[i_eps];
-				int iterBCG = force_fermion_block (force, U, D);
-				double norm = force.squaredNorm();
-				force -= force_star;
-				std::cout << std::scientific << residuals[i_eps] << "\t" << iterBCG
-						  << "\tfermion_force_normBCG: " << norm
-						  << "\tfermion_force_error_normBCG: " << force.squaredNorm()
-						  << "\tfermion_force_star_normBCG: " << norm_star
-						  << std::endl;
-				force.setZero();
-			}
+		    auto timer_start = std::chrono::high_resolution_clock::now();
+			int iter = force_fermion_block (force, U, D);
+		    auto timer_stop = std::chrono::high_resolution_clock::now();
+		    auto timer_count = std::chrono::duration_cast<std::chrono::milliseconds>(timer_stop-timer_start).count();
+			std::cout << std::scientific
+			 << "fermion_force_normBCG: " << force.squaredNorm()
+			 << "\tfermion_force_iterBCG: " << iter
+			 << "\tfermion_force_timeBCG: " << timer_count
+			 << std::endl;		
 		} else {
-			force.setZero();
-			int iterCG = force_fermion (force, U, D);
-			std::cout << std::scientific << "fermion_force_normCG: " << force.squaredNorm() << std::endl;		
+		    auto timer_start = std::chrono::high_resolution_clock::now();
+			int iter = force_fermion (force, U, D);
+		    auto timer_stop = std::chrono::high_resolution_clock::now();
+		    auto timer_count = std::chrono::duration_cast<std::chrono::milliseconds>(timer_stop-timer_start).count();
+			std::cout << std::scientific
+			 << "fermion_force_normCG: " << force.squaredNorm()
+			 << "\tfermion_force_iterCG: " << iter
+			 << "\tfermion_force_timeCG: " << timer_count
+			 << std::endl;		
 		}
 		return 1;
 
@@ -142,7 +136,7 @@ int rhmc::trajectory (field<gauge>& U, dirac_op& D, bool do_reversibility_test, 
 		force_star *= -1.0;
 		double f_star_norm = force_star.norm();
 	    auto timer_stop = std::chrono::high_resolution_clock::now();
-		auto timer_count = std::chrono::duration_cast<std::chrono::seconds>(timer_stop-timer_start).count();
+		auto timer_count = std::chrono::duration_cast<std::chrono::milliseconds>(timer_stop-timer_start).count();
 		std::cout << std::scientific << "# correct force iter " << iter << "\t norm" << f_star_norm << "\t runtime: " << timer_count << std::endl;
 
 		// get approx force vector, output norm of difference
@@ -155,13 +149,13 @@ int rhmc::trajectory (field<gauge>& U, dirac_op& D, bool do_reversibility_test, 
 			force_eps = force_star;
 			int CGiter = force_fermion (force_eps, U, D);
 		    auto timer_stop = std::chrono::high_resolution_clock::now();
-			auto CGtimer = std::chrono::duration_cast<std::chrono::seconds>(timer_stop-timer_start).count();
+			auto CGtimer = std::chrono::duration_cast<std::chrono::milliseconds>(timer_stop-timer_start).count();
 			double CGerr = force_eps.norm();
 		    timer_start = std::chrono::high_resolution_clock::now();
 			force_eps = force_star;
 			int BLOCKiter = force_fermion_block (force_eps, U, D);
 		    timer_stop = std::chrono::high_resolution_clock::now();
-			auto BLOCKtimer = std::chrono::duration_cast<std::chrono::seconds>(timer_stop-timer_start).count();
+			auto BLOCKtimer = std::chrono::duration_cast<std::chrono::milliseconds>(timer_stop-timer_start).count();
 			double BLOCKerr = force_eps.norm();
 			std::cout << std::scientific << residuals[i_eps] << "\t" << CGiter << "\t" << CGerr << "\t" << CGtimer << "\t"
 					  << BLOCKiter << "\t" << BLOCKerr << "\t" << BLOCKtimer << "\t" << f_star_norm << std::endl;
@@ -195,6 +189,11 @@ int rhmc::trajectory (field<gauge>& U, dirac_op& D, bool do_reversibility_test, 
 	// calculate change in action
 	double action_new = action(U, P, D);
 	deltaE = action_new - action_old;
+
+    auto timer_trajectory_stop = std::chrono::high_resolution_clock::now();
+	std::cout << "#RHMC_TrajectoryRuntime " << 
+    	std::chrono::duration_cast<std::chrono::milliseconds>(timer_trajectory_stop-timer_trajectory_start).count()
+		<< std::endl;
 
 	return accept_reject (U, U_old, action_new - action_old);
 }
@@ -555,7 +554,7 @@ int rhmc::force_fermion_norms (field<gauge> &force, field<gauge> &U, dirac_op& D
 	}
 
     auto timer_stop = std::chrono::high_resolution_clock::now();
-    auto timer_count = std::chrono::duration_cast<std::chrono::seconds>(timer_stop-timer_start).count();
+    auto timer_count = std::chrono::duration_cast<std::chrono::milliseconds>(timer_stop-timer_start).count();
 	std::cout << "#RHMC_InitCGRuntime " << timer_count << std::endl;
 	std::cout << "#RHMC_ForceCGIter " << iter << std::endl;
 
@@ -646,7 +645,7 @@ int rhmc::force_fermion (field<gauge> &force, field<gauge> &U, dirac_op& D) {
 	// output fermion force norms
 	
     auto timer_stop = std::chrono::high_resolution_clock::now();
-    auto timer_count = std::chrono::duration_cast<std::chrono::seconds>(timer_stop-timer_start).count();
+    auto timer_count = std::chrono::duration_cast<std::chrono::milliseconds>(timer_stop-timer_start).count();
 	std::cout << "#RHMC_ForceCGRuntime " << timer_count << std::endl;
 	std::cout << "#RHMC_ForceCGIter " << iter << std::endl;
 
@@ -745,7 +744,7 @@ int rhmc::force_fermion_block (field<gauge> &force, field<gauge> &U, dirac_op& D
 	} // end of loop over shifts
 	D.remove_eta_bcs_from_U(U);
     auto timer_stop = std::chrono::high_resolution_clock::now();
-    auto timer_count = std::chrono::duration_cast<std::chrono::seconds>(timer_stop-timer_start).count();
+    auto timer_count = std::chrono::duration_cast<std::chrono::milliseconds>(timer_stop-timer_start).count();
 	std::cout << "#RHMC_ForceBCGRuntime " << timer_count << std::endl;
 	std::cout << "#RHMC_ForceBCGIter " << iter << std::endl;
 

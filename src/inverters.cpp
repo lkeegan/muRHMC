@@ -217,7 +217,7 @@ int cg_multishift(std::vector<field<fermion>>& x, const field<fermion>& b, field
 		x[i_shift].setZero();
 		zeta[i_shift] = 1.0;
 		zeta_m1[i_shift] = 1.0;
-		alpha[i_shift] = 0.0;		
+		alpha[i_shift] = 0.0;
 	}
 	beta_m1[0] = 1.0;
 	// b_norm = sqrt(<b|b>)

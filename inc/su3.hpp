@@ -9,7 +9,7 @@
 #include "Eigen3/Eigen/Dense"
 #include "Eigen3/Eigen/StdVector"
 // hard code (for now) block fermion RHS
-constexpr int N_rhs = 2;
+constexpr int N_rhs = 12;
 constexpr int N_gauge = 3;
 // define types for gauge links and fermion fields
 typedef Eigen::Matrix<std::complex<double>, N_gauge, N_gauge> SU3mat;

@@ -9,6 +9,7 @@ hmc::hmc (const hmc_params& params) : rng(params.seed), params(params) {
 }
 
 int hmc::trajectory (field<gauge>& U, dirac_op& D, bool MEASURE_FORCE_ERROR_NORMS) {
+    auto timer_trajectory_start = std::chrono::high_resolution_clock::now();
 	// set Dirac op mass and isospin mu values
 	D.mass = params.mass;
 	D.mu_I = params.mu_I;
@@ -56,7 +57,7 @@ int hmc::trajectory (field<gauge>& U, dirac_op& D, bool MEASURE_FORCE_ERROR_NORM
 		force_star *= -1.0;
 		double f_star_norm = force_star.norm();
 	    auto timer_stop = std::chrono::high_resolution_clock::now();
-		auto timer_count = std::chrono::duration_cast<std::chrono::seconds>(timer_stop-timer_start).count();
+		auto timer_count = std::chrono::duration_cast<std::chrono::milliseconds>(timer_stop-timer_start).count();
 		std::cout << std::scientific << "# correct force iter " << iter << "\t norm" << f_star_norm << "\t runtime: " << timer_count << std::endl;
 
 		// get approx force vector, output norm of difference
@@ -69,7 +70,7 @@ int hmc::trajectory (field<gauge>& U, dirac_op& D, bool MEASURE_FORCE_ERROR_NORM
 			force_eps = force_star;
 			int CGiter = force_fermion (force_eps, U, phi, D);
 		    auto timer_stop = std::chrono::high_resolution_clock::now();
-			auto CGtimer = std::chrono::duration_cast<std::chrono::seconds>(timer_stop-timer_start).count();
+			auto CGtimer = std::chrono::duration_cast<std::chrono::milliseconds>(timer_stop-timer_start).count();
 			double CGerr = force_eps.norm();
 			std::cout << std::scientific << residuals[i_eps] << "\t" << CGiter << "\t" << CGerr << "\t" << CGtimer << "\t"
 					  << f_star_norm << std::endl;
@@ -90,6 +91,11 @@ int hmc::trajectory (field<gauge>& U, dirac_op& D, bool MEASURE_FORCE_ERROR_NORM
 	// calculate change in action
 	double action_new = action(U, phi, P, D);
 	deltaE = action_new - action_old;
+
+    auto timer_trajectory_stop = std::chrono::high_resolution_clock::now();
+	std::cout << "#RHMC_TrajectoryRuntime " << 
+    	std::chrono::duration_cast<std::chrono::milliseconds>(timer_trajectory_stop-timer_trajectory_start).count()
+		<< std::endl;
 
 	if(params.constrained) {
 		// this value is stored from the last trajectory
@@ -230,7 +236,7 @@ double hmc::action_U (const field<gauge>& U) {
 
 double hmc::action_P (const field<gauge>& P) {
 	double ac = 0.0;
-	//#pragma omp parallel for reduction (+:ac)
+	////#pragma omp parallel for reduction (+:ac)
 	for(int ix=0; ix<P.V; ++ix) {
 		for(int mu=0; mu<4; ++mu) {
 			ac += (P[ix][mu]*P[ix][mu]).trace().real();
@@ -265,7 +271,7 @@ void hmc::step_P_pure_gauge (field<gauge>& P, field<gauge> &U, double eps, bool 
 		force_norm /= eps*eps;
 		std::cout << "gauge_force_norm: " << sqrt(force_norm/static_cast<double>(4*U.V)) << std::endl;
 	} else {
-		//#pragma omp parallel for
+		////#pragma omp parallel for
 		for(int ix=0; ix<U.V; ++ix) {
 			for(int mu=0; mu<4; ++mu) {
 				SU3mat A = staple (ix, mu, U);
@@ -285,7 +291,7 @@ int hmc::step_P_fermion (field<gauge>& P, field<gauge> &U, const field<fermion>&
 	if(MEASURE_FORCE_NORM) {
 		std::cout << "fermion_force_norm: " << sqrt(force.squaredNorm()/static_cast<double>(4*U.V)) << std::endl;
 	}
-	//#pragma omp parallel for
+	////#pragma omp parallel for
 	for(int ix=0; ix<U.V; ++ix) {
 		for(int mu=0; mu<4; ++mu) {
 			P[ix][mu] -= eps * force[ix][mu];
@@ -295,7 +301,7 @@ int hmc::step_P_fermion (field<gauge>& P, field<gauge> &U, const field<fermion>&
 }
 
 void hmc::step_U (const field<gauge>& P, field<gauge> &U, double eps) {
-	//#pragma omp parallel for
+	////#pragma omp parallel for
 	for(int ix=0; ix<U.V; ++ix) {
 		for(int mu=0; mu<4; ++mu) {
 			//U[ix][mu] = ((std::complex<double> (0.0, eps) * P[ix][mu]).exp()) * U[ix][mu];
@@ -349,7 +355,7 @@ void hmc::gaussian_P (field<gauge>& P) {
 }
 
 void hmc::force_gauge (field<gauge> &force, const field<gauge> &U) {
-	//#pragma omp parallel for
+	////#pragma omp parallel for
 	for(int ix=0; ix<U.V; ++ix) {
 		for(int mu=0; mu<4; ++mu) {
 			SU3mat A = staple (ix, mu, U);
@@ -365,7 +371,7 @@ void hmc::stout_smear (double rho, field<gauge> &U) {
 	// construct Q: arxiv:0311018 eq (2)
 	// with rho_munu = rho = constant real
 	field<gauge> Q (U.grid);
-	//#pragma omp parallel for
+	////#pragma omp parallel for
 	for(int ix=0; ix<U.V; ++ix) {
 		for(int mu=0; mu<4; ++mu) {
 			SU3mat A = staple (ix, mu, U);
@@ -409,7 +415,7 @@ int hmc::force_fermion (field<gauge> &force, field<gauge> &U, const field<fermio
 	if(params.EE) {
 		// for even-even version half of the terms are zero:
 		// even ix: ix = ix_e
-		//#pragma omp parallel for
+		////#pragma omp parallel for
 		for(int ix=0; ix<chi.V; ++ix) {
 			for(int mu=0; mu<4; ++mu) {
 				for(int a=0; a<8; ++a) {
@@ -420,7 +426,7 @@ int hmc::force_fermion (field<gauge> &force, field<gauge> &U, const field<fermio
 			}
 		}
 		// odd ix: ix = ix_o + chi.V
-		//#pragma omp parallel for
+		////#pragma omp parallel for
 		for(int ix_o=0; ix_o<chi.V; ++ix_o) {
 			int ix = ix_o + chi.V;
 			for(int mu=0; mu<4; ++mu) {
@@ -435,7 +441,7 @@ int hmc::force_fermion (field<gauge> &force, field<gauge> &U, const field<fermio
 		// mu=0 terms have extra chemical potential isospin factors exp(+-\mu_I/2):
 		double mu_I_plus_factor = exp(0.5 * params.mu_I);
 		double mu_I_minus_factor = exp(-0.5 * params.mu_I);
-		//#pragma omp parallel for
+		////#pragma omp parallel for
 		for(int ix=0; ix<U.V; ++ix) {
 			for(int a=0; a<8; ++a) {
 				double Fa = chi[ix].dot(T[a] * mu_I_plus_factor * U[ix][0] * psi.up(ix,0)).imag();
@@ -488,7 +494,7 @@ double hmc::plaq (int ix, const field<gauge> &U) {
 
 double hmc::plaq (const field<gauge> &U) {
 	double p = 0;
-	//#pragma omp parallel for reduction (+:p)
+	////#pragma omp parallel for reduction (+:p)
 	for(int ix=0; ix<U.V; ++ix) {
 		for(int mu=1; mu<4; ++mu) {
 			for(int nu=0; nu<mu; nu++) {
@@ -501,7 +507,7 @@ double hmc::plaq (const field<gauge> &U) {
 
 double hmc::plaq_1x2 (const field<gauge> &U) {
 	double p = 0;
-	//#pragma omp parallel for reduction (+:p)
+	////#pragma omp parallel for reduction (+:p)
 	for(int ix=0; ix<U.V; ++ix) {
 		for(int mu=0; mu<4; ++mu) {
 			for(int nu=0; nu<4; nu++) {
@@ -520,7 +526,7 @@ double hmc::plaq_1x2 (const field<gauge> &U) {
 
 double hmc::plaq_spatial (const field<gauge> &U) {
 	double p = 0;
-	//#pragma omp parallel for reduction (+:p)
+	////#pragma omp parallel for reduction (+:p)
 	for(int ix=0; ix<U.V; ++ix) {
 		for(int mu=1; mu<4; ++mu) {
 			for(int nu=1; nu<mu; nu++) {
@@ -533,7 +539,7 @@ double hmc::plaq_spatial (const field<gauge> &U) {
 
 double hmc::plaq_timelike (const field<gauge> &U) {
 	double p = 0;
-	//#pragma omp parallel for reduction (+:p)
+	////#pragma omp parallel for reduction (+:p)
 	for(int ix=0; ix<U.V; ++ix) {
 		for(int mu=1; mu<4; ++mu) {
 			p += plaq (ix, mu, 0, U);
