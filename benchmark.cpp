@@ -23,8 +23,8 @@ int main(int argc, char *argv[]) {
     }
 
 	int L = static_cast<int>(atof(argv[1]));
-	int N_dirac_ops = 1 + static_cast<int>(1000000/(L*L*L*L*N_rhs));
-	int N_adds = 200 * N_dirac_ops;
+	int N_dirac_ops = 1 + static_cast<int>(10000000/(L*L*L*L*N_rhs));
+	int N_adds = 20 * N_dirac_ops;
 
 	// make L^4 EO lattice
 	lattice grid (L, true);
@@ -79,6 +79,7 @@ int main(int argc, char *argv[]) {
     }
     int block_add_count = tock();
 	std::cout << "# BLOCKAddRunTime: " << block_add_count << std::endl;
+	exit(0);
 
 	// vector add EIGEN-bigmat
 	tick();

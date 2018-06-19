@@ -1,5 +1,5 @@
 #include "inverters.hpp"
-//#include "omp.h"
+#include "omp.h"
 #include <iostream> //FOR DEBUGGING
 #include <chrono>
 
@@ -26,6 +26,7 @@ void hermitian_dot(const field<block_fermion>& X, const field<block_fermion>& Y,
 // In-place Multiply field X on RHS by inverse of triangular matrix R, i.e.
 // X <- X R^{-1}
 void multiply_triangular_inverse_RHS(field<block_fermion>& X, block_matrix& R) {
+	#pragma omp parallel for
 	for(int ix=0; ix<X.V; ++ix) {
 		for(int i=0; i<N_rhs; ++i) {
 			for(int j=0; j<i; ++j) {

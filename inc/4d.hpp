@@ -3,7 +3,7 @@
 
 #include <vector>
 #include <complex>
-//#include "omp.h"
+#include "omp.h"
 
 // for mkl versions of some matrix ops
 #ifdef EIGEN_USE_MKL_ALL
@@ -149,7 +149,7 @@ public:
 	    return *this;
 	}
 
-	field& operator/=(std::complex<double> scalar)
+	field& operator/=(const std::complex<double>& scalar)
 	{
 		for(int ix=0; ix<V; ++ix) {
 			data_[ix] /= scalar;
@@ -169,7 +169,7 @@ public:
 	template<typename Targ>
 	field& add(const field& rhs, const Targ& rhs_multiplier)
 	{
-		//#pragma omp parallel for
+		#pragma omp parallel for
 		for(int ix=0; ix<V; ++ix) {
 			data_[ix].noalias() += rhs[ix] * rhs_multiplier;
 		}
