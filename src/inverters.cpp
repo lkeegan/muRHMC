@@ -690,7 +690,7 @@ int SBCGrQ(std::vector< field<block_fermion> >& X, const field<block_fermion>& B
 	block_matrix beta_inv = block_matrix::Identity();
 	block_matrix beta_inv_m1 = block_matrix::Identity();
 	// Construct decomposition of S: can then do S^-1 M using S_inv.solve(M)
-	Eigen::ColPivHouseholderQR<block_matrix> S_inv (S);
+	Eigen::FullPivLU<block_matrix> S_inv (S);
 	block_matrix S_m1 = block_matrix::Zero();
 	// These are temporary matrices used for each shift
 	block_matrix tmp_betaC, tmp_Sdag; 
@@ -698,13 +698,13 @@ int SBCGrQ(std::vector< field<block_fermion> >& X, const field<block_fermion>& B
 	// 3-term recurrence so need _k, _k-1, _k-2 for each shift
 	// initially ksi_s_m2 = I, ksi_s_m1 = S
 	std::vector<block_matrix> ksi_s, ksi_s_m1, ksi_s_m2; 
-	std::vector< Eigen::ColPivHouseholderQR<block_matrix> > ksi_s_inv_m1, ksi_s_inv_m2;
+	std::vector< Eigen::FullPivLU<block_matrix> > ksi_s_inv_m1, ksi_s_inv_m2;
 	for(int i_shift=0; i_shift<N_shifts; ++i_shift) {
  		ksi_s.push_back(block_matrix::Identity());
  		ksi_s_m1.push_back(S);
  		ksi_s_inv_m1.push_back(S_inv);
  		ksi_s_m2.push_back(block_matrix::Identity());
- 		ksi_s_inv_m2.push_back(block_matrix::Identity().colPivHouseholderQr());
+ 		ksi_s_inv_m2.push_back(block_matrix::Identity().fullPivLu());
 	}
 
 	// main loop
@@ -738,7 +738,7 @@ int SBCGrQ(std::vector< field<block_fermion> >& X, const field<block_fermion>& B
 //		}
 		// Find inverse of beta_inv via LDLT cholesky decomposition
 		// and solving beta beta_inv = I
-		beta = beta_inv.ldlt().solve(block_matrix::Identity());
+		beta = beta_inv.fullPivLu().solve(block_matrix::Identity());
 		betaC = beta * C;
 
 		// X[0] = X[0] + P[0] beta C
@@ -779,7 +779,7 @@ int SBCGrQ(std::vector< field<block_fermion> >& X, const field<block_fermion>& B
 			// ksi_s:
 			tmp_betaC = S_m1 * beta_inv_m1 - ksi_s_m1[i_shift] * ksi_s_inv_m2[i_shift].solve(beta_inv_m1);
 			tmp_Sdag = block_matrix::Identity() + shifts[i_shift] * beta + tmp_betaC * S_m1.adjoint() * beta;
-			ksi_s[i_shift] = S * tmp_Sdag.colPivHouseholderQr().solve(ksi_s_m1[i_shift]);
+			ksi_s[i_shift] = S * tmp_Sdag.fullPivLu().solve(ksi_s_m1[i_shift]);
 			// tmp_betaC == "alpha^sigma" in paper:
 			tmp_betaC = beta * S_inv.solve(ksi_s[i_shift]);
 			// tmp_Sdag == "beta^sigma" in paper:
@@ -821,13 +821,13 @@ int SBCGrQ(std::vector< field<block_fermion> >& X, const field<block_fermion>& B
 		Eigen::ArrayXd evals = saes.eigenvalues();
 		*/
 			// Output iteration number and worst residual for each shift
-		/*
+		
 		std::cout << "#SBCGrQ " << iter << "\t" << residual;
 		for(int i_shift=0; i_shift<N_shifts; ++i_shift) {
 			std::cout << "\t" << (ksi_s[i_shift].rowwise().norm().array()/b_norm).maxCoeff();
 		}
 		std::cout << std::endl;
-		*/
+		
 	}
 	D.remove_eta_bcs_from_U(U);			
 

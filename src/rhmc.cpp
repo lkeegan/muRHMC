@@ -180,15 +180,18 @@ int rhmc::trajectory (field<gauge>& U, dirac_op& D, bool do_reversibility_test, 
 		P *= -1;
 		OMF2 (U, P, D);
 		P_old += P;
-		std::cout << "P reserve dev: " << P_old.norm() << std::endl;
+		std::cout << "#reverse_dev_P: " << P_old.norm() << std::endl;
 		U_old -= U;
-		std::cout << "U reserve dev: " << U_old.norm() << std::endl;
+		std::cout << "#reverse_dev_U: " << U_old.norm() << std::endl;
+		double deltaH = action(U, P, D) - action_old;
+		std::cout << "reverse_dev_dH: " << deltaH << std::endl;
 		return 1;
 	}
 
 	// calculate change in action
 	double action_new = action(U, P, D);
 	deltaE = action_new - action_old;
+
 
     auto timer_trajectory_stop = std::chrono::high_resolution_clock::now();
 	std::cout << "#RHMC_TrajectoryRuntime " << 
@@ -298,7 +301,8 @@ double rhmc::action_P (const field<gauge>& P) {
 double rhmc::action_F (field<gauge>& U, dirac_op& D) {
 	//std::cout << "#RHMC fermion action: n_f=" << params.n_f << ", n_pf=" << params.n_pf << ", n_rational/2=" << n_rational/2 << ", n_shifts hi=" << RA.beta_inv_hi[n_rational/2].size() << std::endl;
 	if(params.block) {
-		double ac_F = 0;
+	    auto timer_start = std::chrono::high_resolution_clock::now();
+	    double ac_F = 0;
 		field<block_fermion> Ainv_phi (block_phi);
 		// construct Ainv_phi = M^{-1/(n_rational)) phi[i]
 		int iter = rational_approx_SBCGrQ(Ainv_phi, block_phi, U, RA.alpha_inv_hi[n_rational], RA.beta_inv_hi[n_rational], D, params.HB_eps);
@@ -307,9 +311,13 @@ double rhmc::action_F (field<gauge>& U, dirac_op& D) {
 				ac_F += block_phi[i].col(i_pf).dot(Ainv_phi[i].col(i_pf)).real();			
 			}
 		}
+	    auto timer_stop = std::chrono::high_resolution_clock::now();
+	    auto timer_count = std::chrono::duration_cast<std::chrono::milliseconds>(timer_stop-timer_start).count();
+		std::cout << "#RHMC_ActionBCGRuntime " << timer_count << std::endl;
 		std::cout << "#RHMC_ActionBCGIter " << iter << std::endl;
 		return ac_F;		
 	} else {
+	    auto timer_start = std::chrono::high_resolution_clock::now();
 		double ac_F = 0;
 		field<fermion> Ainv_phi (phi[0].grid, phi[0].eo_storage);
 		int iter = 0;
@@ -318,6 +326,9 @@ double rhmc::action_F (field<gauge>& U, dirac_op& D) {
 			iter += rational_approx_cg_multishift(Ainv_phi, phi[i_pf], U, RA.alpha_inv_hi[n_rational], RA.beta_inv_hi[n_rational], D, params.HB_eps);
 			ac_F += phi[i_pf].dot(Ainv_phi).real();
 		}
+	    auto timer_stop = std::chrono::high_resolution_clock::now();
+	    auto timer_count = std::chrono::duration_cast<std::chrono::milliseconds>(timer_stop-timer_start).count();
+		std::cout << "#RHMC_ActionCGRuntime " << timer_count << std::endl;
 		std::cout << "#RHMC_ActionCGIter " << iter << std::endl;
 		return ac_F;		
 	}
@@ -325,8 +336,8 @@ double rhmc::action_F (field<gauge>& U, dirac_op& D) {
 
 void rhmc::step_P_pure_gauge (field<gauge>& P, field<gauge> &U, double eps, bool MEASURE_FORCE_NORM) {
 	std::complex<double> ibeta_12 (0.0, -eps * params.beta / 12.0);
-	double force_norm = 0;
 	if(MEASURE_FORCE_NORM) {
+		double force_norm = 0;
 		for(int ix=0; ix<U.V; ++ix) {
 			for(int mu=0; mu<4; ++mu) {
 				SU3mat A = staple (ix, mu, U);
@@ -340,7 +351,7 @@ void rhmc::step_P_pure_gauge (field<gauge>& P, field<gauge> &U, double eps, bool
 		force_norm /= eps*eps;
 		std::cout << "gauge_force_norm: " << sqrt(force_norm/static_cast<double>(4*U.V)) << std::endl;
 	} else {
-		//#pragma omp parallel for
+		#pragma omp parallel for
 		for(int ix=0; ix<U.V; ++ix) {
 			for(int mu=0; mu<4; ++mu) {
 				SU3mat A = staple (ix, mu, U);
@@ -376,7 +387,7 @@ int rhmc::step_P_fermion (field<gauge>& P, field<gauge> &U, dirac_op& D, double 
 }
 
 void rhmc::step_U (const field<gauge>& P, field<gauge> &U, double eps) {
-	//#pragma omp parallel for
+	#pragma omp parallel for
 	for(int ix=0; ix<U.V; ++ix) {
 		for(int mu=0; mu<4; ++mu) {
 			U[ix][mu] = exp_ch((std::complex<double> (0.0, eps) * P[ix][mu])) * U[ix][mu];
@@ -687,8 +698,8 @@ int rhmc::force_fermion_block (field<gauge> &force, field<gauge> &U, dirac_op& D
 		if(params.EE) {
 			// for even-even version half of the terms are zero:
 			// even ix: ix = ix_e
-			//#pragma omp parallel for
 			block_fermion tmpF, Ta_tmpF;
+			//#pragma omp parallel for //NB this is not threadsafe, not sure why.
 			for(int ix=0; ix<chi[i_s].V; ++ix) {
 				for(int mu=0; mu<4; ++mu) {
 					tmpF = U[ix][mu] * psi.up(ix,mu);

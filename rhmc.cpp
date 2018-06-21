@@ -85,14 +85,14 @@ int main(int argc, char *argv[]) {
 	exit(0);
 	*/
 
-	/*
-	// also repeat force measurements for other (not)blocked case:
-	rhmc_pars.block = !rhmc_pars.block;
-	rhmc rhmc_block (rhmc_pars, grid);
-	rhmc_block.trajectory (U, D, false, true);
-	exit(0);
-	*/
+	// just do reversibility measurements:
 	
+	for(int i=0; i<=run_pars.n_traj; ++i) {
+		read_gauge_field (U, run_pars.base_name, run_pars.initial_config+i);
+		hmc.trajectory (U, D, true, false);
+	}
+	exit(0);
+		
 	// observables to measure
 	std::vector<double> dE;
 	std::vector<double> expdE;
