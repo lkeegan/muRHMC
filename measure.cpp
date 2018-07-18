@@ -1,164 +1,158 @@
-#include "hmc.hpp"
+#include <chrono>
+#include <iomanip>
+#include <iostream>
+#include <random>
 #include "dirac_op.hpp"
 #include "inverters.hpp"
 #include "io.hpp"
+#include "rational_approx.hpp"
+#include "rhmc.hpp"
 #include "stats.hpp"
-#include <iostream>
-#include <random>
-#include <math.h>
+
+std::chrono::time_point<std::chrono::high_resolution_clock> timer_start;
+// start timer
+void tick() { timer_start = std::chrono::high_resolution_clock::now(); }
+// stop timer and return elapsed time in milliseconds
+int tock() {
+  auto timer_stop = std::chrono::high_resolution_clock::now();
+  return std::chrono::duration_cast<std::chrono::milliseconds>(timer_stop -
+                                                               timer_start)
+      .count();
+}
 
 int main(int argc, char *argv[]) {
+  // shifts for shifted solver
+  std::vector<double> shifts = {0,    0,    1e-10, 1e-9, 1e-8, 1e-7, 3e-7,
+                                1e-6, 3e-6, 1e-5,  3e-5, 1e-4, 3e-4, 1e-3,
+                                2e-3, 3e-3, 5e-3,  1e-2, 3e-2, 1e-1, 3e-1,
+                                1,    3,    1e2,   3e2,  1e3,  3e3,  1e4};
+  int N_shifts = static_cast<int>(shifts.size());
 
-    if (argc-1 != 5) {
-        std::cout << "This program requires 5 arguments:" << std::endl;
-        std::cout << "mass mu_I base_name initial_config noise_vectors" << std::endl;
-        std::cout << "e.g. ./measure 0.14 0.25 mu0.25_sus_3.1_3.3 23 100" << std::endl;
-        return 1;
+  if (argc - 1 != 1) {
+    std::cout << "Input file not specified, e.g." << std::endl;
+    std::cout << "./measure input_file.txt" << std::endl;
+    return 1;
+  }
+
+  std::cout.precision(14);
+
+  rhmc_params rhmc_pars;
+  run_params run_pars;
+
+  read_input_file(argv[1], rhmc_pars, run_pars);
+  rhmc_pars.n_pf = N_rhs;
+
+  // make TxL^3 EO lattice
+  lattice grid(run_pars.T, run_pars.L, true);
+
+  double stopping_criterion = rhmc_pars.MD_eps;
+  double stopping_criterion_shifts = 1.e-15;
+  int max_iter = 1e9;
+
+  log("");
+  log("Shifted solver comparison with parameters:");
+  log("");
+  log("N_rhs", rhmc_pars.n_pf);
+  log("mass", rhmc_pars.mass);
+  log("base_name", run_pars.base_name);
+  log("stopping_criterion", stopping_criterion);
+  log("T", grid.L0);
+  log("L1", grid.L1);
+  log("L2", grid.L2);
+  log("L3", grid.L3);
+  log("config", run_pars.initial_config);
+
+  rhmc hmc(rhmc_pars, grid);
+  field<gauge> U(grid);
+  dirac_op D(grid, rhmc_pars.mass, 0.0);
+  read_gauge_field(U, run_pars.base_name, run_pars.initial_config);
+
+  field<block_fermion> B(U.grid, field<block_fermion>::EVEN_ONLY);
+  hmc.gaussian_fermion(B);
+
+  // do SCG solve for each RHS of B separately
+  std::vector<double> resSCG(N_shifts, 0.0);
+  field<fermion> b(U.grid, field<fermion>::EVEN_ONLY), Ax(b);
+  std::vector<field<fermion>> x(N_shifts, b);
+  int iterSCG = 0;
+  int timeSCG = 0;
+  for (int i_rhs = 0; i_rhs < N_rhs; ++i_rhs) {
+    // get i'th RHS column of block vector B
+    for (int i_x = 0; i_x < B.V; ++i_x) {
+      b[i_x] = B[i_x].col(i_rhs);
     }
+    // do SCG solve
+    tick();
+    iterSCG += cg_multishift(x, b, U, shifts, D, stopping_criterion,
+                             stopping_criterion_shifts, max_iter);
+    timeSCG += tock();
+    // measure residuals
+    for (int i_shift = 0; i_shift < N_shifts; ++i_shift) {
+      double shift = shifts[i_shift];
+      D.DDdagger(Ax, x[i_shift], U);
+      Ax.add(x[i_shift], shift);
+      Ax -= b;
+      double residual = sqrt(Ax.dot(Ax).real() / b.dot(b).real());
+      if (residual > resSCG[i_shift]) {
+        resSCG[i_shift] = residual;
+      }
+    }
+  }
 
-	double mass = atof(argv[1]);
-	double mu_I = atof(argv[2]);
-	std::string base_name(argv[3]);
-	int n_initial = static_cast<int>(atof(argv[4]));
-	int noise_vectors = static_cast<int>(atof(argv[5]));
+  // do SBCGrQ solve for B
+  field<block_fermion> AX(B);
+  std::vector<double> resSBCGrQ(N_shifts, 0.0);
+  std::vector<field<block_fermion>> X(N_shifts, B);
+  tick();
+  int iterSBCGrQ = N_rhs * SBCGrQ(X, B, U, shifts, D, stopping_criterion,
+                                  stopping_criterion_shifts, max_iter);
+  int timeSBCGrQ = tock();
+  block_matrix b2;
+  hermitian_dot(B, B, b2);
+  for (int i_shift = 0; i_shift < N_shifts; ++i_shift) {
+    double shift = shifts[i_shift];
+    D.DDdagger(AX, X[i_shift], U);
+    AX.add(X[i_shift], shift);
+    AX -= B;
+    block_matrix r2;
+    hermitian_dot(AX, AX, r2);
+    resSBCGrQ[i_shift] =
+        sqrt((r2.diagonal().real().array() / b2.diagonal().array().real())
+                 .maxCoeff());
+  }
 
-	hmc_params hmc_pars;
-	hmc_pars.mass = mass;
-	hmc_pars.mu_I = mu_I;
-	hmc_pars.seed = 123;
-	double eps = 1.e-10;
+  std::vector<double> resSBCGrQ_old(N_shifts, 0.0);
+  tick();
+  int iterSBCGrQ_old =
+      N_rhs * SBCGrQ_old(X, B, U, shifts, D, stopping_criterion,
+                         stopping_criterion_shifts, max_iter);
+  int timeSBCGrQ_old = tock();
+  hermitian_dot(B, B, b2);
+  for (int i_shift = 0; i_shift < N_shifts; ++i_shift) {
+    double shift = shifts[i_shift];
+    D.DDdagger(AX, X[i_shift], U);
+    AX.add(X[i_shift], shift);
+    AX -= B;
+    block_matrix r2;
+    hermitian_dot(AX, AX, r2);
+    resSBCGrQ_old[i_shift] =
+        sqrt((r2.diagonal().real().array() / b2.diagonal().array().real())
+                 .maxCoeff());
+  }
 
-	// make 4^4 lattice
-	lattice grid (4);
-	hmc hmc (hmc_pars);
+  std::cout << "# Shift\t\t\tSCG\t\t\tSBCGrQ\t\t\tSBCGrQ_old" << std::endl;
+  for (int i_shift = 0; i_shift < N_shifts; ++i_shift) {
+    std::cout << "# " << std::scientific << shifts[i_shift] << "\t"
+              << resSCG[i_shift] << "\t" << resSBCGrQ[i_shift] << "\t"
+              << resSBCGrQ_old[i_shift] << std::endl;
+  }
 
-	std::cout.precision(12);
+  std::cout << "# N\tSCG iter/time\t\tSBCGrQ iter/time\tSBCGrQ_old iter/time"
+            << std::endl;
+  std::cout << "  " << N_rhs << "\t";
+  std::cout << iterSCG << "\t" << timeSCG << "\t\t";
+  std::cout << iterSBCGrQ << "\t" << timeSBCGrQ << "\t\t";
+  std::cout << iterSBCGrQ_old << "\t" << timeSBCGrQ_old << std::endl;
 
-	log("Exact & noise vector observable measurements with parameters:");
-	log("L", grid.L0);
-	log("mass", hmc_pars.mass);
-	log("mu_I", hmc_pars.mu_I);
-	log("inverter precision", eps);
-	log("noise vectors / cnfg", noise_vectors);
-	log("seed", hmc_pars.seed);
-	// make U[mu] field on lattice
-	field<gauge> U (grid);
-	// initialise Dirac Op
-	dirac_op D (grid, hmc_pars.mass, hmc_pars.mu_I);
-
-	// Gaussian noise observables:
-	field<fermion> phi(U.grid);
-	field<fermion> chi(U.grid);
-	field<fermion> psi(U.grid);
-	std::vector<double> psibar_psi, pion_susceptibility, isospin_density, quark_density_real, quark_density_imag;
-
-	for(int i=n_initial; ; i+=1) {
-
-		read_gauge_field(U, base_name, i);
-
-		// Exact observables
-		double phase, pbp, sus, mineval, maxeval, density_real, density_imag;
-
-		// Calculate all eigenvalues lambda_i of Dirac op:
-		Eigen::MatrixXcd eigenvalues = D.D_eigenvalues(U);				
-		// Det[D] = \prod_i \lambda_i
-		// phase{D} = \sum_i phase{lambda_i}
-		phase = 0;
-		for (int j=0; j<eigenvalues.size(); ++j) {
-			//std::cout << std::arg(eigenvalues(i)) << std::endl;
-			phase += std::arg(eigenvalues(j));
-		}
-		log("[evals] det-phase", phase);
-
-		// Trace[D^-1] = \sum_i \lambda_i^-1:
-		pbp = eigenvalues.cwiseInverse().sum().real()/static_cast<double>(3*U.V);
-		log("[evals] psibar-psi", pbp);
-
-		// Calculate all eigenvalues of DDdagger op:
-		Eigen::MatrixXcd eigenvaluesDDdag = D.DDdagger_eigenvalues(U);
-		sus = eigenvaluesDDdag.cwiseInverse().sum().real()/static_cast<double>(3*U.V);
-		mineval = eigenvaluesDDdag.real().minCoeff();
-		maxeval = eigenvaluesDDdag.real().maxCoeff();
-		log("[evals] pion-suscept", sus);
-		log("[evals] mineval-DDdag", mineval);
-		log("[evals] maxeval-DDdag", maxeval);
-
-		// NO SUPPORT for COMPLEX MATRICES in EIGEN generalised eigenvalue
-/*		// Calculate eigenvalues of [D^-1 (dD/dmu)]
-		// Generalised eigenvalue problem: 
-		// (dD/dmu) |lambda_i> = lambda_i D |lambda_i>
-
-		Eigen::GeneralizedEigenSolver<Eigen::MatrixXcd> ges;
-		Eigen::MatrixXcd A = D.dD_dmu_dense_matrix(U, mu_I);
-		Eigen::MATRICESatrixXcd B = D.D_dense_matrix(U, mass, mu_I);
-		ges.compute(A, B, false);
-		std::cout << "The (complex) numerators of the generalzied eigenvalues are: " << ges.alphas().transpose() << std::endl;
-		std::cout << "The (real) denominatore of the generalzied eigenvalues are: " << ges.betas().transpose() << std::endl;
-		std::cout << "The (complex) generalzied eigenvalues are (alphas./beta): " << ges.eigenvalues().transpose() << std::endl;
-		std::complex<double> density = 2.0*ges.eigenvalues().sum()/static_cast<double>(3*U.V);
-		density_real = density.real();
-		density_imag = density.imag();
-		log("[evals] Re quark-density", density_real);
-		log("[evals] Im quark-density", density_imag);
-*/
-		// isospin density noisy estimate
-		for(int i_noise=0; i_noise<noise_vectors; ++i_noise) {
-			// phi = gaussian noise vector
-			// unit norm: <phi|phi> = 1
-			hmc.gaussian_fermion(phi);
-			phi /= sqrt(phi.squaredNorm());
-
-			// chi = [D(mu,m)D(mu,m)^dag]-1 phi	
-			cg(chi, phi, U, D, eps);
-			// pion_susceptibility = Tr[{D(mu,m)D(mu,m)^dag}^-1] = <phi|chi>
-			pion_susceptibility.push_back(phi.dot(chi).real());
-			
-			// psi = -D(mu,m)^dag chi = D(-mu,-m) chi = -D(mu)^-1 phi
-			// psibar_psi = Tr[D(mu,nu)^-1] = -<phi|psi>
-			D.mass = -D.mass;
-			D.mu_I = -D.mu_I;
-			D.D(psi, chi, U);
-			D.mass = -D.mass;
-			D.mu_I = -D.mu_I;
-			psibar_psi.push_back(-phi.dot(psi).real());
-
-			// isospin_density = (d/dmu)Tr[{D(mu,m)D(mu,m)^dag}^-1]
-			// 2 Re{ <chi|(dD/dmu)|psi> }
-			double mu_I_plus_factor = exp(0.5 * hmc_pars.mu_I);
-			double mu_I_minus_factor = exp(-0.5 * hmc_pars.mu_I);
-			double sum_iso = 0;
-			for(int ix=0; ix<U.V; ++ix) {
-				sum_iso += mu_I_plus_factor * chi[ix].dot( U[ix][0] * psi.up(ix,0) ).real();
-				sum_iso += mu_I_minus_factor * chi[ix].dot( U.dn(ix,0)[0].adjoint() * psi.dn(ix,0) ).real();
-			}
-			isospin_density.push_back(0.5 * hmc_pars.mu_I * sum_iso);
-
-			std::complex<double> sum = 0;
-			for(int ix=0; ix<U.V; ++ix) {
-				sum += mu_I_plus_factor * phi[ix].dot( U[ix][0] * psi.up(ix,0) );
-				sum += mu_I_minus_factor * phi[ix].dot( U.dn(ix,0)[0].adjoint() * psi.dn(ix,0) );
-			}
-			quark_density_real.push_back(-hmc_pars.mu_I * sum.real());
-			quark_density_imag.push_back(-hmc_pars.mu_I * sum.imag());
-
-		}
-		print_av(psibar_psi, "[noise] psibar-psi");
-		print_av(pion_susceptibility, "[noise] pion-suscept");
-		print_av(isospin_density, "[noise] iso-density");
-		print_av(quark_density_real, "[noise] Re quark-density");
-		print_av(quark_density_imag, "[noise] Im quark-density");
-
-		// output all obs on single line for later analysis
-		log("phase, sus, pbp, isodensity, mineval, maxeval, plaq, poly");
-		std::cout << phase << "\t"
-				  << sus << "\t"
-				  << pbp << "\t"
-				  << av(isospin_density) << "\t"
-				  << mineval << "\t"
-				  << maxeval << "\t"
-				  << hmc.plaq(U) << "\t"
-				  << hmc.polyakov_loop(U).real() << "\t"
-				  << std::endl;
-	}
-	return(0);
+  return 0;
 }
