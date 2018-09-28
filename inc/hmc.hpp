@@ -133,6 +133,9 @@ class hmc {
   // topological charge
   double topological_charge(const field<gauge>& U);
 
+  double topological_charge(const field<gauge>& U, int mu, int nu, int rho,
+                            int sig);
+
   // returns estimate of chiral_condensate using 1 random gaussian fermion
   // vector
   double chiral_condensate(field<gauge>& U, dirac_op& D);

@@ -7,7 +7,7 @@ int main(int argc, char *argv[]) {
   if (argc - 1 != 4) {
     std::cout << "This program requires 4 arguments:" << std::endl;
     std::cout << "base_name initial_config rho n_smear" << std::endl;
-    std::cout << "e.g. ./topological_charge beta5.2_m0.002_npf3 1 0.01 100"
+    std::cout << "e.g. ./topological_charge beta5.2_m0.002_npf3 1 0.02 50"
               << std::endl;
     return 1;
   }
