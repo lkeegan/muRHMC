@@ -650,21 +650,17 @@ std::complex<double> hmc::polyakov_loop(const field<gauge>& U, int mu) {
 double hmc::topological_charge(const field<gauge>& U) {
   double q = 0;
   for (int ix = 0; ix < U.V; ++ix) {
-    for (int sig = 3; sig < 4; ++sig) {
-      for (int rho = 2; rho < sig; ++rho) {
-        for (int nu = 1; nu < rho; ++nu) {
-          for (int mu = 0; mu < nu; mu++) {
-            SU3mat Pmunu = (U[ix][mu] * U.up(ix, mu)[nu]) *
-                           ((U[ix][nu] * U.up(ix, nu)[mu]).adjoint());
-            SU3mat Prhosig = (U[ix][rho] * U.up(ix, rho)[sig]) *
-                             ((U[ix][sig] * U.up(ix, sig)[rho]).adjoint());
-            q += (Pmunu.imag() * Prhosig.imag()).trace();
-          }
-        }
-      }
-    }
+    int mu = 0;
+    int nu = 1;
+    int rho = 2;
+    int sig = 3;
+    SU3mat Pmunu = (U[ix][mu] * U.up(ix, mu)[nu]) *
+                   ((U[ix][nu] * U.up(ix, nu)[mu]).adjoint());
+    SU3mat Prhosig = (U[ix][rho] * U.up(ix, rho)[sig]) *
+                     ((U[ix][sig] * U.up(ix, sig)[rho]).adjoint());
+    q += (Pmunu.imag() * Prhosig.imag()).trace();
   }
-  return q / static_cast<double>(3 * U.V);
+  return q / static_cast<double>(6 * U.V) / 9.86960440109;
 }
 
 double hmc::chiral_condensate(field<gauge>& U, dirac_op& D) {
