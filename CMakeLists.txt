@@ -54,6 +54,7 @@ add_executable(eigenvalues eigenvalues.cpp ${SRCS})
 add_executable(measure measure.cpp ${SRCS})
 add_executable(CG CG.cpp ${SRCS})
 add_executable(polyakov polyakov.cpp ${SRCS})
+add_executable(topological_charge topological_charge.cpp ${SRCS})
 
 add_executable(benchmark benchmark.cpp src/4d.cpp src/su3.cpp src/dirac_op.cpp)
 

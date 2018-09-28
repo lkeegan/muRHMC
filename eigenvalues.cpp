@@ -13,7 +13,7 @@ int main(int argc, char *argv[]) {
   if (argc - 1 != n_args) {
     std::cout << "This program requires " << n_args
               << " arguments:" << std::endl;
-    std::cout << "mass L base_name config_number" << std::endl;
+    std::cout << "L, mass, base_name, config_number" << std::endl;
     std::cout << "e.g. ./eigenvalues 8 0.002 conf 1" << std::endl;
     return 1;
   }
